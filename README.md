@@ -1,162 +1,60 @@
-# stn-chain
+# STN Chain
 
-The STN Blockchain
+STN Chain is a blockchain being designed to distribute intelligence and
+other data, record authorized decisions, and manage contracts throughout
+the STN ecosystem and its participating network.
 
-## Purpose
+Threat intelligence is one application of the chain. The broader mission
+connects observations to decisions, policies, obligations, and recorded
+outcomes across local and remote systems.
 
-STN Chain is a distributed blockchain intended to provide trusted data
-distribution and smart-contract capabilities across the STN ecosystem.
+## Project status
 
-Its purposes include:
+The historical Go prototype has been removed. This repository currently
+contains design documentation and a minimal ISO C17 Visual Studio scaffold;
+there is no implemented node, miner, contract runtime, or coin.
+The redesign has no compatibility requirement
+with the old Go implementation.
 
-- Retrieve threat intelligence produced by Sentinel installations across
-  participating websites and distribute that intelligence to other
-  participating Sentinel installations through the blockchain.
+## Build
 
-- Provide a distributed mechanism for publishing and preserving threat
-  intelligence concerning malicious or suspicious actors observed across
-  participating systems.
+Open [stn-chain.sln](stn-chain.sln) in Visual Studio 2026 and build
+Release | x64. Headers are in includes/ and C sources in src/.
+See [Visual Studio build instructions](docs/BUILD.md).
+Planned OS/architecture boundaries are listed in [platforms](platforms/README.md).
 
-- Assist DevBot with publication workflows involving blogs, posts, papers,
-  reports, and contracts.
+## Direction
 
-- Provide smart-contract capabilities for moving contracts and other
-  authorized structured agreements throughout the company ecosystem.
+- Implement the portable core primarily in ISO C, with explicit platform
+  interfaces for Windows, Linux, macOS, and purpose-built STN systems.
+- Support independently verifiable records and replicated chain state.
+- Connect Sentinel-MVC intelligence through the STN-Labz API to chain
+  participants and future Sentinel consumers, including Sentinel_Daemon.
+- Support authorized company decisions, policies, doctrine, agreements,
+  and publication workflows, including DevBot integrations.
+- Separate network consensus from authority to issue company records.
+- Design for broad participation while retaining proprietary ownership.
+- Account for possible future Proof-of-Work mining, miner compensation,
+  and a native coin. Activation and economic parameters remain undecided.
 
-- Provide a shared, independently verifiable chain of records that can be
-  consumed by STN systems without requiring a single website or service to
-  act as the sole source of chain state.
+Bitcoin and Ethereum describe the ambition for distributed consensus and
+programmable contracts; protocol, virtual-machine, wallet, and network
+compatibility with either is not currently a requirement.
 
-## Engineering Direction
+## Design documents
 
-### Portability
+- [Mission and scope](docs/MISSION.md)
+- [Component architecture](docs/ARCHITECTURE.md)
+- [Decision register](docs/DECISIONS.md)
+- [Delivery milestones](docs/ROADMAP.md)
+- [Toolchain and dependency proposal](docs/TOOLCHAIN_PROPOSAL.md)
+- [Canonical record encoding proposal](docs/ENCODING_PROPOSAL.md)
+- [Signed intelligence record proposal](docs/SIGNED_RECORD_PROPOSAL.md)
+- [Changelog](docs/CHANGELOG.md)
 
-STN Chain will be developed primarily in ISO C.
-
-The blockchain protocol and core implementation will remain
-system-agnostic wherever practical.
-
-Platform-specific functionality will be isolated behind clearly defined
-interfaces so implementations can support:
-
-- Windows
-- Linux
-- macOS
-- purpose-built STN systems
-
-### Mining
-
-STN Chain will support Proof-of-Work mining using available computing
-hardware.
-
-The miner will be designed to detect and use supported resources available
-on the host system, including:
-
-- ASIC hardware
-- GPU hardware
-- CPU resources
-
-Mining capability will not depend upon a single operating system or
-hardware class.
-
-Where practical, available mining resources may operate concurrently rather
-than requiring the miner to select only one hardware class.
-
-The miner's primary responsibility is to obtain STN Chain work, perform the
-required hashing using available hardware, submit valid results, and
-continue mining.
-
-### Miner Architecture
-
-The STN miner will use a portable ISO C core with platform and hardware
-backends where operating-system or device-specific functionality is
-required.
-
-Conceptually:
-
-    STN Miner
-        |
-        +-- Portable Mining Core
-        |
-        +-- Platform Layer
-        |     +-- Windows
-        |     +-- Linux
-        |     +-- macOS
-        |
-        +-- Mining Backends
-              +-- ASIC
-              +-- GPU
-              +-- CPU
-
-Hardware detection, device communication, and acceleration mechanisms are
-implementation details and will not alter the STN Chain consensus rules.
-
-All supported miners will perform work against the same consensus-defined
-Proof-of-Work requirements.
-
-### Blockchain Core
-
-The blockchain core will be responsible for:
-
-- Block construction and validation
-- Chain validation
-- Transaction processing
-- Threat-intelligence records
-- Smart contracts
-- Peer-to-peer communication
-- Consensus
-- Proof-of-Work validation
-- Persistent chain state
-- Chain synchronization
-
-Mining implementation will remain separate from consensus validation.
-
-A node does not need to understand how another participant produced valid
-Proof-of-Work. It only needs to deterministically establish whether that
-work satisfies the STN Chain consensus rules.
-
-## Design Goals
-
-STN Chain is being redesigned around the following goals:
-
-- ISO C portability
-- Operating-system independence
-- CPU mining
-- GPU mining
-- ASIC mining
-- Deterministic validation
-- Distributed threat-intelligence propagation
-- Smart-contract support
-- Peer-to-peer chain synchronization
-- Hardware-independent consensus
-- Minimal unnecessary external dependencies
-
-## Open Design Work
-
-The following areas require engineering definition before implementation:
-
-- Block format
-- Transaction format
-- Threat record format
-- Smart-contract model
-- Proof-of-Work algorithm
-- Mining work format
-- Difficulty and difficulty adjustment
-- Target block interval
-- Chain selection rules
-- Genesis block
-- Peer discovery
-- Peer synchronization
-- Fork handling
-- Transaction and threat pools
-- Cryptographic identity and signatures
-- Contract authorization and validation
-- Network protocol
-- Persistent storage format
-- Miner/backend interface
-- ASIC device support
-- GPU acceleration interfaces
-- CPU mining implementation
+These documents distinguish established direction from proposed engineering
+boundaries and unresolved protocol choices. They are not a wire protocol
+specification or a claim of implemented capabilities.
 
 ## License
 
@@ -165,6 +63,3 @@ unmodified software, compile unmodified source, and redistribute unchanged
 releases under the [STN Chain Proprietary Participation License](docs/LICENSE.md).
 Modifications require prior written permission from STN-Labz.
 This is not an open-source license.
-
-## Documentation
-- [LICENSE](docs/LICENSE.md)
