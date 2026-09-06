@@ -14,5 +14,6 @@ _Static_assert(sizeof(uint8_t) == 1, "STN Chain requires uint8_t.");
 _Static_assert(sizeof(uint16_t) == 2, "STN Chain requires uint16_t.");
 _Static_assert(sizeof(uint32_t) == 4, "STN Chain requires uint32_t.");
 _Static_assert(sizeof(uint64_t) == 8, "STN Chain requires uint64_t.");
+_Static_assert(SIZE_MAX >= UINT32_MAX, "STN Chain requires at least 32-bit size_t.");
 
 #endif

@@ -7,7 +7,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{05853A7A-4191-4525-976E-E4C19966DAA5}</ProjectGuid>
+    <ProjectGuid>{2DB8DAB0-8F35-476C-9945-467A8DFF2D68}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>stn_chain</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
@@ -26,7 +26,7 @@
   <PropertyGroup>
     <OutDir>$(ProjectDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)build\obj\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
-    <TargetName>stn-chain</TargetName>
+    <TargetName>stn-chain-tests</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -54,7 +54,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="includes\stn_platform.h" />
-    <ClCompile Include="src\main.c" />
+    <ClCompile Include="tests\test_record.c" />
     <ClCompile Include="src\stn_record.c" />
     <ClInclude Include="includes\stn_record.h" />
     <None Include="platforms\README.md" />

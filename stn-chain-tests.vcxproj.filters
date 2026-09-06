@@ -3,11 +3,12 @@
   <ItemGroup>
     <Filter Include="includes"><UniqueIdentifier>{1A73C96F-AC5A-4BC6-B758-72CBFFEC996E}</UniqueIdentifier></Filter>
     <Filter Include="src"><UniqueIdentifier>{17454C27-37FC-49F0-86C1-5905DD0A8F8E}</UniqueIdentifier></Filter>
+    <Filter Include="tests"><UniqueIdentifier>{82F67E86-66CB-4581-898B-3A1093E57B19}</UniqueIdentifier></Filter>
     <Filter Include="platforms"><UniqueIdentifier>{AB8AFA26-8758-4C64-9F57-EA85AD057460}</UniqueIdentifier></Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="includes\stn_platform.h"><Filter>includes</Filter></ClInclude>
-    <ClCompile Include="src\main.c"><Filter>src</Filter></ClCompile>
+    <ClCompile Include="tests\test_record.c"><Filter>tests</Filter></ClCompile>
     <ClCompile Include="src\stn_record.c"><Filter>src</Filter></ClCompile>
     <ClInclude Include="includes\stn_record.h"><Filter>includes</Filter></ClInclude>
     <None Include="platforms\README.md"><Filter>platforms</Filter></None>

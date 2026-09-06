@@ -31,12 +31,27 @@ platforms/ reserves Linux and Windows x86/x64/ARM32/ARM64 boundaries and
 macOS x64/ARM64 boundaries. Only Windows x64 is currently configured.
 See [platform layout](../platforms/README.md).
 
+## Record codec tests
+
+After building Release | x64, right-click stn-chain-tests in Solution Explorer
+and choose Set as Startup Project. Use Ctrl+F5 to run it. It prints check and
+failure counts and returns a nonzero exit code if a check fails. Checks remain
+enabled in Release builds; they do not use the disabled NDEBUG assert macro.
+Select stn-chain as the startup project again to run the application scaffold.
+
+The test executable is build/x64/Release/stn-chain-tests.exe. It exercises an
+independent byte fixture, round trips, all fixture truncations, capacity and
+length failures, unsupported fields, empty and maximum payloads, zero nonces,
+and invalid pointers. It tests envelope structure, not signatures or consensus.
+
 ## Validation
 
 The Release/x64 solution was built with the installed Visual Studio MSBuild
 and the resulting executable was run successfully. No compiler warnings or
-errors were emitted. Interactive IDE opening has not been verified; no
-protocol tests or non-Windows builds are claimed by this scaffold check.
+errors were emitted. The owner also confirmed the original scaffold built
+and ran in Visual Studio. The codec test project was verified through MSBuild
+and direct execution; its interactive IDE run is not yet confirmed. No
+cryptographic validation or non-Windows qualification is claimed.
 
 ## Automation
 

@@ -11,7 +11,8 @@ outcomes across local and remote systems.
 ## Project status
 
 The historical Go prototype has been removed. This repository currently
-contains design documentation and a minimal ISO C17 Visual Studio scaffold;
+contains design documentation, an ISO C17 Visual Studio scaffold, and a tested
+structural record encoder/decoder;
 there is no implemented node, miner, contract runtime, or coin.
 The redesign has no compatibility requirement
 with the old Go implementation.

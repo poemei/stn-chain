@@ -1,7 +1,13 @@
 # Canonical Record Encoding Proposal
 
-Status: proposed experimental format; addresses O-002. Not a released
+Status: adopted for the experimental structural codec; addresses part of O-002. Not a released
 protocol, block format, network frame, or commitment to future compatibility.
+
+Implementation: includes/stn_record.h and src/stn_record.c. Successful codec
+return establishes structural validity only. Payload schema, network matching,
+signature verification, record IDs, authorization, and replay state are later
+validation stages. Synthetic test signatures are deliberately not verified.
+The C profile requires size_t to cover at least the 32-bit unsigned range.
 
 ## Encoding rules
 

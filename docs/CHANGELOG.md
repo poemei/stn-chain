@@ -5,7 +5,21 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Validation
+
+- Windows Release/x64 solution build succeeded with no warnings or errors.
+- Record codec tests passed: 230 checks, zero failures.
+- Application scaffold smoke check passed. Signature verification, payload
+  semantics, and consensus are not covered by this validation.
+
 ### Added
+
+- Bounded ISO C17 record encoder/decoder with explicit errors, borrowed
+  payload views, big-endian fields, length limits, and zero-nonce rejection.
+- Native Release/x64 stn-chain-tests project covering independent byte
+  fixtures, truncations, invalid inputs, and boundary sizes; checks run in Release.
+- Documented the structural codec's separation from cryptographic, payload,
+  authorization, network, and replay validation.
 
 - .gitattributes rules for LF C/documentation files, CRLF Visual Studio and
   Windows scripts, and binary asset handling.
