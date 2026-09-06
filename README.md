@@ -158,5 +158,13 @@ The following areas require engineering definition before implementation:
 - GPU acceleration interfaces
 - CPU mining implementation
 
+## License
+
+STN Chain is proprietary software owned by STN-Labz. You may run the
+unmodified software, compile unmodified source, and redistribute unchanged
+releases under the [STN Chain Proprietary Participation License](docs/LICENSE.md).
+Modifications require prior written permission from STN-Labz.
+This is not an open-source license.
+
 ## Documentation
 - [LICENSE](docs/LICENSE.md)
