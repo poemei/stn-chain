@@ -157,3 +157,6 @@ The following areas require engineering definition before implementation:
 - ASIC device support
 - GPU acceleration interfaces
 - CPU mining implementation
+
+## Documentation
+- [LICENSE](docs/LICENSE.md)
