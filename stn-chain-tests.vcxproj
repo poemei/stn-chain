@@ -61,12 +61,12 @@
     <ClCompile Include="tests\test_validation.c" />
     <ClCompile Include="tests\test_chain_data.c" />
     <ClCompile Include="tests\test_chain.c" />
-    <ClCompile Include="tests\test_pow.c" />
+    <ClCompile Include="tests\test_pow.c" /><ClCompile Include="tests\test_fork.c" />
     <ClCompile Include="src\stn_record.c" />
     <ClCompile Include="src\stn_intelligence.c" />
     <ClCompile Include="src\stn_validation.c" />
     <ClCompile Include="src\stn_block.c" />
-    <ClCompile Include="src\stn_chain.c" />
+    <ClCompile Include="src\stn_chain.c" /><ClCompile Include="src\stn_fork.c" /><ClInclude Include="includes\stn_fork.h" />
     <ClCompile Include="platforms\windows\stn_sha256.c" />
     <ClInclude Include="includes\stn_sha256.h" />
     <ClInclude Include="includes\stn_pow.h" />

@@ -15,7 +15,7 @@ contains design documentation, an ISO C17 Visual Studio scaffold, and a tested
 structural record encoder/decoder, intelligence payload codec, and explicit
 validation context, deterministic transaction/block containers, and local
 chain-state/link validation, Windows SHA-256, and development PoW verification
-with cumulative chain-work accounting;
+with cumulative chain-work accounting and validated fork/reorganization planning;
 there is no implemented node, miner, contract runtime, or coin.
 The redesign has no compatibility requirement
 with the old Go implementation.
@@ -58,6 +58,7 @@ compatibility with either is not currently a requirement.
 - [Transaction and block development format](docs/TRANSACTION_BLOCK_FORMAT.md)
 - [Local chain state and validation boundaries](docs/CHAIN_STATE.md)
 - [SHA-256, PoW profiles, and chain work](docs/POW.md)
+- [Fork choice and reorganization planning](docs/FORK_CHOICE.md)
 - [Changelog](docs/CHANGELOG.md)
 
 These documents distinguish established direction from proposed engineering

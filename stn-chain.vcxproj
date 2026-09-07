@@ -61,7 +61,7 @@
     <ClCompile Include="src\stn_intelligence.c" />
     <ClCompile Include="src\stn_validation.c" />
     <ClCompile Include="src\stn_block.c" />
-    <ClCompile Include="src\stn_chain.c" />
+    <ClCompile Include="src\stn_chain.c" /><ClCompile Include="src\stn_fork.c" /><ClInclude Include="includes\stn_fork.h" />
     <ClCompile Include="platforms\windows\stn_sha256.c" />
     <ClInclude Include="includes\stn_sha256.h" />
     <ClInclude Include="includes\stn_pow.h" />

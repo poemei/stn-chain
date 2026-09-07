@@ -160,8 +160,8 @@ state. Development fixtures and providers are not production mechanisms.
 Implemented follow-up: production SHA-256, fixed development targets, PoW
 verification, and accumulated work; see POW.md for qualification and limits.
 
-Deferred: difficulty adjustment, fork choice,
-chain selection, reorganization, orphan handling, peer agreement, propagation,
+Implemented follow-up: work-based fork evaluation and atomic in-memory plans; see [FORK_CHOICE.md](FORK_CHOICE.md).
+reorganization application, orphan handling, peer agreement, propagation,
 production persistence, wallets, RPC, contract execution, fees, gas, issuance,
 mining rewards, and miner integration. This increment stops at local chain
 validation and does not proceed into any of those subsystems.

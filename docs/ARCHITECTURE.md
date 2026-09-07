@@ -128,3 +128,10 @@ A local block-production harness, if used before consensus is implemented,
 must be labeled as such and must not be represented as a secure blockchain.
 Public operation requires the consensus, authorization, recovery, and
 resource-limit milestones in [ROADMAP.md](ROADMAP.md).
+
+## Local fork evaluation
+
+The core now revalidates two bounded complete PoW histories, compares calculated
+work, discovers their shared prefix and publishes an atomic in-memory plan.
+Equal work retains current. No active state is changed. See [FORK_CHOICE.md](FORK_CHOICE.md)
+for fixed-target limitations, eligibility, detach/attach ranges and future replay coordination.

@@ -149,6 +149,7 @@ int test_validation(void);
 int test_chain_data(void);
 int test_chain(void);
 int test_pow(void);
+int test_fork(void);
 
 int main(void)
 {
@@ -157,6 +158,7 @@ int main(void)
     int chain_data_failed;
     int chain_failed;
     int pow_failed;
+    int fork_failed;
     known_bytes(); malformed(); boundaries(); encode_failure();
     printf("Record codec: %u checks, %u failures.\n", checks, failures);
     intelligence_failed = test_intelligence();
@@ -164,5 +166,6 @@ int main(void)
     chain_data_failed = test_chain_data();
     chain_failed = test_chain();
     pow_failed = test_pow();
-    return failures == 0 && !intelligence_failed && !validation_failed && !chain_data_failed && !chain_failed && !pow_failed ? EXIT_SUCCESS : EXIT_FAILURE;
+    fork_failed = test_fork();
+    return failures == 0 && !intelligence_failed && !validation_failed && !chain_data_failed && !chain_failed && !pow_failed && !fork_failed ? EXIT_SUCCESS : EXIT_FAILURE;
 }

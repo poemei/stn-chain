@@ -124,7 +124,7 @@ PoW per block. Work is not substituted with height or block count.
 
 All full-sequence operations remain atomic. Untrusted loaded history must be
 revalidated from EMPTY; consistency checks cannot authenticate forged metadata.
-No fork choice compares cumulative work yet, and no reorganization is executed.
+Fork choice now compares revalidated cumulative work and produces an in-memory plan; see [FORK_CHOICE.md](FORK_CHOICE.md). No reorganization is executed.
 
 ## Genesis
 
@@ -162,6 +162,6 @@ independent security review remain unverified.
 
 Deferred: mining/search loops, hardware detection, CPU/GPU/ASIC miners, Stratum,
 job distribution, rewards/payouts, issuance, treasury, fees/gas, difficulty
-adjustment, accumulated-work fork choice, reorganization, networking, discovery,
+adjustment, reorganization application, networking, discovery,
 RPC, persistence, wallets, explorers, and contract execution. This increment
 stops at deterministic hashing, work verification and local chain accounting.

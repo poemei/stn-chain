@@ -85,3 +85,7 @@ output and local Visual Studio state are excluded by .gitignore.
 Linux/macOS builds are still planned, not implemented or qualified. No
 software release number has been assigned. Release is a build configuration,
 not a declaration that the software is production-ready or published.
+
+Fork-choice increment: adds 785 checks (1,123,661 total), zero failures in
+Windows Release/x64. Both native projects include stn_fork.c; the test project
+adds test_fork.c. No additional dependency or build configuration is required.

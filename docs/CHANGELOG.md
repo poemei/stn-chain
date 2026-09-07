@@ -5,6 +5,25 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Fork choice and reorganization planning — 2026-09-07
+
+- Added full-history fork evaluation using revalidated cumulative PoW work;
+  invalid/unresolved histories cannot win. Equal work retains current.
+- Added common-ancestor discovery and atomic in-memory plans with calculated
+  old/candidate tips, work, resulting height, and ordered detach/attach ranges.
+  Evaluation changes no accepted state; failed calls preserve plan output.
+- Preserved fixed-target validation. Shorter/higher-work and longer/lower-work
+  comparisons are arithmetic tests only, not eligible different-policy forks.
+- Added 785 Release-enabled checks. Windows Release/x64 build passes without
+  warnings/errors; 1,123,661 total checks, zero failures. All previous
+  1,122,876 checks remain passing and unchanged.
+- Updated native projects, architecture, decision register, chain/PoW/build
+  documentation, and added FORK_CHOICE.md with replay/confirmation implications.
+- Limited to complete histories of 1..64 blocks under one PoW context. No
+  reorganization application, persistent mutation, networking/RPC, mining,
+  wallets/mempool, contracts, difficulty adjustment or economics implemented.
+  Non-Windows builds remain unqualified. Changes are not a published release.
+
 ### Validation
 
 - SHA-256/PoW/work increment: final Windows Release/x64 build passed without

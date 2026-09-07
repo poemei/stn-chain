@@ -106,3 +106,18 @@ tested on Windows Release/x64. See [POW.md](POW.md). Stop at this boundary.
 Real Windows hashing and local PoW-valid chain accounting exist; distributed
 consensus, production signature/authority/replay providers and persistence do
 not. Work and coin ownership grant no organizational authority.
+
+## Fork-choice increment (2026-09-07)
+
+D-022: Compare recalculated cumulative PoW work only after both full histories
+validate under the same context. Equal work retains current. Never accept
+external work claims as evidence of eligibility.
+
+D-023: Preserve fixed-target v3 rules. Unequal-length/work ordering is qualified
+with arithmetic vectors only; different-target histories are not eligible
+competing branches. No target scheduler or adjustment is introduced.
+
+D-024: Discover the last shared prefix ID and publish a bounded in-memory plan
+with ordered detach/attach ranges; no reorganization application or storage
+mutation. See [FORK_CHOICE.md](FORK_CHOICE.md). This supersedes the earlier
+PoW increment's stopping point only for the explicitly authorized fork scope.

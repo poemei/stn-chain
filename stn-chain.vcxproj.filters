@@ -27,4 +27,4 @@
     <ClInclude Include="includes\stn_record.h"><Filter>includes</Filter></ClInclude>
     <None Include="platforms\README.md"><Filter>platforms</Filter></None>
   </ItemGroup>
-</Project>
+<ItemGroup><ClCompile Include="src\stn_fork.c"><Filter>src</Filter></ClCompile><ClInclude Include="includes\stn_fork.h"><Filter>includes</Filter></ClInclude></ItemGroup></Project>
