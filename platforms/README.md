@@ -33,3 +33,7 @@ Linux/macOS persistence providers are not implemented. See docs/PERSISTENCE.md.
 Windows stn_peer_windows.c provides nonblocking Winsock exact transfers and
 finite session deadlines. Loopback synchronization is tested; public Internet
 and non-Windows transports are unqualified. Protocol/sync logic remains in src/.
+
+Host OS/CPU detection is centralized in stn_build_config.h; stn_backend.h rejects
+unavailable runtimes explicitly. Windows declaration headers now live alongside
+their adapters. See [the platform matrix and contracts](../docs/PORTABILITY.md).

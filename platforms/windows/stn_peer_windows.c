@@ -1,4 +1,5 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
+#include "../stn_backend.h"
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
 #include <ws2tcpip.h>

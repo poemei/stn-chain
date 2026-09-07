@@ -1,6 +1,8 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #ifndef STN_PLATFORM_H
 #define STN_PLATFORM_H
+/* Standards-only core prerequisites. Host OS/CPU selection lives exclusively
+ * in platforms/stn_build_config.h and never changes these wire rules. */
 
 #include <limits.h>
 #include <stdint.h>

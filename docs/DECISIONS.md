@@ -152,3 +152,17 @@ complete valid evidence, with no rollback below valid prefix work.
 
 D-031: Windows Winsock provides bounded nonblocking sessions and loopback test
 listening; public listening/discovery and RPC remain deferred. See [PEER_PROTOCOL.md](PEER_PROTOCOL.md).
+
+## Platform isolation increment (2026-09-07)
+
+D-032: Centralize host detection in platforms/stn_build_config.h and runtime
+availability in stn_backend.h. Keep host selection out of deterministic core.
+Unsupported configurations fail explicitly; simulated detection is not qualification.
+
+D-033: Retain src/ and includes/ as the shared portable core. Isolate Windows
+declarations beside their implementations. Existing service contracts cover
+hashing, transport/time, persistence and exclusion without unused abstractions.
+
+D-034: Enforce boundary/detection probes during the native test-project build;
+retain canonical fixtures and add padding/alignment/endian invariance checks.
+Only Windows Release/x64 is qualified. See [PORTABILITY.md](PORTABILITY.md).

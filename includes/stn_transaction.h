@@ -30,7 +30,8 @@ typedef struct stn_transaction {
 
 /* Provider must calculate SHA-256(domain || bytes), including domain's NUL.
  * Return OK, UNRESOLVED, or PROVIDER_ERROR. Other returns become errors.
- * No production provider is shipped. Test doubles provide no cryptography.
+ * Windows supplies CNG behind this contract; other providers must reproduce
+ * identical SHA-256 bytes. Test doubles provide no cryptography.
  * Provider must be deterministic and must not change input or global state. */
 typedef stn_data_status (*stn_hash_fn)(void *user, const uint8_t *domain,
     size_t domain_length, const uint8_t *bytes, size_t length, uint8_t digest[32]);

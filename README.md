@@ -63,6 +63,7 @@ compatibility with either is not currently a requirement.
 - [Fork choice and reorganization planning](docs/FORK_CHOICE.md)
 - [Persistence and atomic application](docs/PERSISTENCE.md)
 - [Peer protocol, synchronization and recovery](docs/PEER_PROTOCOL.md)
+- [Platform isolation and invariance](docs/PORTABILITY.md)
 - [Changelog](docs/CHANGELOG.md)
 
 These documents distinguish established direction from proposed engineering

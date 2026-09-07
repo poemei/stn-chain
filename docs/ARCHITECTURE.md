@@ -153,3 +153,14 @@ full blocks and calculated work alone determine preference. Explicit recovery
 can rebuild damaged snapshots without changing strict startup rejection.
 See [PEER_PROTOCOL.md](PEER_PROTOCOL.md). No peer or peer majority is authoritative;
 P2P is separate from future application RPC.
+
+## Enforced platform boundary
+
+Windows is a supported platform backend, not the STN-Chain architecture.
+
+Consensus-relevant behavior must remain identical across supported operating
+systems and processor architectures.
+
+The current layout and compile-time selection gates are documented in
+[PORTABILITY.md](PORTABILITY.md). OS-specific declarations and services live
+under platforms/; portable core modules share all consensus/wire behavior.

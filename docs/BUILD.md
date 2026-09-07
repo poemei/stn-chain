@@ -99,3 +99,13 @@ Peer increment: ws2_32.lib is linked alongside bcrypt.lib. Added 145 checks
 (1,126,292 total), zero failures in Release/x64. The suite uses private NTFS
 files and ephemeral loopback sockets for a two-endpoint real-hash synchronization
 test; no Internet access or public listening is required.
+
+Portability increment: the test-project pre-build event runs 34 compile/boundary
+probes through provisioned MSVC. Runtime suite adds 93 checks: 1,126,385 runtime
+checks, plus 34 build probes (1,126,419 combined), zero failures. Windows backend
+headers now reside in platforms/windows, included by the native project paths.
+Only Release/x64 remains qualified; simulated probes do not build other targets.
+
+The pre-build helper uses process-scoped PowerShell ExecutionPolicy Bypass to
+run this repository's local verification script. It does not change the machine
+or user execution policy, and it performs no network downloads.

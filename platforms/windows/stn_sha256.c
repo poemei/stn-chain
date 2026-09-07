@@ -1,4 +1,5 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. Windows-only adapter. */
+#include "../stn_backend.h"
 #include "stn_sha256.h"
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>

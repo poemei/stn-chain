@@ -5,6 +5,26 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Platform isolation and consensus invariance — 2026-09-07
+
+- Centralized OS/CPU detection and explicit runtime-backend selection. Unknown,
+  conflicting and unavailable targets fail with clear diagnostics; no Windows
+  fallback for Linux/macOS or unqualified Windows architectures.
+- Moved Windows-only declaration headers into platforms/windows and updated
+  native project include paths. CNG/Winsock/NTFS stay behind existing portable
+  contracts; no wire, hash, consensus, persistence or fork rule changed.
+- Added Visual Studio pre-build selection/boundary enforcement (34 passing
+  compile/audit probes) and 93 runtime invariance checks for padding, unaligned
+  inputs, pointer-independent bytes/IDs, endian fields and bounded integers.
+- Release/x64: 1,126,385 runtime checks plus 34 build probes = 1,126,419 checks,
+  zero failures; all prior 1,126,292 runtime checks remain passing. Localhost
+  real SHA-256/NTFS synchronization passed. Build has no warnings/errors.
+- Added PORTABILITY.md, explicit Linux/macOS boundary docs and updated architecture,
+  decisions/build/platform matrix. Detection probes simulate macros only.
+- Only Windows Release/x64 remains qualified. Linux/macOS runtimes and x86/ARM
+  qualification remain deferred, along with RPC, explorer, wallets, contracts,
+  mining/Stratum, difficulty adjustment, economics and mempool.
+
 ### Bounded P2P synchronization and recovery — 2026-09-07
 
 - Added versioned peer framing, strict network/genesis handshake, chain
