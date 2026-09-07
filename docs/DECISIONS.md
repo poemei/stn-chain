@@ -17,6 +17,16 @@ Status: initial register. Open choices are not implementation defaults.
 | D-009 | Adopt intelligence payload schema version 1 for development encoding and syntax validation | Continued implementation; tested field limits and wire examples; production provenance remains open |
 | D-010 | Explicit staged validation context; missing verification/authority/replay providers remain unresolved | Owner's bounded semantic/context increment; no economics or new blockchain subsystems |
 | D-011 | Development time policy requires observation <= publication and explicit current time/tolerances | Deterministic context checks with boundary tests; consensus time derivation remains open |
+| D-012 | Publication transaction wraps exactly one unchanged STNR record; other transaction classes reserved and rejected | Smallest container preserving tested record/signing behavior; no duplicate identity fields |
+| D-013 | Development blocks use a 168-byte header and ordered bounded transactions; reserved work fields zero | Explicit structural model; 16 transactions, maximum 1,051,880 bytes; not final consensus |
+| D-014 | Transaction IDs hash complete transaction witnesses; linear body commitment and duplicate checks use an explicit provider | No qualified production hash implementation; absent provider unresolved; integrity separate from semantics |
+| D-015 | Block ID commits canonical header through the configured hash provider; genesis is exact supplied bytes | Local development linkage, no production hash or final genesis |
+| D-016 | Explicit minimal chain state and atomic sequence validation, maximum 64 blocks per call | Owner-authorized chain increment; loaded history uses the same validation path |
+| D-017 | Sequential height/parent checks and nondecreasing block timestamps; no ambient time or fork choice | Deterministic development rules, not finalized consensus |
+| D-018 | Windows CNG SHA-256 adapter supplies real canonical hashing; other platform providers remain unqualified | Mature locally operated OS primitive, replaceable provider boundary, known-answer tests |
+| D-019 | Version 3 activates full 256-bit target and uint64 nonce; version 1 stays explicit legacy and version 2 reserved | Preserve old structural negatives and prevent profile downgrade |
+| D-020 | PoW hash equals existing domain-separated single-SHA256 block ID | Smallest compatible construction; no ASIC compatibility claimed |
+| D-021 | Fixed development target in [1, 2^255-1]; integer work floor(2^256/(T+1)), checked 256-bit cumulative sum | No adjustment, economic policy, rewards, or supply ceiling |
 
 ## Proposed architecture constraints
 
@@ -85,15 +95,14 @@ compatibility or activation. O-004 and O-018 must define that relationship.
 | Items | Concrete proposal | Status and remaining gate |
 | --- | --- | --- |
 | O-001 | [C17 with native Visual Studio projects and a separate Unix build path](TOOLCHAIN_PROPOSAL.md) | Windows C17 scaffold implemented; Unix builds and minimum supported tool versions remain open |
-| O-002 | [Fixed-order binary envelope](ENCODING_PROPOSAL.md) | Structural development codec implemented/tested; payload semantics, block format and complete budgets remain open |
+| O-002 | [Fixed-order record envelope](ENCODING_PROPOSAL.md) and [transaction/block containers](TRANSACTION_BLOCK_FORMAT.md) | Development codecs implemented/tested; final protocol budgets and activation remain open |
 | O-003 | SHA-256 IDs and PureEd25519, with a replaceable crypto provider | Proposed; exact verification acceptance profile and dependency qualification remain open |
 | O-006/O-007 | [Signed intelligence exercise](SIGNED_RECORD_PROPOSAL.md) | Development payload codec implemented/tested; production provenance, corrections, actual API, and source-attestation contract still open |
 
 ## Next design increment
 
-The authorized intelligence payload plus validation-context increment is
-complete and regression tested on Windows Release/x64. See
-[VALIDATION_CONTEXT.md](VALIDATION_CONTEXT.md). Stop at this boundary.
-No production signature/authority/replay provider exists; future qualification
-requires a separate increment. No blockchain implementation or economic
-activation is claimed here. Coin ownership grants no company authority.
+The separately authorized SHA-256/PoW/work increment is complete and regression
+tested on Windows Release/x64. See [POW.md](POW.md). Stop at this boundary.
+Real Windows hashing and local PoW-valid chain accounting exist; distributed
+consensus, production signature/authority/replay providers and persistence do
+not. Work and coin ownership grant no organizational authority.

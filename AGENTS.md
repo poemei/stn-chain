@@ -5,6 +5,10 @@
 Maintain docs/CHANGELOG.md for every meaningful code, documentation, build,
 or configuration change. Record work in Unreleased until it is released.
 Do not label uncommitted work as a published release.
+Preserve earlier changelog entries. Each completed increment must add meaningful
+changes, validation evidence, limitations, and deferred functionality.
+Stop at the increment's requested scope; report build/check results and
+commit status concisely without unsolicited next-step recommendations.
 
 ## Design baseline
 

@@ -7,11 +7,21 @@ are not claims of a published or deployed release.
 
 ### Validation
 
+- SHA-256/PoW/work increment: final Windows Release/x64 build passed without
+  warnings/errors. Added 323 passing checks, including SHA-256 known answers,
+  independent IDs, target arithmetic, PoW and atomic cumulative work. Total:
+  1,122,876 checks, zero failures; all earlier 1,122,553 checks preserved.
+
 - Windows Release/x64 solution build succeeded with no warnings or errors.
 - Record codec tests passed: 230 checks, zero failures; intelligence payload
   tests passed: 2,027 checks, zero failures; validation-context tests passed:
   462 checks, zero failures (2,719 total). Provider hooks use test doubles;
   these results do not establish cryptographic validity.
+- Transaction/block suite passed 1,118,656 checks, including exhaustive
+  byte-truncation loops for maximum-size containers. Combined suite:
+  1,121,375 checks, zero failures; hash-provider tests use a noncryptographic stub.
+- Chain-context suite passed 1,178 checks; combined Release/x64 suite passed
+  1,122,553 checks with zero failures. All prior 1,121,375 checks retained.
 - Application scaffold smoke check passed. Signature verification, payload
   truth/evidence verification, authorization, and consensus are not covered
   by this validation. Payload syntax and field limits are covered.
@@ -19,6 +29,34 @@ are not claims of a published or deployed release.
   preserved; this increment stops at payload and validation-context support.
 
 ### Added
+
+- Real SHA-256 Windows CNG adapter behind the existing provider boundary;
+  no remote service or bundled third-party dependency introduced.
+- Version-3 PoW block profile with full big-endian targets, single-SHA256
+  block-ID/work hash, fixed context target, and explicit verification stages.
+- Bounded integer work calculation and checked cumulative-work state,
+  integrated into atomic candidate/sequence validation including genesis.
+- Exact PoW/work documentation and independent fixed real-hash fixtures.
+- Legacy version-1 development mode retained explicitly; no mining loops,
+  fork choice, persistence, networking, wallets, contracts, or economics added.
+
+- Minimal explicit chain state, exact development-genesis context, and
+  provider-bound canonical header IDs without production hashing.
+- Candidate validation for structure, contextual links, body integrity,
+  expected networks, and nondecreasing development timestamps.
+- Bounded sequential validation with atomic output assignment, first-failure
+  index/height diagnostics, and fail-closed hash-provider handling.
+- Independent genesis fixture and local-chain regressions covering failure
+  paths, unchanged state, loaded inputs, and a 64-block development batch.
+
+- Versioned publication transaction wrapping one unchanged record, with
+  bounded canonical encoding and reserved future transaction classes.
+- Versioned 168-byte block header and ordered length-prefixed transaction
+  body; development limits of 16 transactions and 1,051,880 block bytes.
+- Separate transaction/header/body/block structural checks, provider-bound
+  transaction IDs and body commitments, and duplicate-ID integrity checks.
+- Exact wire-layout documentation, fixed independent fixtures, failure-path
+  tests, and integration through intelligence, record, transaction, and block.
 
 - Explicit staged validation context for expected network, supplied time
   policy, signature verification, authority lookup, and replay checks.

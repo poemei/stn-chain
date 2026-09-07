@@ -99,5 +99,8 @@ Tests preserve the original 230 envelope checks. Positive signature outcomes
 are test-double behavior, not cryptographic evidence. Windows Release/x64 is
 the executed target; other platforms remain unqualified.
 
-This increment stops here. Blocks, PoW, mining backends, wallets, contracts,
-networking, RPC, gas, fees, and coin economics are not implemented.
+The validation-context increment stopped at this boundary. A later, separately
+authorized increment added transaction/block data containers; see
+[TRANSACTION_BLOCK_FORMAT.md](TRANSACTION_BLOCK_FORMAT.md). PoW, mining backends,
+wallets, contracts, networking, RPC, gas, fees, and coin economics remain
+unimplemented. Block containers do not supply consensus acceptance.

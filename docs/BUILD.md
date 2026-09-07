@@ -15,6 +15,7 @@ scaffold. It prints its development status and exits; it is not a node yet.
 - Optimized Release build, warning level 4, warnings treated as errors.
 - Static release C runtime; no third-party runtime dependencies added.
 - Debug symbols retained for diagnosis of Release builds.
+- Windows CNG SHA-256 adapter links the OS bcrypt.lib import library.
 - Executable: build/x64/Release/stn-chain.exe.
 - Intermediate files: build/obj/stn-chain/x64/Release/.
 
@@ -49,6 +50,22 @@ payload truncations, and nested envelope/payload checks. Current result:
 with zero failures (2,719 total). Context tests cover time, network, stage
 ordering, missing/rejecting/error providers, and conditional acceptance.
 Provider test doubles are not cryptographic verification or consensus.
+
+The transaction/block suite adds 1,118,656 checks, including every byte
+truncation of maximum-size containers, for 1,121,375 total checks. It tests
+independent wire fixtures, counts, lengths, reserved fields, provider failures,
+duplicate IDs, body commitments, and nested payload integration. Hash-provider
+test doubles provide no cryptographic guarantees. All original 2,719 checks
+remain unchanged in behavior.
+
+Chain-context tests add 1,178 checks, giving 1,122,553 total with zero failures.
+They cover sequential links, exact genesis, provider failures, atomic state
+updates, deterministic failure locations, timestamp boundaries, and 64-block
+batches. This is local validation under test hashing, not distributed consensus.
+
+The SHA-256/PoW/work increment adds 323 checks, giving 1,122,876 total with
+zero failures. Known-answer and linked-chain cases use real Windows hashing;
+error/equality/overflow cases also retain declared test providers. See POW.md.
 
 ## Validation
 

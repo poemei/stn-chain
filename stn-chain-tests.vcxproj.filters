@@ -8,12 +8,26 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="includes\stn_platform.h"><Filter>includes</Filter></ClInclude>
+    <ClInclude Include="src\stn_wire_internal.h"><Filter>src</Filter></ClInclude>
     <ClCompile Include="tests\test_record.c"><Filter>tests</Filter></ClCompile>
     <ClCompile Include="tests\test_intelligence.c"><Filter>tests</Filter></ClCompile>
     <ClCompile Include="tests\test_validation.c"><Filter>tests</Filter></ClCompile>
+    <ClCompile Include="tests\test_chain_data.c"><Filter>tests</Filter></ClCompile>
+    <ClCompile Include="tests\test_chain.c"><Filter>tests</Filter></ClCompile>
+    <ClCompile Include="tests\test_pow.c"><Filter>tests</Filter></ClCompile>
     <ClCompile Include="src\stn_record.c"><Filter>src</Filter></ClCompile>
     <ClCompile Include="src\stn_intelligence.c"><Filter>src</Filter></ClCompile>
     <ClCompile Include="src\stn_validation.c"><Filter>src</Filter></ClCompile>
+    <ClCompile Include="src\stn_block.c"><Filter>src</Filter></ClCompile>
+    <ClCompile Include="src\stn_chain.c"><Filter>src</Filter></ClCompile>
+    <ClCompile Include="platforms\windows\stn_sha256.c"><Filter>platforms</Filter></ClCompile>
+    <ClInclude Include="includes\stn_sha256.h"><Filter>includes</Filter></ClInclude>
+    <ClInclude Include="includes\stn_pow.h"><Filter>includes</Filter></ClInclude>
+    <ClCompile Include="src\stn_pow.c"><Filter>src</Filter></ClCompile>
+    <ClInclude Include="includes\stn_chain.h"><Filter>includes</Filter></ClInclude>
+    <ClInclude Include="includes\stn_block.h"><Filter>includes</Filter></ClInclude>
+    <ClCompile Include="src\stn_transaction.c"><Filter>src</Filter></ClCompile>
+    <ClInclude Include="includes\stn_transaction.h"><Filter>includes</Filter></ClInclude>
     <ClInclude Include="includes\stn_validation.h"><Filter>includes</Filter></ClInclude>
     <ClInclude Include="includes\stn_intelligence.h"><Filter>includes</Filter></ClInclude>
     <ClInclude Include="includes\stn_record.h"><Filter>includes</Filter></ClInclude>

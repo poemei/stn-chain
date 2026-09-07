@@ -57,6 +57,10 @@ ownership must be documented before implementation interfaces are frozen.
 
 ## Chain state and recovery
 
+The development implementation now has an explicit in-memory validation state
+and bounded atomic sequence validator; see [CHAIN_STATE.md](CHAIN_STATE.md).
+Storage/recovery mechanisms below remain future design responsibilities.
+
 Genesis must be identical for participants in the same network. Loading a
 file successfully is not evidence that the chain is valid. Define verified
 startup state, recovery after interrupted writes, and how indexes rebuild.
@@ -82,6 +86,11 @@ rotation, and revocation rules. A company service may prepare a decision;
 validators must establish its validity using available protocol data.
 
 ## Mining boundary
+
+The version-3 development profile now verifies work and accumulates integer
+chain work, using real Windows SHA-256; see [POW.md](POW.md). The miner and
+hardware backends described below remain unimplemented. Legacy version 1
+is explicitly non-PoW and cannot be accepted by the PoW chain profile.
 
 If PoW is selected for activation, define a work interface that binds work
 to a parent, candidate contents, target, and job identity. Define stale-work

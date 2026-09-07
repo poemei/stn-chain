@@ -2,7 +2,8 @@
 
 Status: Visual Studio IDE-first Windows workflow accepted by the owner;
 remaining recommendations address O-001 and the implementation part of O-003.
-This document does not install tools or adopt a cryptographic dependency.
+The original proposal below is supplemented by the adopted Windows CNG
+SHA-256 adapter in [POW.md](POW.md). Signature-provider selection remains open.
 
 ## Language and build
 
@@ -76,7 +77,7 @@ not an ad hoc signing of a digest.
 RFC 8032 specifies Ed25519 with 32-byte public keys and 64-byte signatures
 and includes test vectors. See [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032.html).
 
-Evaluate OpenSSL libcrypto through EVP as the first provider candidate.
+For signatures, evaluate OpenSSL libcrypto through EVP as a provider candidate.
 Its documented one-shot Ed25519 API fits the bounded-record design. Pin an
 evaluated release and verify the exact API/provider configuration before
 adoption. See [OpenSSL Ed25519](https://docs.openssl.org/3.5/man7/EVP_SIGNATURE-ED25519/).
@@ -92,6 +93,7 @@ provider choice.
 
 | Candidate | Requirement/value | Control and exit | Remaining evaluation |
 | --- | --- | --- | --- |
+| Windows CNG (adopted for SHA-256) | OS cryptographic primitive, offline operation | Narrow replaceable adapter; identical byte vectors for other providers | Non-Windows adapters and independent review; see POW.md |
 | Visual Studio/MSBuild | Owner's native Windows IDE workflow and optional automation | Retain solution/project settings and SDK/toolset requirements; portable core also builds through a separate Unix path | Installed instance, C workload, SDK, and IDE build/run qualification |
 | OpenSSL libcrypto | Maintained hash/signature primitives | Narrow adapter, retained source/build recipe, pinned checksums; qualify replacement against identical vectors | Exact release, license notices, patch process, size, verification profile |
 | OS SDK/compiler | Native executable and platform services | Document toolchain and SDK versions; retain recoverable build inputs | Installed tools and target support |
