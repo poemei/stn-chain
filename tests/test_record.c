@@ -150,6 +150,8 @@ int test_chain_data(void);
 int test_chain(void);
 int test_pow(void);
 int test_fork(void);
+int test_storage(void);
+int test_peer(void);
 
 int main(void)
 {
@@ -159,6 +161,8 @@ int main(void)
     int chain_failed;
     int pow_failed;
     int fork_failed;
+    int storage_failed;
+    int peer_failed;
     known_bytes(); malformed(); boundaries(); encode_failure();
     printf("Record codec: %u checks, %u failures.\n", checks, failures);
     intelligence_failed = test_intelligence();
@@ -167,5 +171,7 @@ int main(void)
     chain_failed = test_chain();
     pow_failed = test_pow();
     fork_failed = test_fork();
-    return failures == 0 && !intelligence_failed && !validation_failed && !chain_data_failed && !chain_failed && !pow_failed && !fork_failed ? EXIT_SUCCESS : EXIT_FAILURE;
+    storage_failed = test_storage();
+    peer_failed = test_peer();
+    return failures == 0 && !intelligence_failed && !validation_failed && !chain_data_failed && !chain_failed && !pow_failed && !fork_failed && !storage_failed && !peer_failed ? EXIT_SUCCESS : EXIT_FAILURE;
 }

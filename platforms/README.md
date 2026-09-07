@@ -25,3 +25,11 @@ Do not duplicate portable logic or consensus rules across these directories.
 The native Visual Studio project currently selects only Release/x64.
 Add other configurations when their toolchain, adapter, and test requirements
 are satisfied. macOS does not currently reserve legacy x86 or ARM32 targets.
+
+Windows now also has a local NTFS snapshot provider in stn_storage_windows.c,
+qualified by Release/x64 file tests. Portable coordination remains in src/.
+Linux/macOS persistence providers are not implemented. See docs/PERSISTENCE.md.
+
+Windows stn_peer_windows.c provides nonblocking Winsock exact transfers and
+finite session deadlines. Loopback synchronization is tested; public Internet
+and non-Windows transports are unqualified. Protocol/sync logic remains in src/.

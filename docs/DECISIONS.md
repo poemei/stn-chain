@@ -121,3 +121,34 @@ D-024: Discover the last shared prefix ID and publish a bounded in-memory plan
 with ordered detach/attach ranges; no reorganization application or storage
 mutation. See [FORK_CHOICE.md](FORK_CHOICE.md). This supersedes the earlier
 PoW increment's stopping point only for the explicitly authorized fork scope.
+
+## Persistence increment (2026-09-07)
+
+D-025: Storage v1 holds bounded canonical blocks plus a domain-separated SHA-256
+checksum. Recalculate all derived chain state; a checksum is not consensus truth.
+
+D-026: Provider exclusion spans reload, validation and replacement. Extension
+and reorganization use the same revalidated-plan, greater-work-only application
+path. Commit memory only after complete snapshot publication.
+
+D-027: Qualify Windows local NTFS staging/flush/same-volume replacement only.
+Preserve old snapshots on pre-publication failures. Leftover staging blocks
+writes until operator handling; no automatic repair or power-loss guarantee.
+See [PERSISTENCE.md](PERSISTENCE.md). Scalable storage and other OS adapters remain deferred.
+
+## Peer protocol increment (2026-09-07)
+
+D-028: Use protocol-v1 framed HELLO/STATE/header/indexed-block exchange; explicit
+network/genesis/capability agreement, one outstanding request and 64-block bound.
+Headers identify reusable prefixes but full blocks establish work/acceptance.
+
+D-029: Treat all advertisements as claims. Recalculate work, recheck current
+storage under exclusion, and retain healthy active state on equal/lower work.
+Peer counts do not influence preference; fixed-target semantics are unchanged.
+
+D-030: Add explicit validated-prefix recovery separate from strict load. Never
+activate a prefix or patch peer bytes in place. Atomic replacement requires
+complete valid evidence, with no rollback below valid prefix work.
+
+D-031: Windows Winsock provides bounded nonblocking sessions and loopback test
+listening; public listening/discovery and RPC remain deferred. See [PEER_PROTOCOL.md](PEER_PROTOCOL.md).

@@ -161,7 +161,13 @@ Implemented follow-up: production SHA-256, fixed development targets, PoW
 verification, and accumulated work; see POW.md for qualification and limits.
 
 Implemented follow-up: work-based fork evaluation and atomic in-memory plans; see [FORK_CHOICE.md](FORK_CHOICE.md).
-reorganization application, orphan handling, peer agreement, propagation,
-production persistence, wallets, RPC, contract execution, fees, gas, issuance,
-mining rewards, and miner integration. This increment stops at local chain
-validation and does not proceed into any of those subsystems.
+Implemented follow-up: bounded snapshot persistence and atomic extension/
+reorganization application; see [PERSISTENCE.md](PERSISTENCE.md). Loaded data
+is revalidated from EMPTY before activation.
+
+Deferred: difficulty adjustment, orphan handling, peer agreement, propagation,
+scalable storage, wallets, RPC, contracts, fees/gas/issuance, mining rewards,
+and miner integration. Local validation is not full distributed consensus.
+Bounded peer synchronization now supplies untrusted candidate evidence to these
+same rules. Explicit recovery keeps validated prefixes inactive until complete
+replacement succeeds. See [PEER_PROTOCOL.md](PEER_PROTOCOL.md).

@@ -59,7 +59,8 @@ ownership must be documented before implementation interfaces are frozen.
 
 The development implementation now has an explicit in-memory validation state
 and bounded atomic sequence validator; see [CHAIN_STATE.md](CHAIN_STATE.md).
-Storage/recovery mechanisms below remain future design responsibilities.
+Bounded Windows snapshot storage/application now exists; see
+[PERSISTENCE.md](PERSISTENCE.md). Scalable storage/recovery remain future work.
 
 Genesis must be identical for participants in the same network. Loading a
 file successfully is not evidence that the chain is valid. Define verified
@@ -135,3 +136,20 @@ The core now revalidates two bounded complete PoW histories, compares calculated
 work, discovers their shared prefix and publishes an atomic in-memory plan.
 Equal work retains current. No active state is changed. See [FORK_CHOICE.md](FORK_CHOICE.md)
 for fixed-target limitations, eligibility, detach/attach ranges and future replay coordination.
+
+## Persistence coordination
+
+The portable storage layer treats disk as untrusted canonical input and calls
+existing validators/fork choice. It reloads active data, rejects stale plans,
+and commits caller state only after provider replacement. Windows filesystem
+operations remain in platforms/windows. No transaction, replay or mempool state
+is implicitly changed; those future subsystems require coordinated application.
+
+## Peer evidence and explicit recovery
+
+Socket transport, framing/handshake, sync coordination, consensus and storage
+remain separate. Bounded header hints avoid retransmitting validated prefixes;
+full blocks and calculated work alone determine preference. Explicit recovery
+can rebuild damaged snapshots without changing strict startup rejection.
+See [PEER_PROTOCOL.md](PEER_PROTOCOL.md). No peer or peer majority is authoritative;
+P2P is separate from future application RPC.

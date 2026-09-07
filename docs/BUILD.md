@@ -89,3 +89,13 @@ not a declaration that the software is production-ready or published.
 Fork-choice increment: adds 785 checks (1,123,661 total), zero failures in
 Windows Release/x64. Both native projects include stn_fork.c; the test project
 adds test_fork.c. No additional dependency or build configuration is required.
+
+Persistence increment: adds 2,486 checks (1,126,147 total), zero failures in
+Windows Release/x64. Tests create private temporary files on local NTFS and
+exercise the real adapter plus injected failures. Kernel32 supplies existing
+Windows file APIs; no new package is downloaded. See PERSISTENCE.md for limits.
+
+Peer increment: ws2_32.lib is linked alongside bcrypt.lib. Added 145 checks
+(1,126,292 total), zero failures in Release/x64. The suite uses private NTFS
+files and ephemeral loopback sockets for a two-endpoint real-hash synchronization
+test; no Internet access or public listening is required.

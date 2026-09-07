@@ -5,6 +5,50 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Bounded P2P synchronization and recovery — 2026-09-07
+
+- Added versioned peer framing, strict network/genesis handshake, chain
+  advertisements, bounded headers/indexed full-block exchange, and an explicit
+  synchronous peer protocol over a replaceable exact-transfer boundary.
+- Added Windows nonblocking Winsock transport with finite total deadlines,
+  explicit IPv4 connectivity and a loopback-only development listener.
+- Added prefix-reusing sync with complete local validation and cumulative-work
+  fork choice. Advertisements and peer majority never establish authority.
+- Added separate recovery evidence scanning and atomic adoption: preserve strict
+  startup rejection, validate prefixes from genesis, rebuild only from fully
+  verified blocks, recheck disk under exclusion and commit after replacement.
+- Release/x64 build passes without warnings/errors. Added 145 passing checks;
+  total 1,126,292 checks, zero failures. All prior 1,126,147 checks preserved.
+  Localhost two-endpoint sync passed with real SHA-256 and NTFS save/reload.
+- Updated protocol/recovery, architecture, decision, build and platform docs.
+  No software release assigned; previous changelog history retained.
+- Limited to 64 blocks, one outstanding request, explicit endpoints and fixed
+  targets. No Internet/non-Windows qualification, public service/discovery,
+  authentication/privacy, scalable storage/sync or power-loss guarantee.
+  RPC, wallets, contracts, mining/Stratum, difficulty adjustment, economics,
+  treasury, gas/fees and mempool remain deferred.
+
+### Persistence and atomic application — 2026-09-07
+
+- Added a versioned, bounded canonical-block snapshot format with SHA-256
+  corruption checks and full startup revalidation; derived state is rebuilt.
+- Added portable storage-provider coordination and Windows local NTFS staging,
+  flushing, exclusive writer coordination and same-volume snapshot replacement.
+- Added one application path for extensions/reorganizations: reload active
+  history, recalculate and verify plan/state, require greater work, persist
+  before committing memory. Corruption, stale plans and failed writes reject.
+- Added 2,486 checks, including real Windows file operations and injected
+  staging/write/flush/promotion failures. Final Release/x64 build passes with
+  no warnings/errors; 1,126,147 checks, zero failures. All earlier 1,123,661
+  regression checks remain unchanged and passing.
+- Updated architecture, decision register, chain/fork/build documentation and
+  platform status; added PERSISTENCE.md with format, startup, application,
+  recovery and actual durability limits. Existing changelog history preserved.
+- Limited to 64 complete blocks and whole-snapshot replacement on local NTFS.
+  No non-Windows qualification, power-cut guarantee, automatic staging recovery,
+  scalable database, node networking/RPC, mining, wallets, contracts, difficulty
+  adjustment, economic policy or mempool/confirmation/replay coordination.
+
 ### Fork choice and reorganization planning — 2026-09-07
 
 - Added full-history fork evaluation using revalidated cumulative PoW work;

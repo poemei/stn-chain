@@ -66,7 +66,9 @@ input and output objects must not overlap. No ambient time or allocation is
 used by the evaluator. A 64-block bound applies per supplied full history;
 suffix-only and larger-history evaluation are currently unsupported.
 
-There is no application interface. A returned plan is neither authenticated
+The persistence increment adds an application interface that revalidates the
+complete plan under storage exclusion; see [PERSISTENCE.md](PERSISTENCE.md).
+A returned plan is neither authenticated
 nor a durable authorization token. Future application must revalidate against
 the then-current active tip and atomically update all affected state. Passing
 local rules still does not establish record signatures, organizational
@@ -88,5 +90,5 @@ SHA-256 genesis/child fixture also qualifies the production path. All previous
 checks remain unchanged. Only Windows Release/x64 has been executed.
 
 Deferred: varying/automatic target rules, longer-history storage/indexing,
-reorganization application, persistence, networking/discovery/RPC, mining,
+scalable persistence, networking/discovery/RPC, mining,
 Stratum, wallet/mempool behavior, contracts, fees/gas/rewards and coin economics.

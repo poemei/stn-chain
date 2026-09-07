@@ -47,7 +47,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -76,4 +76,4 @@
     <None Include="platforms\README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-</Project>
+<ItemGroup><ClCompile Include="src\stn_storage.c" /><ClCompile Include="platforms\windows\stn_storage_windows.c" /><ClInclude Include="includes\stn_storage.h" /><ClInclude Include="includes\stn_windows_storage.h" /></ItemGroup><ItemGroup><ClCompile Include="src\stn_peer.c" /><ClCompile Include="platforms\windows\stn_peer_windows.c" /><ClInclude Include="includes\stn_peer.h" /><ClInclude Include="includes\stn_windows_peer.h" /></ItemGroup></Project>
