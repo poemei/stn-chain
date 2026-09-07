@@ -56,6 +56,10 @@
     <ClInclude Include="includes\stn_platform.h" />
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\stn_record.c" />
+    <ClCompile Include="src\stn_intelligence.c" />
+    <ClCompile Include="src\stn_validation.c" />
+    <ClInclude Include="includes\stn_validation.h" />
+    <ClInclude Include="includes\stn_intelligence.h" />
     <ClInclude Include="includes\stn_record.h" />
     <None Include="platforms\README.md" />
   </ItemGroup>

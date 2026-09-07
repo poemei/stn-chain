@@ -14,6 +14,9 @@ Status: initial register. Open choices are not implementation defaults.
 | D-006 | Native Visual Studio solution/projects and IDE-first Windows build/test workflow; no CMake requirement | Project owner preference and acceptance |
 | D-007 | ISO C17 development scaffold, Release/x64, v145 and SDK 10.0.26100.0; root project files with includes/ and src/ | Requested project scaffold and discovered local toolchain; not a network release |
 | D-008 | Adopt envelope version 1 layout and limits for the structural development codec | Authorized codec increment; fixed bytes and negative tests; not finalized consensus rules |
+| D-009 | Adopt intelligence payload schema version 1 for development encoding and syntax validation | Continued implementation; tested field limits and wire examples; production provenance remains open |
+| D-010 | Explicit staged validation context; missing verification/authority/replay providers remain unresolved | Owner's bounded semantic/context increment; no economics or new blockchain subsystems |
+| D-011 | Development time policy requires observation <= publication and explicit current time/tolerances | Deterministic context checks with boundary tests; consensus time derivation remains open |
 
 ## Proposed architecture constraints
 
@@ -84,13 +87,13 @@ compatibility or activation. O-004 and O-018 must define that relationship.
 | O-001 | [C17 with native Visual Studio projects and a separate Unix build path](TOOLCHAIN_PROPOSAL.md) | Windows C17 scaffold implemented; Unix builds and minimum supported tool versions remain open |
 | O-002 | [Fixed-order binary envelope](ENCODING_PROPOSAL.md) | Structural development codec implemented/tested; payload semantics, block format and complete budgets remain open |
 | O-003 | SHA-256 IDs and PureEd25519, with a replaceable crypto provider | Proposed; exact verification acceptance profile and dependency qualification remain open |
-| O-006/O-007 | [Signed intelligence exercise](SIGNED_RECORD_PROPOSAL.md) | Proposed synthetic schema; actual API and source-attestation contract still needed |
+| O-006/O-007 | [Signed intelligence exercise](SIGNED_RECORD_PROPOSAL.md) | Development payload codec implemented/tested; production provenance, corrections, actual API, and source-attestation contract still open |
 
 ## Next design increment
 
-The Windows C17 Release/x64 scaffold and bounded envelope codec now build and
-run, with a separate native test project. Platform directories reserve other
-targets without asserting support. Next, implement the intelligence payload
-schema and explicit validation context, then qualify cryptographic verification.
-Do not treat structural decoding as authorization to accept a chain record.
-No blockchain implementation or economic activation is claimed here.
+The authorized intelligence payload plus validation-context increment is
+complete and regression tested on Windows Release/x64. See
+[VALIDATION_CONTEXT.md](VALIDATION_CONTEXT.md). Stop at this boundary.
+No production signature/authority/replay provider exists; future qualification
+requires a separate increment. No blockchain implementation or economic
+activation is claimed here. Coin ownership grants no company authority.

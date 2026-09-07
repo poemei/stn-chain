@@ -42,7 +42,13 @@ Select stn-chain as the startup project again to run the application scaffold.
 The test executable is build/x64/Release/stn-chain-tests.exe. It exercises an
 independent byte fixture, round trips, all fixture truncations, capacity and
 length failures, unsupported fields, empty and maximum payloads, zero nonces,
-and invalid pointers. It tests envelope structure, not signatures or consensus.
+and invalid pointers. Intelligence tests add payload field and domain-label
+checks, exhaustive one-byte classification/subject alphabets, all maximum-size
+payload truncations, and nested envelope/payload checks. Current result:
+230 envelope checks, 2,027 payload checks, and 462 validation-context checks,
+with zero failures (2,719 total). Context tests cover time, network, stage
+ordering, missing/rejecting/error providers, and conditional acceptance.
+Provider test doubles are not cryptographic verification or consensus.
 
 ## Validation
 

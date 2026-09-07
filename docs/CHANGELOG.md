@@ -8,11 +8,32 @@ are not claims of a published or deployed release.
 ### Validation
 
 - Windows Release/x64 solution build succeeded with no warnings or errors.
-- Record codec tests passed: 230 checks, zero failures.
+- Record codec tests passed: 230 checks, zero failures; intelligence payload
+  tests passed: 2,027 checks, zero failures; validation-context tests passed:
+  462 checks, zero failures (2,719 total). Provider hooks use test doubles;
+  these results do not establish cryptographic validity.
 - Application scaffold smoke check passed. Signature verification, payload
-  semantics, and consensus are not covered by this validation.
+  truth/evidence verification, authorization, and consensus are not covered
+  by this validation. Payload syntax and field limits are covered.
+- Original envelope wire behavior and all 230 existing envelope checks
+  preserved; this increment stops at payload and validation-context support.
 
 ### Added
+
+- Explicit staged validation context for expected network, supplied time
+  policy, signature verification, authority lookup, and replay checks.
+- Separate stage/final statuses with fail-closed unresolved/error behavior;
+  missing providers never yield acceptance and later stages do not run.
+- Deterministic observation/publication time rules with overflow-safe bounds,
+  hook-contract and stage-order regression tests, and implementation limits.
+
+- Allocation-free intelligence payload encoder/decoder for the development
+  schema, with borrowed ASCII spans and exact field-length validation.
+- Severity, classification alphabet, source-label, printable subject, and
+  nonzero evidence-digest checks; no DNS or external-service calls.
+- Intelligence tests covering independent wire bytes, all fixture truncations,
+  alphabet/length boundaries, malformed fields, output failure behavior,
+  and integration with the outer record envelope.
 
 - Bounded ISO C17 record encoder/decoder with explicit errors, borrowed
   payload views, big-endian fields, length limits, and zero-nonce rejection.

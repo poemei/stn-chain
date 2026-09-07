@@ -12,7 +12,8 @@ outcomes across local and remote systems.
 
 The historical Go prototype has been removed. This repository currently
 contains design documentation, an ISO C17 Visual Studio scaffold, and a tested
-structural record encoder/decoder;
+structural record encoder/decoder, intelligence payload codec, and explicit
+validation context;
 there is no implemented node, miner, contract runtime, or coin.
 The redesign has no compatibility requirement
 with the old Go implementation.
@@ -51,6 +52,7 @@ compatibility with either is not currently a requirement.
 - [Toolchain and dependency proposal](docs/TOOLCHAIN_PROPOSAL.md)
 - [Canonical record encoding proposal](docs/ENCODING_PROPOSAL.md)
 - [Signed intelligence record proposal](docs/SIGNED_RECORD_PROPOSAL.md)
+- [Implemented validation context and limits](docs/VALIDATION_CONTEXT.md)
 - [Changelog](docs/CHANGELOG.md)
 
 These documents distinguish established direction from proposed engineering

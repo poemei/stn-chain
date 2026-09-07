@@ -9,7 +9,13 @@
   <ItemGroup>
     <ClInclude Include="includes\stn_platform.h"><Filter>includes</Filter></ClInclude>
     <ClCompile Include="tests\test_record.c"><Filter>tests</Filter></ClCompile>
+    <ClCompile Include="tests\test_intelligence.c"><Filter>tests</Filter></ClCompile>
+    <ClCompile Include="tests\test_validation.c"><Filter>tests</Filter></ClCompile>
     <ClCompile Include="src\stn_record.c"><Filter>src</Filter></ClCompile>
+    <ClCompile Include="src\stn_intelligence.c"><Filter>src</Filter></ClCompile>
+    <ClCompile Include="src\stn_validation.c"><Filter>src</Filter></ClCompile>
+    <ClInclude Include="includes\stn_validation.h"><Filter>includes</Filter></ClInclude>
+    <ClInclude Include="includes\stn_intelligence.h"><Filter>includes</Filter></ClInclude>
     <ClInclude Include="includes\stn_record.h"><Filter>includes</Filter></ClInclude>
     <None Include="platforms\README.md"><Filter>platforms</Filter></None>
   </ItemGroup>

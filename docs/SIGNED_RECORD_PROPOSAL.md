@@ -1,8 +1,17 @@
 # Signed Intelligence Record Proposal
 
-Status: proposed development profile; addresses parts of O-003, O-006, and
+Status: payload schema and explicit validation orchestration implemented for
+development; production identity, signature, and replay providers remain
+unimplemented. Addresses parts of O-003, O-006, and
 O-007. Uses [ENCODING_PROPOSAL.md](ENCODING_PROPOSAL.md). All initial data is
 synthetic. This is not the final Sentinel schema or company identity model.
+
+The payload codec is implemented in includes/stn_intelligence.h and
+src/stn_intelligence.c, with tests in tests/test_intelligence.c. It validates
+schema and exact encoding, not signatures, source ownership, evidence contents,
+network identity, authorization, or replay state. A nonzero evidence_digest
+is a structurally admissible commitment; its referenced evidence is not read
+or hashed by this codec.
 
 ## Record type 1 payload
 
@@ -68,9 +77,10 @@ are acceptable only in clearly labeled fixtures.
 ## Validation stages
 
 1. Enforce input-size bounds and decode the exact envelope.
-2. Match configured network ID, supported version, and supported record type.
-3. Parse and validate the entire payload schema without external lookups.
-4. Verify the signature over the exact domain-prefixed unsigned bytes using
+2. Parse and validate the entire payload schema without external lookups.
+3. Match configured network ID and validate explicit time policy. Supported
+   envelope version and record type are checked at stage 1.
+4. Invoke signature verification over the exact domain-prefixed unsigned bytes using
    the protocol's qualified verification profile.
 5. Check the signer is authorized in the explicit supplied prior state.
 6. Check replay state, then return the recomputed record ID and proposed
@@ -80,6 +90,11 @@ The host performs durable acceptance only when the encompassing block is
 valid. Block validation repeats these checks; API acceptance is not authority
 to bypass them. Provider errors, unknown keys, and malformed inputs fail
 closed with distinct diagnostic categories.
+
+Stages 1-3 and hook orchestration are implemented. Actual signature verification,
+authority lookup, replay storage, record-ID hashing, and durable block acceptance
+are not. See [VALIDATION_CONTEXT.md](VALIDATION_CONTEXT.md) for the exact current
+statuses and time rules; the host/block description is future architecture.
 
 ## Replay and corrections
 

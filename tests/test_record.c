@@ -144,9 +144,16 @@ static void encode_failure(void)
     CHECK(written == 0 && memcmp(bytes, before, sizeof(bytes)) == 0);
 }
 
+int test_intelligence(void);
+int test_validation(void);
+
 int main(void)
 {
+    int intelligence_failed;
+    int validation_failed;
     known_bytes(); malformed(); boundaries(); encode_failure();
     printf("Record codec: %u checks, %u failures.\n", checks, failures);
-    return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    intelligence_failed = test_intelligence();
+    validation_failed = test_validation();
+    return failures == 0 && !intelligence_failed && !validation_failed ? EXIT_SUCCESS : EXIT_FAILURE;
 }
