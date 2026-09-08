@@ -32,14 +32,16 @@ a search implementation. Later templates require valid work supplied by a client
 For explicit operator-selected development inputs:
 
 ```
-stn-chain.exe --genesis genesis.block --transaction selected.stnt --data chain.stns --rpc-port 18473
+stn-chain.exe --dev --genesis genesis.block --transaction selected.stnt --data chain.stns --rpc-port 18473
 ```
 
 Supply canonical v3 genesis bytes and one canonical STNT transaction, not text
 or hexadecimal. Network and fixed target come from the exact genesis, which is
 fully validated including PoW. The selected transaction is reused until restart
-with a different explicit input. There is no automatic selection from prior blocks
-or a submission queue. Without configured content the core returns UNAVAILABLE:
+with a different explicit input in this explicit development mode.
+Normal mode uses `--genesis genesis.block --data chain.stns --rpc-port 18473`
+without `--dev` or `--transaction`, selecting eligible pending publications.
+Without eligible content the core returns UNAVAILABLE:
 current consensus requires at least one transaction, so empty blocks are invalid.
 This remains a structural development chain; signature/authority/replay admission
 is not silently added to the existing block validator.
@@ -58,6 +60,40 @@ connections alive while I/O remains active rather than enforcing a 64-request or
 60-second total-session fixture. The loopback listener supports resource-limited concurrent clients with serialized dispatch. Public binding, authentication and peer discovery remain deferred.
 
 ## Canonical template
+
+### Pending candidate selection
+
+When a pending store is configured, candidate construction uses its ascending
+unsigned canonical-ID enumeration, then the existing canonical body encoder.
+It reuses record validation against the immutable current context and excludes
+active-history signer/nonce replays. Missing or mismatched context fails closed;
+ineligible entries are skipped without eviction. Provider errors fail the build.
+The caller must externally serialize the complete operation with admission and
+chain activation, as the Windows RPC dispatcher already does.
+
+Eligible transactions are selected in that order up to the existing limit of
+16 transactions and 1,051,712 body bytes. Selection stops if the next eligible
+transaction cannot fit the protocol body limit. A short caller buffer returns
+CAPACITY rather than silently choosing different content. Current pending bounds
+(256 KiB total canonical transaction bytes) make the protocol byte ceiling
+unreachable before the store/count bounds; the byte guard remains enforced.
+
+No eligible transactions returns UNAVAILABLE because empty blocks are prohibited.
+No filler, fees, rewards, arrival-time priority, or fixture fallback is introduced.
+Template and work-context queries do not remove pending entries, including ones
+made ineligible by active history. Existing cleanup in other operations is
+preserved without extension in this increment.
+
+Unchanged tip, target, deterministic timestamp, validation snapshot and pending
+set produce identical candidate bytes and work ID. A changed selected candidate
+invalidates old pending-derived work under the existing STALE handling; a change
+outside the selected set need not change the work ID. The 64-bit nonce region and
+nonce-only submission rules remain unchanged. Explicit `--dev` fixture support
+remains; normal construction requires no selected.stnt. The executable still
+needs production identity providers to admit eligible signed publications; test
+hooks demonstrating selection do not supply those providers.
+
+### Header and work identity
 
 `stn_mining_service` loads and fully validates persisted history, then constructs
 one v3 block using its network, tip ID, next height, fixed target, and tip timestamp.

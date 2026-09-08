@@ -175,6 +175,81 @@ P2P is node-to-node evidence exchange; RPC is application-to-node interaction.
 No RPC client gains consensus authority and no node becomes authoritative merely
 by exposing RPC. See [RPC.md](RPC.md) for implemented and deferred methods.
 
-## Runnable node and mining work
+## In-memory pending store foundation
+
+`stn_pending_init`, `stn_pending_insert`, `stn_pending_lookup`,
+`stn_pending_remove`, `stn_pending_count`, `stn_pending_enumerate`, and
+`stn_pending_clear` provide a local store bounded independently to 128 entries
+and 256 KiB of copied canonical transaction bytes. The fixed entry table adds
+bounded metadata overhead. Insert checks the supported canonical transaction
+structure and derives its protocol transaction ID through the SHA-256 provider.
+This low-level operation does not authenticate or authorize a publication;
+admission policy remains the caller's responsibility.
+
+Identity and enumeration use ascending unsigned canonical ID bytes, independent
+of arrival order. Duplicate IDs return DUPLICATE, including when full. Entry or
+byte exhaustion returns CAPACITY without eviction or other mutation; removal
+releases capacity. Allocation failure also returns CAPACITY without mutation.
+Lookup copies bytes and enumeration copies bounded pages of IDs into caller
+buffers; neither returns an internal pointer. Insert's ID output changes only
+on success. Short lookup buffers return CAPACITY with zero bytes written.
+
+Initialize only fresh storage; initialization allocates nothing and cannot
+fail. Clear frees all owned bytes and resets the store, serving as both reset
+and destruction; repeated clear is safe. Never shallow-copy a live store or
+modify its implementation fields. Calls and caller buffers require external
+serialization and the disjoint-span contract in `stn_pending.h`. This foundation
+increment adds no RPC, mining, assembly, gossip, or pending persistence behavior;
+existing working-tree integrations are preserved without extension.
+
+## Validated pending admission
+
+Incoming canonical publications use `stn_pending_admit_transaction` (STNT) or
+`stn_pending_admit` (STNR), not the structural store insert primitive. Transaction
+decoding delegates to existing canonical codecs; both admission paths reuse
+`stn_validate_intelligence_record` for envelope, intelligence schema, network,
+configured timestamp, signature, authority, and replay-hook validation. Only
+UNDER_CONTEXT proceeds. The supplied immutable context must describe the same
+network and active snapshot as the caller's validated storage view; callers hold
+external serialization throughout validation and insertion.
+
+The existing protocol transaction ID identifies pending entries. After successful
+validation, an exact pending ID returns DUPLICATE before capacity checks. A
+different ID reusing a pending signer/nonce returns REPLAY. Admission also scans
+the validated active history for that signer/nonce before insertion, supplementing
+the required replay hook; no new index or persistent replay subsystem is added.
+The shared store primitive owns allocation/copying and preserves its limits,
+ordering, and rejection guarantees. No allocation occurs before validation.
+
+Results reuse the existing small enum: ACCEPTED, DUPLICATE, CAPACITY, INVALID
+(including malformed data), UNSUPPORTED, REPLAY, NETWORK, TIME, SIGNATURE,
+AUTHORITY, UNAVAILABLE (unresolved prerequisites), and PROVIDER (internal/provider
+failure). Record-validation details remain available in the existing report;
+later replay/store failures are conveyed by the returned admission result.
+Unsupported transaction, record, or intelligence versions fail closed.
+
+Signature and authority enforcement uses supplied validation hooks; no production
+Ed25519 or authority provider is implemented by this increment. Missing hooks
+cannot admit data. Positive admission tests use explicitly scripted hooks and
+production SHA-256, proving orchestration rather than signature qualification.
+Existing integration work is preserved; this increment adds no RPC, mining,
+assembly, gossip, or pending-persistence integration.
+
+## Windows node composition
+
+Pending-derived candidate construction now consumes the store's canonical ID
+enumeration under the same external serialization as admission. Existing
+validation and active-history replay checks determine eligibility; canonical
+encoding enforces the unchanged block limits. Template/work-context reads never
+prune pending entries. Empty eligibility yields no work, and unchanged inputs
+yield identical work identity. Explicit development fixtures remain isolated
+from normal pending selection. See [MINING_WORK.md](MINING_WORK.md).
+
+Canonical pending submissions are exposed by STNC 0x1005 through the existing
+validated admission API. Protocol result values are explicitly mapped and only
+accepted/duplicate IDs are returned; no validation internals are exposed by this
+operation. STNC 0x1004 now supplies a fixed 16-byte count/usage/capacity summary.
+Both use the existing serialized service dispatch boundary and current validated
+history. See [RPC.md](RPC.md). No new mining or assembly integration is involved.
 
 The Windows application composes existing storage and byte-transport adapters with the portable mining service. It provides loopback RPC and strict persisted startup; automatic P2P orchestration remains deferred. Explicit configured transaction content produces deterministic work. Submitted solutions use ordinary full fork evaluation and atomic storage application with production SHA-256. Mining origin grants no authority. See [MINING_WORK.md](MINING_WORK.md).

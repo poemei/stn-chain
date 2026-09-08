@@ -139,7 +139,7 @@ int stn_windows_app(int argc,char **argv)
     wchar_t relative[260],absolute[260];DWORD path_length;
     uint8_t *genesis=NULL,*body=NULL;
     size_t genesis_length=0,transaction_length=0;stn_block decoded;
-    stn_chain_context chain={0};stn_pow_policy policy;stn_mining_service mining={0};
+    stn_chain_context chain={0};stn_pow_policy policy;stn_mining_service mining={0};stn_pending pending={0};
     stn_windows_storage disk;stn_storage_provider storage;stn_storage_view view;
     stn_windows_peer listener={0};uint16_t bound;stn_storage_status status;
     stn_rpc_service service={&mining,stn_mining_handle};
@@ -156,21 +156,21 @@ int stn_windows_app(int argc,char **argv)
             if(errno!=0 || *end!='\0' || end==argv[i] || port>65535){goto usage;}
         }else{goto usage;}
     }
-    if((dev && (genesis_path!=NULL || transaction_path!=NULL)) ||
-       (!dev && (genesis_path==NULL || transaction_path==NULL))){goto usage;}
-    genesis=malloc(STN_BLOCK_MAX_SIZE);body=malloc(4+STN_TX_MAX_SIZE);mining.template_bytes=malloc(STN_BLOCK_MAX_SIZE);
+    if((dev && ((genesis_path==NULL)!=(transaction_path==NULL))) ||
+       (!dev && (genesis_path==NULL || transaction_path!=NULL))){goto usage;}
+    genesis=malloc(STN_BLOCK_MAX_SIZE);body=malloc(STN_BLOCK_MAX_BODY);mining.template_bytes=malloc(STN_BLOCK_MAX_SIZE);
     if(genesis==NULL || body==NULL || mining.template_bytes==NULL){goto cleanup;}
-    if(dev){development_genesis(genesis);genesis_length=364;memcpy(body,genesis+168,196);transaction_length=192;}
+    if(dev && genesis_path==NULL){development_genesis(genesis);genesis_length=364;memcpy(body,genesis+168,196);transaction_length=192;}
     else{
         if(!read_file(genesis_path,genesis,STN_BLOCK_MAX_SIZE,&genesis_length) ||
-           !read_file(transaction_path,body+4,STN_TX_MAX_SIZE,&transaction_length)){fprintf(stderr,"Cannot read genesis/transaction.\n");goto cleanup;}
+           (dev && !read_file(transaction_path,body+4,STN_TX_MAX_SIZE,&transaction_length))){fprintf(stderr,"Cannot read genesis/transaction.\n");goto cleanup;}
         stn_wire_write(body,4,transaction_length);
     }
     if(stn_block_decode(genesis,genesis_length,&decoded)!=STN_DATA_OK || decoded.header.version!=3){fprintf(stderr,"Invalid v3 genesis.\n");goto cleanup;}
     memcpy(chain.network_id,decoded.header.network_id,32);memcpy(policy.fixed_target,decoded.header.reserved_target,32);
     chain.genesis_bytes=genesis;chain.genesis_length=genesis_length;chain.pow_policy=&policy;chain.hash_provider.hash=stn_sha256;
-    if(stn_block_body_validate_structure(body,4+transaction_length,1)!=STN_DATA_OK ||
-       memcmp(body+24,chain.network_id,32)!=0){fprintf(stderr,"Invalid selected transaction or network.\n");goto cleanup;}
+    if(dev && (stn_block_body_validate_structure(body,4+transaction_length,1)!=STN_DATA_OK ||
+       memcmp(body+24,chain.network_id,32)!=0)){fprintf(stderr,"Invalid selected transaction or network.\n");goto cleanup;}
     if(MultiByteToWideChar(CP_ACP,0,data,-1,relative,260)==0){goto cleanup;}
     path_length=GetFullPathNameW(relative,260,absolute,NULL);
     if(path_length==0 || path_length>=260 || stn_windows_storage_init(&disk,absolute,&storage)!=STN_STORAGE_OK){fprintf(stderr,"Data path requires a trusted existing local NTFS directory.\n");goto cleanup;}
@@ -182,6 +182,7 @@ int stn_windows_app(int argc,char **argv)
         mining.snapshot_capacity=cap;mining.workspace.current_capacity=cap;mining.workspace.next_capacity=cap;
     }
     mining.chain=&chain;mining.storage=&storage;mining.body=body;mining.body_length=4+transaction_length;mining.transaction_count=1;
+    if(!dev){mining.pending=&pending;mining.pending_body=body;mining.pending_body_capacity=STN_BLOCK_MAX_BODY;mining.body=NULL;mining.body_length=0;mining.transaction_count=0;}
     mining.template_capacity=STN_BLOCK_MAX_SIZE;mining.owns_buffers=1;
     status=stn_storage_load(&chain,&storage,mining.snapshot,mining.snapshot_capacity,&view);
     if(status==STN_STORAGE_NOT_FOUND){stn_block_span anchor={genesis,genesis_length};
@@ -214,11 +215,11 @@ shutdown:
     InterlockedExchange(&stopping,1);stop_clients(&clients);(void)SetConsoleCtrlHandler(stop,FALSE);
 cleanup:
     stn_windows_peer_close(&listener);if(lock_ready){DeleteCriticalSection(&dispatch_lock);}
-    free(genesis);free(body);free(mining.snapshot);free(mining.workspace.current_bytes);free(mining.workspace.next_bytes);free(mining.template_bytes);
+    stn_pending_clear(&pending);free(genesis);free(body);free(mining.snapshot);free(mining.workspace.current_bytes);free(mining.workspace.next_bytes);free(mining.template_bytes);
     return result;
 usage:
     puts("Usage: stn-chain --dev [--data PATH] [--rpc-port 18473]\n"
-         "   or: stn-chain --genesis BLOCK --transaction STNT --data PATH [--rpc-port PORT]\n"
-         "Loopback development RPC only. --once serves one connection. Port 0 chooses a free port.");
+         "   or: stn-chain --genesis BLOCK --data PATH [--rpc-port PORT]\n"
+         "Explicit selected content: --dev --genesis BLOCK --transaction STNT.\nLoopback RPC only. --once serves one connection. Port 0 chooses a free port.");
     return argc==1 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

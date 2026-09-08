@@ -61,9 +61,11 @@ This classification is not authentication. No remote policy is configured.
 | 0x0002 BLOCK_HEIGHT | READ | height u64 | Canonical full block or NOT_FOUND |
 | 0x0003 BLOCK_ID | READ | ID 32 | Bounded scan by calculated block ID or NOT_FOUND |
 | 0x1000 CHECK_INTELLIGENCE | READ | Whole STNR record, 180..65,716 bytes | 20-byte existing validation report; no admission |
-| 0x1001 SUBMIT_INTELLIGENCE | SUBMISSION | Whole STNR record | Existing validation, then UNAVAILABLE for otherwise valid/unresolved submission; invalid evidence REJECTED |
+| 0x1001 SUBMIT_INTELLIGENCE | SUBMISSION | Whole STNR record | Preserved legacy record-admission/report path in the configured pending service; snapshot-only adapter cannot admit |
 | 0x1002 INTELLIGENCE_ID | READ | Identifier 32 | UNAVAILABLE; standalone record ID/index is not implemented |
 | 0x1003 INTELLIGENCE_CURSOR | READ | Snapshot tip 32, block index u32, transaction index u32 | UNAVAILABLE; accepted-intelligence cursor behavior is reserved |
+| 0x1004 PENDING | READ | empty | 16-byte pending count, entry capacity, byte usage, byte capacity |
+| 0x1005 SUBMIT_TRANSACTION | SUBMISSION | Whole canonical STNT transaction, at most 65,728 bytes | 36-byte versioned admission result and canonical transaction ID |
 | 0x2000 MINING_CONTEXT | READ | empty | 76-byte tip/target/height context, template availability=1 when configured (0 in snapshot-only adapter) |
 | 0x2001 CHECK_WORK_BASE | READ | Base tip 32 | Current mining context if matching; otherwise STALE |
 | 0x2002 MINING_TEMPLATE | READ | empty | Parent 32, work ID 32, block length u32, canonical block |
@@ -72,8 +74,55 @@ This classification is not authentication. No remote policy is configured.
 
 SUBMIT_WORK requires the nested block length to match the remaining payload
 and the current canonical block size bounds. Template identity and nonce mutation are defined in [MINING_WORK.md](MINING_WORK.md).
-Reserved methods never return successful empty placeholders. Full authentication,
-administrative actions and actual submission admission remain unimplemented.
+Reserved methods never return successful empty placeholders. Production identity
+providers and administrative actions remain unimplemented.
+
+## Canonical pending submission
+
+SUBMIT_TRANSACTION (0x1005) calls `stn_pending_admit_transaction`; it never calls
+the structural-only store insertion API. Its only request content is canonical
+STNT bytes. The frame decoder rejects method payloads larger than 65,728 bytes
+before admission. Smaller malformed content, including empty input, receives
+the deterministic invalid-submission result. Global STNC bounds are unchanged.
+
+A handled admission response has envelope code OK and exactly 36 payload bytes:
+format u16=1 at offset 0, admission result u16 at offset 2, and canonical ID[32]
+at offset 4. These explicit wire values are mapped independently from internal
+enums:
+
+| Value | Admission result |
+| --- | --- |
+| 0 | ACCEPTED |
+| 1 | DUPLICATE |
+| 2 | CAPACITY |
+| 3 | INVALID (malformed content, wrong network, or invalid timestamp) |
+| 4 | UNSUPPORTED |
+| 5 | REPLAY |
+| 6 | UNAUTHORIZED (signature or authority rejection) |
+| 7 | PROVIDER_UNAVAILABLE (unresolved admission prerequisites) |
+| 8 | INTERNAL_ERROR (provider/internal admission error) |
+
+Only ACCEPTED and DUPLICATE include the canonical transaction ID; other results
+contain 32 zero bytes. No payload, provider diagnostics, or validation-stage
+report is echoed. Envelope errors such as FORBIDDEN, INVALID framing, storage
+failure, or insufficient response capacity retain their existing empty-payload
+semantics. Response capacity is checked before mutation. Admission rejection
+does not prune or otherwise change pending entries or active chain state.
+
+PENDING (0x1004) reuses the existing status operation with four u32 fields:
+count at 0, entry capacity (128) at 4, owned byte usage at 8, byte capacity
+(262,144) at 12. This replaces the earlier uncommitted ID-list response;
+clients must expect exactly 16 bytes. No payload browsing or pagination is
+exposed. Existing active-history reconciliation in the service is preserved.
+The Windows listener holds its shared dispatch critical section across status,
+admission, and chain operations; transport reads/writes remain per client.
+The portable service requires the same external serialization.
+
+Production signature/authority providers are not supplied. The actual node
+fails closed; successful admission tests use explicitly scripted validation
+hooks with real SHA-256. The legacy 0x1001 record/report operation is preserved;
+new integrations should use the minimal canonical 0x1005 operation. No mining
+template, nonce, assembly, pending persistence, or gossip behavior is added here.
 
 ## Node/service boundary and read consistency
 

@@ -3,6 +3,7 @@
 #define STN_MINING_H
 #include "stn_node_service.h"
 #include "stn_storage.h"
+#include "stn_pending.h"
 /* Explicit operator-selected canonical body, not a mempool/selection policy.
  * Caller serializes calls and keeps inputs immutable. All buffers and inputs
  * must be disjoint. Default scratch remains caller-owned and never reallocates.
@@ -22,6 +23,9 @@ typedef struct stn_mining_service {
     uint8_t *template_bytes; size_t template_capacity;
     stn_storage_workspace workspace;
     stn_chain_state active;
+    stn_pending *pending;
+    const stn_validation_context *intelligence;
+    uint8_t *pending_body;size_t pending_body_capacity;
     int owns_buffers; /* Opt in only for malloc/realloc-owned scratch. */
 } stn_mining_service;
 #define STN_MINING_PREFIX 68u

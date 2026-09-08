@@ -21,7 +21,7 @@ stn_rpc_code stn_node_service_handle(void *user,const stn_rpc_message *q,uint8_t
     const stn_node_service *s=user;stn_chain_state state;stn_rpc_code code;size_t index;
     if(written!=NULL){*written=0;}
     if(s==NULL || q==NULL || p==NULL || written==NULL){return STN_RPC_PROVIDER;}
-    if(q->method==STN_RPC_ADMIN_CONTROL || q->method==STN_RPC_INTELLIGENCE_ID ||
+    if(q->method==STN_RPC_PENDING || q->method==STN_RPC_ADMIN_CONTROL || q->method==STN_RPC_INTELLIGENCE_ID ||
         q->method==STN_RPC_INTELLIGENCE_CURSOR || q->method==STN_RPC_MINING_TEMPLATE){return STN_RPC_UNAVAILABLE;}
     if(q->method==STN_RPC_CHECK_INTELLIGENCE || q->method==STN_RPC_SUBMIT_INTELLIGENCE){
         stn_validation_report r;uint16_t fields[10];size_t i;

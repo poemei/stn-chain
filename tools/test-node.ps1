@@ -1,6 +1,6 @@
 # Copyright (c) 2026 STN-Labz. See docs/LICENSE.md.
 # Real executable / TCP / CNG / NTFS integration. No mining search loop.
-param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe")
+param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly)
 $ErrorActionPreference = 'Stop'
 $script:checks = 0
 function Check($condition, $message) {
@@ -38,10 +38,11 @@ function Request($stream, [int]$method, [byte[]]$payload, [int]$version = 1) {
     Check ($n -le 1051948) 'response bounded'
     return @{ Code = (ReadNumber $header[10..11]); Payload = (ReadExact $stream ([int]$n)) }
 }
-function StartNode([string]$data, [bool]$once = $true) {
+function StartNode([string]$data, [bool]$once = $true, [string]$genesis = '') {
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = [IO.Path]::GetFullPath($Executable)
     $info.Arguments = '--dev --once --rpc-port 0 --data "' + $data + '"'
+    if ($genesis) { $info.Arguments = $info.Arguments.Replace('--dev', '--genesis "' + $genesis + '"') }
     if (!$once) { $info.Arguments = $info.Arguments.Replace('--once ', '') }
     $info.UseShellExecute = $false; $info.CreateNoWindow = $true
     $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
@@ -59,10 +60,54 @@ function StartNode([string]$data, [bool]$once = $true) {
 $directory = Join-Path ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Executable))) ('node-test-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Path $directory
 $data = Join-Path $directory 'chain.stns'
+$genesisPath = Join-Path $directory 'genesis.block'
 $script:processes = @(); $script:clients = @()
 try {
     $node = StartNode $data
     Check ($node.Height -eq 0) 'genesis startup'
+    $anchor = Request $node.Stream 2 (NumberBytes 0 8)
+    Check ($anchor.Code -eq 0 -and $anchor.Payload.Length -eq 364) 'explicit normal-mode genesis'
+    [IO.File]::WriteAllBytes($genesisPath, $anchor.Payload)
+    if ($PendingRpcOnly) {
+        $node.Client.Close(); Check ($node.Process.WaitForExit(5000)) 'bootstrap stopped'
+        $node = StartNode $data $false $genesisPath
+        $submission = [byte[]]::new(244)
+        [Text.Encoding]::ASCII.GetBytes('STNT').CopyTo($submission, 0)
+        $submission[5]=1; $submission[7]=1; $submission[11]=232
+        [Text.Encoding]::ASCII.GetBytes('STNR').CopyTo($submission, 12)
+        $fields = @{5=1;7=1;8=1;40=2;72=3;103=1;111=10;115=52;117=1;125=5;126=1;128=1;129=97;131=1;132=98;134=1;135=99;136=1;168=4}
+        foreach ($key in $fields.Keys) { $submission[12+$key] = $fields[$key] }
+        $streams = @($node.Stream)
+        for ($i=0; $i -lt 2; $i++) {
+            $client = [Net.Sockets.TcpClient]::new('127.0.0.1', $node.Port)
+            $client.ReceiveTimeout=5000; $client.SendTimeout=5000; $script:clients += $client
+            $streams += $client.GetStream()
+        }
+        # Queue all clients before reading any reply; one has a bad STNC version.
+        for ($i=0; $i -lt 3; $i++) {
+            $version = if ($i -eq 0) { 2 } else { 1 }
+            $frame = [byte[]]([Text.Encoding]::ASCII.GetBytes('STNC') + (NumberBytes $version 2) +
+                (NumberBytes 1 2) + (NumberBytes 0x1005 2) + (NumberBytes 0 2) +
+                (NumberBytes 123 8) + (NumberBytes $submission.Length 4) + $submission)
+            $streams[$i].Write($frame,0,$frame.Length)
+        }
+        for ($i=0; $i -lt 3; $i++) {
+            $header=ReadExact $streams[$i] 24; $code=ReadNumber $header[10..11]
+            $payload=ReadExact $streams[$i] ([int](ReadNumber $header[20..23]))
+            if ($i -eq 0) { Check ($code -eq 2 -and $payload.Length -eq 0) 'bad client isolated' }
+            else { Check ($code -eq 0 -and $payload.Length -eq 36 -and $payload[3] -eq 7) 'real node fails closed without identity providers' }
+            $r=Request $streams[$i] 0x1004 @()
+            Check ($r.Code -eq 0 -and $r.Payload.Length -eq 16 -and
+                (ReadNumber $r.Payload[0..3]) -eq 0 -and (ReadNumber $r.Payload[4..7]) -eq 128 -and
+                (ReadNumber $r.Payload[8..11]) -eq 0 -and (ReadNumber $r.Payload[12..15]) -eq 262144) 'status and session preserved'
+        }
+        $r=Request $node.Stream 0x1005 ([byte[]]::new(65729))
+        Check ($r.Code -eq 1 -and $r.Payload.Length -eq 0) 'oversized submission rejected'
+        $r=Request $streams[1] 1 @()
+        Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq 0) 'other client and chain unchanged'
+        Write-Output "Pending RPC executable/TCP: $script:checks checks, 0 failures."
+        return
+    }
     $r = Request $node.Stream 0x2002 @()
     Check ($r.Code -eq 0 -and $r.Payload.Length -eq 432) 'template retrieval'
     [byte[]]$work = $r.Payload
@@ -152,11 +197,26 @@ try {
     Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[140..147]) -eq 71) 'work after long-history restart'
     $node.Client.Dispose()
     Check ($node.Process.WaitForExit(10000) -and $node.Process.ExitCode -eq 0) 'long-history exit'
+    $node = StartNode $data $true $genesisPath
+    Check ($node.Height -eq 70) 'normal startup without selected transaction'
+    $r = Request $node.Stream 0x1004 @()
+    Check ($r.Code -eq 0 -and $r.Payload.Length -eq 16 -and (ReadNumber $r.Payload[0..3]) -eq 0) 'empty memory-only pending'
+    $r = Request $node.Stream 0x2002 @()
+    Check ($r.Code -eq 5) 'no fixture fallback in normal mode'
+    $record = [byte[]]::new(232)
+    [Text.Encoding]::ASCII.GetBytes('STNR').CopyTo($record, 0)
+    foreach ($pair in @(@(5,1),@(7,1),@(8,1),@(40,2),@(72,3),@(111,10),@(115,52),@(117,1),@(125,5),@(126,1),@(128,1),@(129,97),@(131,1),@(132,98),@(134,1),@(135,99),@(136,1),@(168,4))) { $record[$pair[0]] = $pair[1] }
+    $r = Request $node.Stream 0x1001 $record
+    Check ($r.Code -eq 0 -and $r.Payload.Length -eq 56 -and (ReadNumber $r.Payload[2..3]) -eq 4) 'missing authentication context fails closed'
+    $r = Request $node.Stream 0x1004 @()
+    Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[0..3]) -eq 0) 'unavailable submission never enqueued'
+    $node.Client.Dispose()
+    Check ($node.Process.WaitForExit(10000) -and $node.Process.ExitCode -eq 0) 'normal-mode exit'
     Write-Output "Executable/TCP/NTFS: $script:checks checks, 0 failures."
 } finally {
     foreach ($client in $script:clients) { $client.Dispose() }
     foreach ($p in $script:processes) { if (!$p.HasExited) { $p.Kill(); $p.WaitForExit() }; $p.Dispose() }
-    foreach ($file in @($data, "$data.lock", "$data.stage")) {
+    foreach ($file in @($data, "$data.lock", "$data.stage", $genesisPath)) {
         if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file }
     }
     Remove-Item -LiteralPath $directory

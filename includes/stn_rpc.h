@@ -2,6 +2,7 @@
 #ifndef STN_RPC_H
 #define STN_RPC_H
 #include "stn_block.h"
+#include "stn_pending.h"
 #define STN_RPC_HEADER_SIZE 24u
 #define STN_RPC_MAX_PAYLOAD (68u+STN_BLOCK_MAX_SIZE)
 #define STN_RPC_MAX_FRAME (STN_RPC_HEADER_SIZE+STN_RPC_MAX_PAYLOAD)
@@ -17,10 +18,18 @@ typedef enum stn_rpc_method {
     STN_RPC_INFO=1,STN_RPC_BLOCK_HEIGHT=2,STN_RPC_BLOCK_ID=3,
     STN_RPC_CHECK_INTELLIGENCE=0x1000,STN_RPC_SUBMIT_INTELLIGENCE=0x1001,
     STN_RPC_INTELLIGENCE_ID=0x1002,STN_RPC_INTELLIGENCE_CURSOR=0x1003,
+    STN_RPC_PENDING=0x1004,STN_RPC_SUBMIT_TRANSACTION=0x1005,
     STN_RPC_MINING_CONTEXT=0x2000,STN_RPC_CHECK_WORK_BASE=0x2001,
     STN_RPC_MINING_TEMPLATE=0x2002,STN_RPC_SUBMIT_WORK=0x2003,
     STN_RPC_ADMIN_CONTROL=0x3000
 } stn_rpc_method;
+/* STNC submission-result v1 wire values; independent of internal enums. */
+typedef enum stn_rpc_submission_result {
+    STN_RPC_ADMITTED=0, STN_RPC_DUPLICATE=1, STN_RPC_POOL_FULL=2,
+    STN_RPC_BAD_SUBMISSION=3, STN_RPC_UNSUPPORTED_SUBMISSION=4,
+    STN_RPC_REPLAY=5, STN_RPC_UNAUTHORIZED=6,
+    STN_RPC_ADMISSION_UNAVAILABLE=7, STN_RPC_ADMISSION_INTERNAL=8
+} stn_rpc_submission_result;
 typedef struct stn_rpc_message {
     uint16_t kind; /* 1 request, 2 response */
     uint16_t method;

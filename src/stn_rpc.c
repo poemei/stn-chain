@@ -5,10 +5,10 @@
 static uint32_t capability(uint16_t method)
 {
     switch(method){
-    case STN_RPC_INFO:case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:
+    case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_INTELLIGENCE_CURSOR:
     case STN_RPC_MINING_CONTEXT:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_MINING_TEMPLATE:return STN_RPC_READ;
-    case STN_RPC_SUBMIT_INTELLIGENCE:case STN_RPC_SUBMIT_WORK:return STN_RPC_SUBMISSION;
+    case STN_RPC_SUBMIT_TRANSACTION:case STN_RPC_SUBMIT_INTELLIGENCE:case STN_RPC_SUBMIT_WORK:return STN_RPC_SUBMISSION;
     case STN_RPC_ADMIN_CONTROL:return STN_RPC_ADMIN;
     default:return 0;
     }
@@ -16,7 +16,8 @@ static uint32_t capability(uint16_t method)
 static int shape(uint16_t method,const uint8_t *p,size_t n)
 {
     switch(method){
-    case STN_RPC_INFO:case STN_RPC_MINING_CONTEXT:case STN_RPC_MINING_TEMPLATE:case STN_RPC_ADMIN_CONTROL:return n==0;
+    case STN_RPC_SUBMIT_TRANSACTION:return n<=STN_TX_MAX_SIZE;
+    case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_MINING_CONTEXT:case STN_RPC_MINING_TEMPLATE:case STN_RPC_ADMIN_CONTROL:return n==0;
     case STN_RPC_BLOCK_HEIGHT:return n==8;
     case STN_RPC_BLOCK_ID:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_CHECK_WORK_BASE:return n==32;
     case STN_RPC_INTELLIGENCE_CURSOR:return n==40;
@@ -28,8 +29,14 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
 static int response_shape(uint16_t method,const uint8_t *p,size_t n)
 {
     switch(method){
+    case STN_RPC_SUBMIT_TRANSACTION:return n==36 && stn_wire_read(p,2)==1 && stn_wire_read(p+2,2)<=8;
     case STN_RPC_MINING_TEMPLATE:return shape(STN_RPC_SUBMIT_WORK,p,n);
     case STN_RPC_SUBMIT_WORK:return n==72;
+    case STN_RPC_SUBMIT_INTELLIGENCE:return n==56 && stn_wire_read(p,2)==1 && stn_wire_read(p+2,2)<=STN_PENDING_UNSUPPORTED;
+    case STN_RPC_PENDING:return n==16 &&
+        stn_wire_read(p,4)<=(uint64_t)STN_PENDING_MAX_ENTRIES &&
+        stn_wire_read(p+4,4)==STN_PENDING_MAX_ENTRIES && stn_wire_read(p+8,4)<=STN_PENDING_MAX_BYTES &&
+        stn_wire_read(p+n-4,4)==STN_PENDING_MAX_BYTES;
     case STN_RPC_INFO:return n==176;
     case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:return n>=STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY && n<=STN_BLOCK_MAX_SIZE;
     case STN_RPC_CHECK_INTELLIGENCE:return n==20;

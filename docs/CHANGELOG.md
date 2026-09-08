@@ -5,6 +5,109 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Deterministic pending candidates — 2026-09-08
+
+- Reconciled current pending assembly to consume the store's ascending canonical
+  ID enumeration and reject mismatched active-network validation contexts.
+  Preserved existing revalidation, replay exclusion, canonical body encoding,
+  16-transaction/body limits, deterministic stop behavior, and empty no-work result.
+- Template and work-context queries no longer perform pending pruning. Ineligible
+  entries stay owned by the store; candidate construction is read-only. Existing
+  accepted/peer cleanup behavior is preserved without extension.
+- Normal pending-based mining already bypassed selected.stnt in the current
+  source; preserved that path and explicit --dev fixtures. No CLI redesign,
+  nonce/work-identity change, economic priority, persistence, or gossip added.
+- Added and ran 132 targeted candidate checks: single/multiple inclusion, ID
+  order, reverse arrivals, repeated identical work, count limit, exact/short
+  buffer boundary, empty/ineligible behavior, rejection exclusion, changed-content
+  stale work, zero template nonce, and no removal even for included entries.
+- Release/x64, Visual Studio 2026: zero warnings/errors. The initial test used
+  an incorrect header member name; corrected before the successful build.
+  All 1,130,076 C runtime checks and 34 compile/boundary probes pass, zero failures.
+  Existing pending/admission/RPC/mining regressions remain passing. No new block
+  acceptance, peer/reorg, or long-chain scenarios; no other platform qualification.
+- Updated MINING_WORK.md and ARCHITECTURE.md. Signature/authority success remains
+  scripted in positive tests; production providers are still required. Current
+  working-tree changes preserved. No commit or push performed.
+
+### Canonical pending admission over STNC — 2026-09-08
+
+- Added SUBMIT_TRANSACTION (0x1005), carrying only canonical STNT bytes through
+  the existing validated admission API. Explicit protocol codes distinguish
+  acceptance, duplicate, capacity, invalid, unsupported, replay, unauthorized,
+  unresolved providers, and internal errors. The 36-byte response contains only
+  format/result and an accepted/duplicate ID; all other IDs are zero.
+- Reused PENDING (0x1004) as a fixed 16-byte count, entry-capacity, byte-usage,
+  byte-capacity summary. Replaced its earlier uncommitted ID-list shape; no new
+  browsing or pagination. Preserved legacy record submission and all existing
+  mining/assembly behavior without extending it. No pending persistence/gossip.
+- Preserved listener serialization and per-client transport. Generic submission
+  checks response capacity before admission and does not prune on rejection.
+  Method-oversized payloads reject before admission; global framing is unchanged.
+- Release/x64, Visual Studio 2026: zero warnings/errors. Added 763 RPC checks,
+  including 12 concurrent dispatcher clients (one malformed), exactly one
+  acceptance and ten duplicates, capacity, replay, failure mapping, identity,
+  permissions, bounds, and status accounting. Existing C regressions pass:
+  1,129,944 total C checks, zero failures; 34 build/boundary probes pass.
+- Added and ran the bounded test-node.ps1 -PendingRpcOnly mode: 27 actual
+  executable/TCP checks passed. Concurrent client requests verify missing-provider
+  rejection, bad-client isolation, surviving sessions, oversize rejection, status
+  capacities, and unchanged chain height. Temporary test state was removed.
+  Positive admission uses scripted signature/authority hooks in the C harness;
+  the production node still fails closed without identity providers.
+- Updated RPC.md and ARCHITECTURE.md. No other platform qualification, new mining
+  or P2P scenarios, commit, or push. Existing working-tree changes are preserved.
+
+### Validated pending admission — 2026-09-08
+
+- Added canonical STNT admission through the existing record admission and
+  validation context. Reconciled record admission to use the shared pending-store
+  insertion primitive instead of duplicating allocation and sorted insertion.
+  Preserved the current working tree and existing integration work.
+- Reused canonical decoding, intelligence payload validation, network/time,
+  signature/authority/replay hooks, and protocol transaction-ID derivation.
+  Missing context/providers fail closed. Unsupported outer, record, and payload
+  versions return UNSUPPORTED; malformed data returns INVALID. Existing detailed
+  validation and admission results remain deterministic without another framework.
+- Exact pending IDs take precedence over pending nonce conflicts and capacity
+  after validation. Existing active-history signer/nonce checks supplement the
+  required replay hook. Duplicate/new-full requests preserve count and ownership;
+  accepted bytes are copied by the same bounded store. No replay index added.
+- Release/x64, Visual Studio 2026: zero warnings/errors. Added and ran 311 direct
+  admission checks, zero failures. Prior 1,064 store checks and C regressions pass:
+  1,129,181 total C checks and 34 compile/boundary probes, zero failures. No new
+  RPC, mining, P2P, or long-chain scenarios; no other platform qualification.
+- Positive signature/authority outcomes are explicitly scripted test hooks;
+  production SHA-256 supplies canonical IDs. No production Ed25519/authority
+  provider is introduced. Existing missing-provider behavior remains closed.
+- Updated ARCHITECTURE.md and the public header. No new RPC, template, assembly,
+  gossip, or pending-persistence integration. No commit or push performed.
+
+### In-memory pending store foundation — 2026-09-08
+
+- Added explicit initialization, structural canonical-transaction insertion,
+  copy-out lookup, removal, count, and bounded ID enumeration to the current
+  pending store. Clear supplies reset/destruction. Store insertion is not
+  authenticated admission and does not establish chain eligibility.
+- Independent limits: 128 entries and 256 KiB of owned transaction bytes,
+  plus fixed metadata. Entry/byte exhaustion and allocation failure explicitly
+  reject without eviction or mutation. Duplicate canonical IDs return DUPLICATE
+  even at capacity. Enumeration uses ascending unsigned canonical ID bytes.
+- Inputs are copied; lookup/enumeration return no internal pointers. Removal
+  and clear free owned memory. Initialization allocates nothing. External
+  serialization is required; live stores must not be shallow-copied.
+- Release/x64 (Visual Studio 2026): zero warnings/errors. Added and ran 1,064
+  targeted store checks covering empty/init, insertion, identity, independent
+  input lifetime, lookup buffer capacity, duplicate/full rejection, preservation,
+  arrival-order invariance, bounded pages, removal, reset, and reuse. Zero failures.
+  Existing C regressions also pass: 1,128,870 C checks total, including the
+  preserved 224 pending/assembly checks; 34 compile/boundary probes pass.
+  No additional platform qualification or long-running executable scenarios.
+- Documented the store boundary in ARCHITECTURE.md and its header. Preserved
+  the existing working tree, including earlier uncommitted integration work;
+  this bounded increment adds no RPC, mining-template, assembly, P2P, or pending
+  persistence integration. No commit or push performed.
+
 ### Long-running RPC and longer-history reconciliation — 2026-09-08
 
 - Continued from 548ea36 without resetting the source. Corrected stale cached
