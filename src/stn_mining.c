@@ -124,8 +124,8 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         /* Work construction observes pending state; cleanup is a separate
          * operation even if the active history makes an entry ineligible. */
         if(q->method!=STN_RPC_MINING_TEMPLATE && q->method!=STN_RPC_MINING_CONTEXT &&
-           q->method!=STN_RPC_CHECK_WORK_BASE){
-            if(stn_pending_inclusions(s->pending,&v,remove)!=STN_DATA_OK){code=STN_RPC_PROVIDER;goto done;}
+           q->method!=STN_RPC_CHECK_WORK_BASE && q->method!=STN_RPC_SUBMIT_WORK){
+            if(stn_pending_inclusions(s->pending,&v,&s->chain->hash_provider,remove)!=STN_DATA_OK){code=STN_RPC_PROVIDER;goto done;}
             stn_pending_prune(s->pending,remove);
         }
         if(q->method==STN_RPC_SUBMIT_INTELLIGENCE){
@@ -178,7 +178,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
               n-STN_MINING_NONCE_OFFSET-STN_MINING_NONCE_SIZE)!=0){code=STN_RPC_REJECTED;goto done;}
     if(s->pending!=NULL){
         stn_block_span block={q->payload+68,n};stn_storage_view inclusion={0};inclusion.blocks=&block;inclusion.count=1;
-        if(stn_pending_inclusions(s->pending,&inclusion,remove)!=STN_DATA_OK){code=STN_RPC_PROVIDER;goto done;}
+        if(stn_pending_inclusions(s->pending,&inclusion,&s->chain->hash_provider,remove)!=STN_DATA_OK){code=STN_RPC_PROVIDER;goto done;}
     }
     if(!storage_bytes_required(&v,n,&required) || !ensure_storage_capacity(s,required)){code=STN_RPC_CAPACITY;goto done;}
     accepted=v.state;

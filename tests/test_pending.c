@@ -412,9 +412,22 @@ int test_pending(void)
     s.pending=&first;modes.authority=STN_STAGE_UNRESOLVED;
     r=call(&s,STN_RPC_MINING_TEMPLATE,NULL,0);CHECK(r.code==STN_RPC_UNAVAILABLE && first.count==17);modes.authority=STN_STAGE_PASS;
     memcpy(other,work,n);other[68+159]=1;before=first;old_size=disk_size;memcpy(saved,disk,disk_size);
+    {
+        uint8_t included_id[32],prepared[STN_PENDING_MAX_ENTRIES],unchanged[STN_PENDING_MAX_ENTRIES];
+        stn_hash_provider bad_hash={admission_hash_error,NULL};
+        CHECK(stn_pending_insert(&first,anchor+172,192,&c.hash_provider,included_id)==STN_PENDING_ACCEPTED);
+        before=first;
+        r=call(&s,STN_RPC_SUBMIT_WORK,other,n);
+        CHECK(r.code==STN_RPC_REJECTED && memcmp(&first,&before,sizeof(first))==0);
+        memset(prepared,0xA5,sizeof(prepared));memcpy(unchanged,prepared,sizeof(prepared));
+        CHECK(stn_pending_inclusions(&first,&active,&bad_hash,prepared)==STN_DATA_PROVIDER_ERROR && memcmp(prepared,unchanged,sizeof(prepared))==0 && memcmp(&first,&before,sizeof(first))==0);
+        CHECK(stn_pending_remove(&first,included_id)==STN_PENDING_ACCEPTED);
+        before=first;
+    }
     r=call(&s,STN_RPC_SUBMIT_WORK,other,n);CHECK(r.code==STN_RPC_REJECTED && memcmp(&first,&before,sizeof(first))==0);
     disk_fail=1;r=call(&s,STN_RPC_SUBMIT_WORK,work,n);CHECK(r.code==STN_RPC_PROVIDER && memcmp(&first,&before,sizeof(first))==0 && disk_size==old_size && memcmp(saved,disk,disk_size)==0);disk_fail=0;
     r=call(&s,STN_RPC_SUBMIT_WORK,work,n);CHECK(r.code==STN_RPC_OK && s.active.height==1 && first.count==1 && first.entries[0].nonce[31]==11);
+    CHECK(first.bytes==244 && first.entries[0].length==244);
     record(bytes,1);rejected(&s,bytes,STN_PENDING_REPLAY);
     stn_storage_view_release(&active);CHECK(stn_storage_load(&c,&provider,snapshot,CAP,&active)==STN_STORAGE_OK && active.count==2);
     r=call(&s,STN_RPC_MINING_TEMPLATE,NULL,0);CHECK(r.code==STN_RPC_OK && r.length==484);w=r.length;memcpy(other,r.payload,w);other[68+159]=1;

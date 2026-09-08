@@ -107,7 +107,7 @@ stn_peer_report stn_peer_sync(const stn_chain_context *c,const stn_storage_provi
     const stn_peer_transport *t,stn_peer_workspace *w,stn_chain_state *active)
 {
     stn_peer_report r={0};stn_storage_view local={0};stn_peer_message m;stn_storage_status ss;
-    uint8_t greeting[68],request[8],headers[64][168];stn_block_span *blocks=NULL;
+    uint8_t greeting[68],request[8],headers[64][168],remove[STN_PENDING_MAX_ENTRIES];stn_block_span *blocks=NULL;
     size_t count,i,page,num,offset=0;stn_chain_state checked;int matching=1;
     r.status=STN_PEER_ARGUMENT;
     if(c==NULL || storage==NULL || t==NULL || t->send==NULL || t->receive==NULL || w==NULL || active==NULL || w->candidate==NULL || w->frame==NULL){return r;}
@@ -148,9 +148,14 @@ stn_peer_report stn_peer_sync(const stn_chain_context *c,const stn_storage_provi
             memcpy(w->candidate+offset,bytes,length);blocks[i].bytes=w->candidate+offset;blocks[i].length=length;offset+=length;
         }
     }
+    if(w->pending!=NULL){
+        stn_storage_view included={0};included.blocks=blocks;included.count=count;
+        if(stn_pending_inclusions(w->pending,&included,&c->hash_provider,remove)!=STN_DATA_OK){r.status=STN_PEER_VALIDATION;goto done;}
+    }
     ss=stn_storage_adopt(c,storage,blocks,count,&w->storage,active);
     if(ss==STN_STORAGE_NOT_PREFERRED){r.status=STN_PEER_RETAINED;r.verified=checked;goto done;}
     if(ss!=STN_STORAGE_OK){r.status=STN_PEER_STORAGE;goto done;}
+    if(w->pending!=NULL){stn_pending_prune(w->pending,remove);}
     r.status=STN_PEER_OK;r.verified=checked;
 done:
     free(blocks);stn_storage_view_release(&local);return r;

@@ -2,6 +2,7 @@
 #ifndef STN_PEER_H
 #define STN_PEER_H
 #include "stn_storage.h"
+#include "stn_pending.h"
 #define STN_PEER_HEADER 12u
 #define STN_PEER_MAX_PAYLOAD (STN_BLOCK_MAX_SIZE+4u)
 #define STN_PEER_MAX_FRAME (STN_PEER_HEADER+STN_PEER_MAX_PAYLOAD)
@@ -36,6 +37,9 @@ typedef struct stn_peer_workspace {
     stn_storage_workspace storage;
     uint8_t *candidate;size_t candidate_capacity;
     uint8_t *frame;size_t frame_capacity;
+    /* Optional local store. Serialize the entire sync with pending/RPC work.
+     * Only successful adoption applies prepared canonical-ID removals. */
+    stn_pending *pending;
 } stn_peer_workspace;
 /* STNP,u16 version=1,u16 type,u32 payload length; big-endian, exact framing.
  * Header-only parse gives bounded payload length before reading/allocating.

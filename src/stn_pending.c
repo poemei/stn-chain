@@ -76,9 +76,9 @@ void stn_pending_clear(stn_pending *p)
 }
 static int same_nonce(const stn_pending_entry *e,const stn_record *r)
 {return memcmp(e->signer,r->signer_public_key,32)==0 && memcmp(e->nonce,r->nonce,32)==0;}
-static stn_data_status scan(const stn_pending *p,const stn_storage_view *v,uint8_t *mask,int replay)
+static stn_data_status scan(const stn_pending *p,const stn_storage_view *v,uint8_t *mask,int replay,const stn_hash_provider *hash)
 {
-    size_t i,j,k,offset;stn_block b;stn_transaction tx;stn_record r;
+    size_t i,j,k,offset;stn_block b;stn_transaction tx;stn_record r;uint8_t id[32];
     if(p==NULL || v==NULL || mask==NULL || (v->count!=0 && v->blocks==NULL)){return STN_DATA_ARGUMENT;}
     memset(mask,0,STN_PENDING_MAX_ENTRIES);
     for(i=0;i<v->count;++i){
@@ -88,17 +88,18 @@ static stn_data_status scan(const stn_pending *p,const stn_storage_view *v,uint8
             size_t n=(size_t)stn_wire_read(b.body+offset,4);
             if(stn_transaction_decode(b.body+offset+4,n,&tx)!=STN_DATA_OK ||
                stn_record_decode(tx.record_bytes,tx.record_length,&r)!=STN_RECORD_OK){return STN_DATA_CONTENT;}
-            for(k=0;k<p->count;++k){if(replay ? same_nonce(&p->entries[k],&r) : (p->entries[k].length==n && memcmp(p->entries[k].transaction,b.body+offset+4,n)==0)){mask[k]=1;}}
+            if(!replay && stn_transaction_id(b.body+offset+4,n,hash,id)!=STN_DATA_OK){return STN_DATA_PROVIDER_ERROR;}
+            for(k=0;k<p->count;++k){if(replay ? same_nonce(&p->entries[k],&r) : memcmp(p->entries[k].id,id,32)==0){mask[k]=1;}}
             offset+=4+n;
         }
     }
     return STN_DATA_OK;
 }
-stn_data_status stn_pending_inclusions(const stn_pending *p,const stn_storage_view *v,uint8_t remove[STN_PENDING_MAX_ENTRIES])
+stn_data_status stn_pending_inclusions(const stn_pending *p,const stn_storage_view *v,const stn_hash_provider *hash,uint8_t remove[STN_PENDING_MAX_ENTRIES])
 {
     uint8_t mask[STN_PENDING_MAX_ENTRIES];stn_data_status s;
     if(remove==NULL){return STN_DATA_ARGUMENT;}
-    s=scan(p,v,mask,0);if(s==STN_DATA_OK){memcpy(remove,mask,sizeof(mask));}return s;
+    s=scan(p,v,mask,0,hash);if(s==STN_DATA_OK){memcpy(remove,mask,sizeof(mask));}return s;
 }
 void stn_pending_prune(stn_pending *p,const uint8_t remove[STN_PENDING_MAX_ENTRIES])
 {
@@ -150,7 +151,7 @@ stn_pending_result stn_pending_admit(stn_pending *p,const uint8_t *record,size_t
     /* This check supplements, never replaces, the configured replay hook.
      * Exact accepted IDs necessarily share this network/signer/nonce tuple. */
     probe.entries[0]=e;probe.count=1;
-    if(scan(&probe,active,mask,1)!=STN_DATA_OK){return STN_PENDING_PROVIDER;}
+    if(scan(&probe,active,mask,1,NULL)!=STN_DATA_OK){return STN_PENDING_PROVIDER;}
     if(mask[0]){return STN_PENDING_REPLAY;}
     return stn_pending_insert(p,encoded,n,hash,id);
 }
@@ -186,7 +187,7 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
     if(p==NULL || body==NULL || written==NULL || count==NULL){return STN_DATA_ARGUMENT;}
     if(c==NULL){return STN_DATA_UNRESOLVED;}
     if(active==NULL || memcmp(c->expected_network,active->state.network_id,32)!=0){return STN_DATA_UNRESOLVED;}
-    if(scan(p,active,replay,1)!=STN_DATA_OK){return STN_DATA_CONTENT;}
+    if(scan(p,active,replay,1,NULL)!=STN_DATA_OK){return STN_DATA_CONTENT;}
     if(stn_pending_enumerate(p,0,ids,STN_PENDING_MAX_ENTRIES,&available)!=STN_PENDING_ACCEPTED){return STN_DATA_CONTENT;}
     for(i=0;i<available && n<STN_BLOCK_MAX_TRANSACTIONS;++i){
         size_t at=find_id(p,ids[i]);

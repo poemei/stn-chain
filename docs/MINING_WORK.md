@@ -95,6 +95,15 @@ hooks demonstrating selection do not supply those providers.
 
 ### Header and work identity
 
+Successful local acceptance prepares canonical-ID pending removals before the
+atomic storage transition and applies them only after success. SUBMIT_WORK no
+longer performs preliminary pending pruning, so validation, storage, or stale
+activation failures preserve the complete pending state. Multiple included IDs
+are removed together; absent IDs are harmless and unrelated entries retain their
+bytes/order. Peer synchronization supplies the equivalent post-adoption cleanup
+when its workspace is attached to the node's pending store. Template construction
+continues to remove nothing. Detached-block requeue is not implemented.
+
 `stn_mining_service` loads and fully validates persisted history, then constructs
 one v3 block using its network, tip ID, next height, fixed target, and tip timestamp.
 The timestamp is deliberately unchanged (existing rules allow equality); no wall

@@ -5,6 +5,30 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Accepted-block pending cleanup — 2026-09-08
+
+- Inclusion preparation now derives protocol transaction IDs through the existing
+  hash provider and matches pending IDs explicitly. Preparation is read-only;
+  failures leave the removal mask and store unchanged. Applying the mask releases
+  only matching owned bytes and preserves unrelated ordering/count accounting.
+- Local solved-work acceptance keeps its prepare/commit/prune sequence, but no
+  longer prunes old inclusions before validation. Failed work, persistence, or
+  stale activation therefore cannot consume pending entries.
+- Added an optional pending-store attachment to peer synchronization. Fully
+  validated candidate history prepares removals; only successful atomic adoption
+  applies them. Retained/failed candidates preserve pending. Caller serialization
+  spans synchronization and pending/RPC mutations; no new threads or peer runtime.
+- Added 18 targeted checks, including peer success, unrelated same-nonce/different-ID
+  preservation, failed peer validation/persistence, retained activation, no-match
+  acceptance, missing removal, hash-failure atomicity, local rejection with an
+  already-included pending entry, and byte accounting after multiple local removals.
+  Existing single/multiple acceptance, persistence-failure, template-read-only,
+  pending/admission/RPC/candidate, local mining and P2P regressions still pass.
+- Release/x64, Visual Studio 2026: zero warnings/errors; 1,130,094 C checks and
+  34 compile/boundary probes pass, zero failures. Other platforms unqualified.
+- Updated ARCHITECTURE.md and MINING_WORK.md. Reorg re-addition, pending persistence
+  and gossip remain deferred. No commit or push performed.
+
 ### Deterministic pending candidates — 2026-09-08
 
 - Reconciled current pending assembly to consume the store's ascending canonical

@@ -63,7 +63,7 @@ stn_pending_result stn_pending_admit_transaction(stn_pending *pool,
 /* Prepare inclusion/replay removals without mutation; apply only after successful
  * activation. All outputs/input spans must be disjoint. Mask is not serialized. */
 stn_data_status stn_pending_inclusions(const stn_pending *pool,const stn_storage_view *active,
-    uint8_t remove[STN_PENDING_MAX_ENTRIES]);
+    const stn_hash_provider *hash,uint8_t remove[STN_PENDING_MAX_ENTRIES]);
 void stn_pending_prune(stn_pending *pool,const uint8_t remove[STN_PENDING_MAX_ENTRIES]);
 /* Revalidate eligibility; select ascending unsigned transaction-ID bytes.
  * Skip ineligible entries without eviction. Stop at count/body/caller capacity.

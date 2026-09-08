@@ -237,6 +237,26 @@ assembly, gossip, or pending-persistence integration.
 
 ## Windows node composition
 
+### Accepted-block pending cleanup
+
+Local solved-work acceptance and peer synchronization prepare a bounded removal
+mask by deriving each included transaction's existing canonical ID. Only exact
+pending-ID matches are removed; a different signature/ID sharing a signer and
+nonce is not an inclusion match. Preparation is read-only and publishes no mask
+on hash/decoding failure. Cleanup frees owned bytes and updates count/usage only
+after atomic storage acceptance and active-state publication succeed.
+
+Peer callers attach the node's store through optional `stn_peer_workspace.pending`
+and serialize the entire synchronization with admission, templates and local
+acceptance. A null pointer preserves store-independent peer operation. Successful
+adoption reconciles included IDs across the newly active history; retained,
+invalid, disconnected, and failed-persistence candidates never consume entries.
+No additional workers or runtime peer orchestration are introduced.
+
+Unmatched transactions are normal and unrelated pending entries survive. No
+fallible step follows successful persistence before cleanup. Re-adding detached
+transactions remains deferred, as do pending persistence and gossip.
+
 Pending-derived candidate construction now consumes the store's canonical ID
 enumeration under the same external serialization as admission. Existing
 validation and active-history replay checks determine eligibility; canonical

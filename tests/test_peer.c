@@ -117,6 +117,26 @@ static void synchronization(stn_chain_context *c)
     m.c=c;m.count=3;branch(b,bs,99);reset(c,2,&active);
     r=stn_peer_sync(c,&p,&t,&w,&active);
     CHECK(r.status==STN_PEER_OK && r.reused_blocks==2 && r.received_blocks==1 && active.height==2);
+    {
+        stn_pending pending={0},pending_before;uint8_t id[32],unrelated[192],kept[32];
+        w.pending=&pending;
+        CHECK(stn_pending_insert(&pending,bs[0].bytes+172,192,&c->hash_provider,id)==STN_PENDING_ACCEPTED);
+        memcpy(unrelated,bs[0].bytes+172,192);unrelated[191]^=1;
+        CHECK(stn_pending_insert(&pending,unrelated,192,&c->hash_provider,kept)==STN_PENDING_ACCEPTED);
+        pending_before=pending;reset(c,1,&active);m.count=3;m.mode=0;memset(&m.session,0,sizeof(m.session));
+        mem.fail=1;r=stn_peer_sync(c,&p,&t,&w,&active);
+        CHECK(r.status==STN_PEER_STORAGE && memcmp(&pending,&pending_before,sizeof(pending))==0);mem.fail=0;
+        m.mode=9;memset(&m.session,0,sizeof(m.session));r=stn_peer_sync(c,&p,&t,&w,&active);
+        CHECK(r.status!=STN_PEER_OK && memcmp(&pending,&pending_before,sizeof(pending))==0);
+        m.mode=0;memset(&m.session,0,sizeof(m.session));r=stn_peer_sync(c,&p,&t,&w,&active);
+        CHECK(r.status==STN_PEER_OK && pending.count==1 && pending.bytes==192 && memcmp(pending.entries[0].id,kept,32)==0);
+        pending_before=pending;memset(&m.session,0,sizeof(m.session));r=stn_peer_sync(c,&p,&t,&w,&active);
+        CHECK(r.status==STN_PEER_RETAINED && memcmp(&pending,&pending_before,sizeof(pending))==0);
+        m.count=4;memset(&m.session,0,sizeof(m.session));r=stn_peer_sync(c,&p,&t,&w,&active);
+        CHECK(r.status==STN_PEER_OK && memcmp(&pending,&pending_before,sizeof(pending))==0);
+        CHECK(stn_pending_remove(&pending,id)==STN_PENDING_NOT_FOUND && pending.bytes==192);
+        stn_pending_clear(&pending);w.pending=NULL;
+    }
     memset(&m.session,0,sizeof(m.session));m.mode=1;m.count=2;
     before=active;r=stn_peer_sync(c,&p,&t,&w,&active);
     CHECK(r.status==STN_PEER_RETAINED && memcmp(&active,&before,sizeof(active))==0);
