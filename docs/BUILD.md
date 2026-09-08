@@ -6,7 +6,7 @@ ISO C17, not C++.
 
 Release | x64 is currently the only solution configuration. Use Build >
 Build Solution, then Debug > Start Without Debugging to run the console
-scaffold. It prints its development status and exits; it is not a node yet.
+development node. Use the configured development launch arguments or run-dev.cmd to start loopback RPC; no arguments print usage.
 
 ## Configuration
 
@@ -38,7 +38,7 @@ After building Release | x64, right-click stn-chain-tests in Solution Explorer
 and choose Set as Startup Project. Use Ctrl+F5 to run it. It prints check and
 failure counts and returns a nonzero exit code if a check fails. Checks remain
 enabled in Release builds; they do not use the disabled NDEBUG assert macro.
-Select stn-chain as the startup project again to run the application scaffold.
+Select stn-chain as the startup project again to run the development node.
 
 The test executable is build/x64/Release/stn-chain-tests.exe. It exercises an
 independent byte fixture, round trips, all fixture truncations, capacity and
@@ -109,3 +109,16 @@ Only Release/x64 remains qualified; simulated probes do not build other targets.
 The pre-build helper uses process-scoped PowerShell ExecutionPolicy Bypass to
 run this repository's local verification script. It does not change the machine
 or user execution policy, and it performs no network downloads.
+
+RPC increment: adds 237 runtime checks, giving 1,126,622 runtime plus 34 build
+probes (1,126,656 combined), zero failures. That earlier checkpoint tested RPC in-process; the mining increment below adds a real executable listener. Existing localhost P2P/NTFS integration still passes.
+Both projects compile portable stn_rpc.c and stn_node_service.c.
+
+
+## Mining runtime checkpoint
+
+Build Release | x64, set stn-chain as startup project, and run with the supplied --dev debugger arguments (unless overridden in local VS settings). Alternatively double-click run-dev.cmd in the repository root. It serves binary RPC on 127.0.0.1:18473 and persists the explicit development fixture. See [MINING_WORK.md](MINING_WORK.md).
+
+Run tools/test-node.ps1 with PowerShell process-local -ExecutionPolicy Bypass for the real executable/TCP/NTFS restart checks. This is separate from the C test executable. No persistent execution-policy change is needed.
+
+Validated: 1,127,559 C runtime checks plus 42 executable integration checks = 1,127,601 runtime checks; 34 build probes; 1,127,635 total; zero failures. The Release/x64 solution built with zero warnings/errors. All 1,126,622 prior runtime checks remain passing.

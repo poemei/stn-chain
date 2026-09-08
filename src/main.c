@@ -5,10 +5,5 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(void)
-{
-    if (puts("STN Chain - development scaffold; node not implemented.") == EOF) {
-        return EXIT_FAILURE;
-    }
-    return EXIT_SUCCESS;
-}
+int stn_windows_app(int argc,char **argv);
+int main(int argc,char **argv) { return stn_windows_app(argc,argv); }

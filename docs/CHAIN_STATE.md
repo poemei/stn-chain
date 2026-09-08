@@ -171,3 +171,7 @@ and miner integration. Local validation is not full distributed consensus.
 Bounded peer synchronization now supplies untrusted candidate evidence to these
 same rules. Explicit recovery keeps validated prefixes inactive until complete
 replacement succeeds. See [PEER_PROTOCOL.md](PEER_PROTOCOL.md).
+
+## Mining application
+
+The node now creates deterministic next-block templates and submits solved evidence through existing full-history validation, fork evaluation and atomic persistence. No empty-block exemption, reward transaction, timestamp rule, signature provider or replay rule is introduced. Tip changes from any accepted source invalidate old-parent work. See [MINING_WORK.md](MINING_WORK.md).

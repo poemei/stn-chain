@@ -22,7 +22,7 @@ int test_portability(void)
     stn_work work;uint8_t target[32]={0};stn_peer_message message;size_t n,m,i;
     CHECK(STN_HOST_OS>=STN_OS_WINDOWS && STN_HOST_OS<=STN_OS_MACOS);
     CHECK(STN_HOST_ARCH>=STN_ARCH_X86 && STN_HOST_ARCH<=STN_ARCH_ARM64);
-    CHECK(STN_STORAGE_MAX_SIZE<=UINT32_MAX && STN_PEER_MAX_FRAME<=UINT32_MAX);
+    CHECK(STN_PEER_MAX_FRAME<=UINT32_MAX);
     /* Set every field independently, keeping distinct object padding bytes. */
     memset(&a,0x55,sizeof(a));memset(&b,0xaa,sizeof(b));fields(&a);fields(&b);
     CHECK(stn_record_encode(&a,x,sizeof(x),&n)==STN_RECORD_OK && n==180);

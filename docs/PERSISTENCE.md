@@ -1,8 +1,8 @@
 # Chain Persistence and Atomic Application
 
-Status: implemented bounded ISO C17 storage coordination and a Windows x64
-local NTFS adapter. Full node, networking, mempool and economic state do not
-exist. This is a replaceable snapshot foundation, not a scalable database.
+Status: implemented ISO C17 storage coordination and a Windows x64 local NTFS
+adapter. The runnable node uses this as its current canonical block store. The
+format is still whole-snapshot persistence, not the final scalable/indexed store.
 
 ## Persisted representation
 
@@ -14,14 +14,16 @@ are fixed-width unsigned big-endian. No C structs or derived state are stored.
 | 0 | 4 | STNS magic |
 | 4 | 2 | Storage version 1 |
 | 6 | 2 | Flags 0; unknown flags rejected |
-| 8 | 4 | Count, 1 through 64 |
+| 8 | 4 | Nonzero block count (u32) |
 | 12 onward | repeated | u32 block length followed by exact canonical block bytes |
 | final 32 bytes | 32 | SHA-256 of storage domain followed by all preceding file bytes |
 
 The domain is ASCII STN-CHAIN:STORAGE:1 followed by one NUL. Each block is
-364 through 1,051,880 bytes. Maximum snapshot is 67,320,620 bytes. Minimum
-snapshot is 412 bytes. Counts and lengths are checked before advancing spans;
-truncation and trailing bytes reject. Input limits bound all size arithmetic.
+364 through 1,051,880 bytes. Storage history is no longer coupled to the
+64-block validation/fork batch constant. Counts and lengths are checked against
+the actual file before advancing spans; truncation, overflow and trailing bytes
+reject. The runnable node sizes its workspace from the existing file and grows
+it as accepted blocks require.
 
 The checksum detects accidental corruption, not malicious replacement: anyone
 can recompute it. Complete chain validation is required even when it matches.
@@ -30,9 +32,9 @@ headers carry their normal consensus fields; state is reconstructed from them.
 
 ## Startup and provider boundary
 
-stn_storage_load acquires provider exclusion, reads into caller-owned bounded
-scratch, checks framing/checksum, initializes EMPTY and runs the same complete
-sequence validation used for newly supplied canonical blocks. Structural and
+stn_storage_load acquires provider exclusion, reads into caller-owned scratch,
+checks framing/checksum, initializes EMPTY and validates canonical blocks
+incrementally in chain order. The 64-block batch limit is not a history limit. Structural and
 body checks, network, exact genesis, links, timestamps, target, PoW and work
 must pass. Only then does it publish a view/state. Views borrow scratch bytes.
 
@@ -124,11 +126,11 @@ reorganization, corrupt startup rejection, and real SHA-256 genesis/extension.
 Tests use private temporary files and remove their own files on success.
 Non-Windows adapters, cross-platform tests and power-cut guarantees are absent.
 
-The bound is 64 complete blocks, with whole-snapshot rewriting and repeated
-validation. This is intentionally not appropriate for a growing public chain.
-Scalable indexing, pruning, streaming transactions and recovery tooling need
-separate design. No runtime storage file is opened by the scaffold executable;
-the explicit APIs and tests implement the foundation.
+Whole-snapshot rewriting and full startup validation remain current limitations.
+They are correctness-first behavior, not a 64-block lifetime ceiling. Scalable
+indexing, pruning and a future streaming/segmented store remain separate work.
+Ordinary mined extension now uses a dedicated validate-current-tip + atomic
+replace path rather than whole-history fork-choice evaluation.
 
 Deferred: networking/RPC/discovery/propagation, automatic target adjustment,
 mining/Stratum, wallets, contracts, rewards/issuance/treasury, fees/gas, mempool

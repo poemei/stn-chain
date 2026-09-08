@@ -2,6 +2,7 @@
 #include "stn_storage.h"
 #include "stn_wire_internal.h"
 #include <string.h>
+#include <stdlib.h>
 
 static stn_storage_status digest(const stn_chain_context *c,const uint8_t *p,size_t n,uint8_t out[32])
 {
@@ -13,32 +14,48 @@ static stn_storage_status digest(const stn_chain_context *c,const uint8_t *p,siz
 }
 static stn_storage_status validate(const stn_chain_context *c,const stn_block_span *b,size_t n,stn_chain_state *out)
 {
-    stn_chain_state empty;stn_chain_report r;
-    if(c==NULL || b==NULL || n==0 || n>STN_CHAIN_MAX_BATCH || c->pow_policy==NULL) { return STN_STORAGE_ARGUMENT; }
-    if(stn_chain_initialize(c,&empty)!=STN_DATA_OK) { return STN_STORAGE_VALIDATION; }
-    r=stn_chain_validate_sequence(c,&empty,b,n,out);
-    return r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT ? STN_STORAGE_OK :
-        r.acceptance==STN_ACCEPTANCE_UNRESOLVED ? STN_STORAGE_UNRESOLVED : STN_STORAGE_VALIDATION;
+    stn_chain_state state,next;size_t i;stn_chain_report r;
+    if(c==NULL || b==NULL || n==0 || c->pow_policy==NULL || out==NULL) { return STN_STORAGE_ARGUMENT; }
+    if(stn_chain_initialize(c,&state)!=STN_DATA_OK) { return STN_STORAGE_VALIDATION; }
+    for(i=0;i<n;++i) {
+        r=stn_chain_validate_candidate(c,&state,b[i].bytes,b[i].length,&next);
+        if(r.acceptance==STN_ACCEPTANCE_UNRESOLVED) { return STN_STORAGE_UNRESOLVED; }
+        if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT) { return STN_STORAGE_VALIDATION; }
+        state=next;
+    }
+    *out=state;return STN_STORAGE_OK;
+}
+void stn_storage_view_release(stn_storage_view *v)
+{
+    if(v!=NULL){free(v->blocks);memset(v,0,sizeof(*v));}
 }
 stn_storage_status stn_storage_decode(const stn_chain_context *c,const uint8_t *p,size_t n,stn_storage_view *out)
 {
-    stn_storage_view v={0};size_t i,offset=12,length;uint8_t hash[32];stn_storage_status s;
+    stn_storage_view v={0};size_t i,offset=12,length;uint8_t hash[32];stn_storage_status s;uint64_t count64;
     if(c==NULL || p==NULL || out==NULL) { return STN_STORAGE_ARGUMENT; }
-    if(n<STN_STORAGE_OVERHEAD || n>STN_STORAGE_MAX_SIZE || memcmp(p,"STNS",4)!=0 ||
+    if(n<STN_STORAGE_OVERHEAD || memcmp(p,"STNS",4)!=0 ||
         stn_wire_read(p+4,2)!=1 || stn_wire_read(p+6,2)!=0) { return STN_STORAGE_FORMAT; }
-    v.count=(size_t)stn_wire_read(p+8,4);
-    if(v.count==0 || v.count>STN_CHAIN_MAX_BATCH) { return STN_STORAGE_FORMAT; }
+    count64=stn_wire_read(p+8,4);
+    if(count64==0 || count64>SIZE_MAX/sizeof(stn_block_span)) { return STN_STORAGE_FORMAT; }
+    v.count=(size_t)count64;
+    /* Every record needs at least a length word plus the minimum legal block. */
+    if(v.count>(n-STN_STORAGE_OVERHEAD)/(4u+STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY)) { return STN_STORAGE_FORMAT; }
+    v.blocks=(stn_block_span*)calloc(v.count,sizeof(*v.blocks));
+    if(v.blocks==NULL) { return STN_STORAGE_CAPACITY; }
     for(i=0;i<v.count;++i) {
-        if(n-32-offset<4) { return STN_STORAGE_FORMAT; }
+        if(offset>n-32 || n-32-offset<4) { s=STN_STORAGE_FORMAT;goto fail; }
         length=(size_t)stn_wire_read(p+offset,4);offset+=4;
-        if(length<STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY || length>STN_BLOCK_MAX_SIZE || length>n-32-offset) { return STN_STORAGE_FORMAT; }
+        if(length<STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY || length>STN_BLOCK_MAX_SIZE ||
+           offset>n-32 || length>n-32-offset) { s=STN_STORAGE_FORMAT;goto fail; }
         v.blocks[i].bytes=p+offset;v.blocks[i].length=length;offset+=length;
     }
-    if(offset!=n-32) { return STN_STORAGE_FORMAT; }
-    s=digest(c,p,offset,hash);if(s!=STN_STORAGE_OK) { return s; }
-    if(memcmp(hash,p+offset,32)!=0) { return STN_STORAGE_FORMAT; }
-    s=validate(c,v.blocks,v.count,&v.state);if(s!=STN_STORAGE_OK) { return s; }
+    if(offset!=n-32) { s=STN_STORAGE_FORMAT;goto fail; }
+    s=digest(c,p,offset,hash);if(s!=STN_STORAGE_OK) { goto fail; }
+    if(memcmp(hash,p+offset,32)!=0) { s=STN_STORAGE_FORMAT;goto fail; }
+    s=validate(c,v.blocks,v.count,&v.state);if(s!=STN_STORAGE_OK) { goto fail; }
     *out=v;return STN_STORAGE_OK;
+fail:
+    stn_storage_view_release(&v);return s;
 }
 stn_storage_status stn_storage_encode(const stn_chain_context *c,const stn_block_span *b,size_t n,
     uint8_t *p,size_t capacity,size_t *written)
@@ -49,8 +66,12 @@ stn_storage_status stn_storage_encode(const stn_chain_context *c,const stn_block
     uint8_t hash[32];
     if(written!=NULL) { *written=0; }
     if(p==NULL || written==NULL) { return STN_STORAGE_ARGUMENT; }
+    if(n>UINT32_MAX){return STN_STORAGE_CAPACITY;}
     s=validate(c,b,n,&state);if(s!=STN_STORAGE_OK) { return s; }
-    for(i=0;i<n;++i) { total+=4+b[i].length; }
+    for(i=0;i<n;++i) {
+        if(b[i].length>SIZE_MAX-total-4u){return STN_STORAGE_CAPACITY;}
+        total+=4u+b[i].length;
+    }
     if(total>capacity) { return STN_STORAGE_CAPACITY; }
     memcpy(p,"STNS",4);stn_wire_write(p+4,2,1);stn_wire_write(p+6,2,0);stn_wire_write(p+8,4,n);
     for(i=0;i<n;++i) { stn_wire_write(p+offset,4,b[i].length);offset+=4;memcpy(p+offset,b[i].bytes,b[i].length);offset+=b[i].length; }
@@ -73,7 +94,6 @@ static stn_storage_status read_locked(const stn_chain_context *c,const stn_stora
     uint8_t *scratch,size_t capacity,stn_storage_view *out)
 {
     size_t n=0;stn_storage_status s;
-    if(capacity>STN_STORAGE_MAX_SIZE) { capacity=STN_STORAGE_MAX_SIZE; }
     s=io_status(p->read(p->user,scratch,capacity,&n));
     if(s!=STN_STORAGE_OK) { return s; }
     if(n>capacity) { return STN_STORAGE_IO; }
@@ -119,7 +139,7 @@ stn_storage_status stn_storage_create(const stn_chain_context *c,const stn_stora
 stn_storage_status stn_storage_apply(const stn_chain_context *c,const stn_storage_provider *p,
     const stn_block_span *b,size_t n,const stn_reorg_plan *plan,stn_storage_workspace *w,stn_chain_state *active)
 {
-    stn_storage_status s;stn_storage_view current;stn_reorg_plan fresh;stn_fork_report r;size_t length;
+    stn_storage_status s;stn_storage_view current={0};stn_reorg_plan fresh;stn_fork_report r;size_t length;
     if(c==NULL || !provider_valid(p) || b==NULL || plan==NULL || w==NULL || active==NULL ||
         w->current_bytes==NULL || w->next_bytes==NULL) { return STN_STORAGE_ARGUMENT; }
     s=io_status(p->acquire(p->user));if(s!=STN_STORAGE_OK) { return s; }
@@ -137,7 +157,33 @@ stn_storage_status stn_storage_apply(const stn_chain_context *c,const stn_storag
     if(s==STN_STORAGE_OK) { s=io_status(p->replace(p->user,w->next_bytes,length)); }
     if(s==STN_STORAGE_OK) { *active=fresh.candidate; }
 done:
-    p->release(p->user);return s;
+    stn_storage_view_release(&current);p->release(p->user);return s;
+}
+
+stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_storage_provider *p,
+    const uint8_t *block,size_t block_length,stn_storage_workspace *w,stn_chain_state *active)
+{
+    stn_storage_status s;stn_storage_view current={0};stn_chain_state next;stn_chain_report r;
+    stn_block_span *history=NULL;size_t encoded=0;
+    if(c==NULL || !provider_valid(p) || block==NULL || w==NULL || active==NULL ||
+       w->current_bytes==NULL || w->next_bytes==NULL){return STN_STORAGE_ARGUMENT;}
+    s=io_status(p->acquire(p->user));if(s!=STN_STORAGE_OK){return s;}
+    s=read_locked(c,p,w->current_bytes,w->current_capacity,&current);
+    if(s!=STN_STORAGE_OK){goto done;}
+    if(!state_equal(active,&current.state)){s=STN_STORAGE_STALE;goto done;}
+    r=stn_chain_validate_candidate(c,&current.state,block,block_length,&next);
+    if(r.acceptance==STN_ACCEPTANCE_UNRESOLVED){s=STN_STORAGE_UNRESOLVED;goto done;}
+    if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){s=STN_STORAGE_VALIDATION;goto done;}
+    if(current.count==SIZE_MAX/sizeof(*history)){s=STN_STORAGE_CAPACITY;goto done;}
+    history=(stn_block_span*)malloc((current.count+1u)*sizeof(*history));
+    if(history==NULL){s=STN_STORAGE_CAPACITY;goto done;}
+    if(current.count!=0){memcpy(history,current.blocks,current.count*sizeof(*history));}
+    history[current.count].bytes=block;history[current.count].length=block_length;
+    s=stn_storage_encode(c,history,current.count+1u,w->next_bytes,w->next_capacity,&encoded);
+    if(s==STN_STORAGE_OK){s=io_status(p->replace(p->user,w->next_bytes,encoded));}
+    if(s==STN_STORAGE_OK){*active=next;}
+done:
+    free(history);stn_storage_view_release(&current);p->release(p->user);return s;
 }
 
 static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_storage_provider *p,
@@ -145,7 +191,6 @@ static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_s
 {
     stn_storage_view v={0};size_t n=0,count=0,offset=12,i;stn_storage_status s;
     if(c->pow_policy==NULL || stn_chain_initialize(c,&v.state)!=STN_DATA_OK) { return STN_STORAGE_VALIDATION; }
-    if(capacity>STN_STORAGE_MAX_SIZE) { capacity=STN_STORAGE_MAX_SIZE; }
     s=io_status(p->read(p->user,scratch,capacity,&n));
     if(s==STN_STORAGE_NOT_FOUND) { *out=v;*recovery=1;return STN_STORAGE_OK; }
     if(s!=STN_STORAGE_OK) { return s; }
@@ -156,7 +201,11 @@ static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_s
     /* Wrong/unknown framing is not guessed. Do not interpret unsupported versions. */
     if(n>=12 && memcmp(scratch,"STNS",4)==0 && stn_wire_read(scratch+4,2)==1 && stn_wire_read(scratch+6,2)==0) {
         count=(size_t)stn_wire_read(scratch+8,4);
-        if(count>STN_CHAIN_MAX_BATCH) { count=0; }
+        if(count!=0 && count<=SIZE_MAX/sizeof(stn_block_span) &&
+           count<=(n>=STN_STORAGE_OVERHEAD ? (n-STN_STORAGE_OVERHEAD)/(4u+STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY) : 0)) {
+            v.blocks=(stn_block_span*)calloc(count,sizeof(*v.blocks));
+            if(v.blocks==NULL){return STN_STORAGE_CAPACITY;}
+        } else { count=0; }
     }
     for(i=0;i<count;++i) {
         size_t length;stn_chain_report r;
@@ -164,8 +213,8 @@ static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_s
         length=(size_t)stn_wire_read(scratch+offset,4);offset+=4;
         if(length>STN_BLOCK_MAX_SIZE || length>n-offset) { break; }
         r=stn_chain_validate_candidate(c,&v.state,scratch+offset,length,&v.state);
-        if(r.acceptance==STN_ACCEPTANCE_UNRESOLVED) { return STN_STORAGE_UNRESOLVED; }
-        if(r.acceptance==STN_ACCEPTANCE_ERROR) { return STN_STORAGE_IO; }
+        if(r.acceptance==STN_ACCEPTANCE_UNRESOLVED) { stn_storage_view_release(&v);return STN_STORAGE_UNRESOLVED; }
+        if(r.acceptance==STN_ACCEPTANCE_ERROR) { stn_storage_view_release(&v);return STN_STORAGE_IO; }
         if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT) { break; }
         v.blocks[v.count].bytes=scratch+offset;v.blocks[v.count].length=length;++v.count;offset+=length;
     }
@@ -182,7 +231,7 @@ stn_storage_status stn_storage_recovery_read(const stn_chain_context *c,const st
 stn_storage_status stn_storage_adopt(const stn_chain_context *c,const stn_storage_provider *p,
     const stn_block_span *b,size_t n,stn_storage_workspace *w,stn_chain_state *active)
 {
-    stn_storage_status s;stn_storage_view local;stn_chain_state candidate;int recovery;
+    stn_storage_status s;stn_storage_view local={0};stn_chain_state candidate;int recovery;
     stn_reorg_plan plan;stn_fork_report r;size_t length;
     if(c==NULL || !provider_valid(p) || w==NULL || active==NULL || w->current_bytes==NULL || w->next_bytes==NULL) { return STN_STORAGE_ARGUMENT; }
     s=validate(c,b,n,&candidate);if(s!=STN_STORAGE_OK) { return s; }
@@ -202,5 +251,5 @@ stn_storage_status stn_storage_adopt(const stn_chain_context *c,const stn_storag
     if(s==STN_STORAGE_OK) { s=io_status(p->replace(p->user,w->next_bytes,length)); }
     if(s==STN_STORAGE_OK) { *active=candidate; }
 finished:
-    p->release(p->user);return s;
+    stn_storage_view_release(&local);p->release(p->user);return s;
 }

@@ -14,7 +14,7 @@ consensus implementations or cosmetic core directory migration is introduced.
 | --- | --- |
 | includes/ | Portable core types and explicit service contracts |
 | src/stn_*.c | Canonical codecs, validation, work, chain/fork logic, protocol/sync and storage coordination |
-| src/main.c | Application composition and current scaffold entry point |
+| src/main.c | Application composition and development-node entry point |
 | platforms/stn_build_config.h | Sole compiler-macro OS/CPU detection |
 | platforms/stn_backend.h | Deliberate runtime backend availability gate |
 | platforms/windows/ | CNG, Winsock, NTFS and their Windows-specific declarations |
@@ -108,3 +108,13 @@ pre-build probes use provisioned Visual Studio tools and do not download tools.
 Deferred: Linux/macOS implementations and qualification, ARM/x86 qualification,
 public RPC/explorer APIs, wallets, contracts, mining/Stratum, difficulty adjustment,
 economics and mempool. No protocol or software release version is changed.
+
+## RPC follow-up
+
+RPC codecs/dispatch and node-service snapshots now reside in portable src/ and
+includes/. They contain no OS APIs, paths, native handles or struct wire copies.
+The Windows loopback RPC runtime is now implemented; transport must stay
+behind platform interfaces. See [RPC.md](RPC.md).
+
+
+Mining-work identity hashes canonical bytes including the body with a zero nonce; no native structures, addresses or ambient time are serialized. The runnable Windows composition lives in platforms/windows/stn_app_windows.c and reuses CNG/NTFS/Winsock adapters. Tests cover input relocation and unaligned work; only Release/x64 is qualified.

@@ -1,0 +1,145 @@
+# Deterministic mining work and runnable development node
+
+Implemented on Windows Release/x64. This is a node-side work interface, not a
+miner, Stratum server, public network, wallet, or coin. Production CNG SHA-256
+and the existing v3 block rules validate submitted work regardless of its source.
+
+## Run locally
+
+Build Release | x64 in Visual Studio, then double-click `run-dev.cmd` in the
+repository root. It starts `build\x64\Release\stn-chain.exe` with:
+
+```
+stn-chain.exe --dev --data stn-chain-dev.stns --rpc-port 18473
+```
+
+The listener is **127.0.0.1:18473**, binary RPC v1 `STNC` (see [RPC.md](RPC.md)).
+It is not HTTP/JSON-RPC, Bitcoin RPC, Ethereum RPC, or Stratum. stn-stratumd must
+implement this documented node-facing protocol; compatibility with an existing
+stratumd implementation has not been tested. No stratumd source was supplied.
+There is no background mining. Ctrl+C requests shutdown. Socket timeouts are
+idle I/O bounds; a healthy connection is no longer killed by a fixed total
+session lifetime.
+
+`--dev` explicitly selects the existing fixed real-SHA256 regression genesis
+and its single structural test transaction. The fixture has **no semantically
+validated intelligence**, production signatures, admission policy, or monetary
+value. Its repeat use is an explicit test configuration, not transaction selection
+or production replay policy. The first template is already solved at nonce 0;
+nonce 1 fails PoW and nonce 2 also solves it. These are fixed test vectors, not
+a search implementation. Later templates require valid work supplied by a client.
+
+For explicit operator-selected development inputs:
+
+```
+stn-chain.exe --genesis genesis.block --transaction selected.stnt --data chain.stns --rpc-port 18473
+```
+
+Supply canonical v3 genesis bytes and one canonical STNT transaction, not text
+or hexadecimal. Network and fixed target come from the exact genesis, which is
+fully validated including PoW. The selected transaction is reused until restart
+with a different explicit input. There is no automatic selection from prior blocks
+or a submission queue. Without configured content the core returns UNAVAILABLE:
+current consensus requires at least one transaction, so empty blocks are invalid.
+This remains a structural development chain; signature/authority/replay admission
+is not silently added to the existing block validator.
+
+Data paths require an existing trusted directory on local fixed NTFS. Missing
+storage is created once; existing storage is fully revalidated. Corruption fails
+startup and is never treated as an empty chain. The app does not automatically
+invoke recovery or P2P synchronization. It reloads disk on each request, so an
+external writer using the existing storage contract is observed on the next call.
+`--rpc-port 0` chooses and prints a free port. `--once` exits after one connection
+and is used by `tools/test-node.ps1`. No arguments print usage.
+
+Chain history is no longer bounded by the 64-block validation batch constant,
+and the runnable node grows its storage work buffers as history grows. RPC keeps
+connections alive while I/O remains active rather than enforcing a 64-request or
+60-second total-session fixture. The current listener is still loopback and
+single-client; public binding, authentication, peer discovery and concurrent
+client service remain deferred.
+
+## Canonical template
+
+`stn_mining_service` loads and fully validates persisted history, then constructs
+one v3 block using its network, tip ID, next height, fixed target, and tip timestamp.
+The timestamp is deliberately unchanged (existing rules allow equality); no wall
+clock or process state contributes. The explicit canonical body supplies count,
+length, and calculated body commitment. Structural/network/integrity checks run
+before publication. The template nonce is zero. Zero nonce need not satisfy PoW.
+Capacity and cumulative-work overflow fail closed. No rewards or fees are inserted.
+
+The response and solved-work request share this payload:
+
+| Offset | Bytes | Meaning |
+| --- | ---: | --- |
+| 0 | 32 | Current parent/tip ID |
+| 32 | 32 | Deterministic work ID |
+| 64 | 4 | Canonical block length, unsigned big-endian |
+| 68 | block length | Complete canonical candidate block |
+
+```
+work_id = SHA256("STN-CHAIN:WORK:ID:1" || 00 || complete_zero_nonce_block)
+```
+
+The NUL is exactly one byte. Work identity includes the body, not just the header.
+Only **block offsets 152..159** (payload 220..227) may change: one unsigned
+64-bit big-endian nonce. All other bytes and the work ID must match exactly.
+The 32-byte unsigned big-endian target is at block offsets 120..151 (payload
+188..219). Do not reverse hash bytes or use Bitcoin compact-target notation.
+
+PoW remains single SHA-256 of `"STN-CHAIN:BLOCK:ID:1" || 00 || header[0..167]`.
+Interpret the digest as unsigned big-endian and require H <= T. Header offset
+152 is not a Bitcoin 32-bit nonce, and SHA256d ASIC compatibility is not claimed.
+
+Independent first development work ID:
+`59f6d10b443dcf2bf0bb37f021b3c5644a66e71839be8380d956cbf2ca4b76c7`.
+Nonce-zero child block ID:
+`35eb9fa251a3eeca9412b3c23159fbdbf26d874fa9af8969341d2ef67d8c8726`.
+
+## Submission and atomicity
+
+Send the returned payload to RPC 0x2003, changing only nonce bytes. The node
+reloads the current snapshot, rejects a different parent as STALE, rebuilds the
+canonical template, and verifies its work ID and every immutable byte. An unknown
+ID or changed content under the same parent is REJECTED. Malformed nested lengths
+are INVALID. No cache or list of previously issued jobs is required. Repeated
+identical context/body produces the same work ID across restarts and relocations.
+
+Solved local work is validated directly against the current accepted tip using
+the ordinary candidate validator, including real SHA-256, PoW, body, network,
+link, timestamp and target rules. `stn_storage_extend` reloads under exclusion,
+requires the persisted state to still equal the active state, revalidates the
+candidate, and atomically replaces storage before publishing the new active state.
+Fork choice remains reserved for actual competing branches rather than ordinary
+one-block extension.
+An intervening accepted write produces STALE; failed replacement leaves both the
+previous persisted snapshot and this service's accepted-state output unchanged.
+Successful response is block ID 32, accepted height u64, cumulative work 32 (72 bytes).
+Failure responses carry no payload.
+
+Tip changes caused by local work, peer extension, reorganization, or recovered-chain
+activation invalidate work identically: no origin-specific branch exists. Repair
+that restores the exact same tip and configured content does not create a new job.
+The cached `active` field records successful local submissions; validation and
+queries always reload disk rather than trust that cache after another writer acts.
+
+Stratum distributes the canonical work; miners search it; STN-Chain validates
+solutions. Internal miners can call this same logical service using the same
+payload. Neither needs access to storage files, private state, nor candidate
+construction logic. There is no privileged internal-miner acceptance route.
+
+## Verification and remaining scope
+
+The C suite tests independent work bytes/ID, repeated/relocated inputs, unaligned
+submissions, every immutable byte, fixed valid and invalid real PoW, malformed
+requests, RPC responses, local extension, reorganization, recovered activation,
+intervening storage writes, and replacement failure without partial activation.
+`tools/test-node.ps1` starts the real executable, fragments TCP headers, exercises
+work retrieval/submission/errors, stops it, and verifies NTFS persistence on restart.
+Pointer-width independence is a serialization property, not an x86/ARM build claim.
+
+Deferred: CPU/GPU/ASIC mining and detection, internal/background mining, Stratum/
+stn-stratumd, shares/payouts, wallet/coin/issuance/rewards/treasury, fees/gas/economics,
+difficulty adjustment, mempool/admission, contract runtime, explorer, public RPC
+deployment/authentication, and additional OS/architecture qualification.

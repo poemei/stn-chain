@@ -27,6 +27,8 @@
     <OutDir>$(ProjectDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)build\obj\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>stn-chain</TargetName>
+    <LocalDebuggerCommandArguments>--dev --data &quot;$(ProjectDir)stn-chain-dev.stns&quot; --rpc-port 18473</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -76,4 +78,4 @@
     <None Include="platforms\README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-<ItemGroup><ClCompile Include="src\stn_storage.c" /><ClCompile Include="platforms\windows\stn_storage_windows.c" /><ClInclude Include="includes\stn_storage.h" /><ClInclude Include="platforms\windows\stn_windows_storage.h" /></ItemGroup><ItemGroup><ClCompile Include="src\stn_peer.c" /><ClCompile Include="platforms\windows\stn_peer_windows.c" /><ClInclude Include="includes\stn_peer.h" /><ClInclude Include="platforms\windows\stn_windows_peer.h" /></ItemGroup><ItemGroup><ClInclude Include="platforms\stn_build_config.h" /><ClInclude Include="platforms\stn_backend.h" /></ItemGroup></Project>
+<ItemGroup><ClCompile Include="src\stn_storage.c" /><ClCompile Include="platforms\windows\stn_storage_windows.c" /><ClInclude Include="includes\stn_storage.h" /><ClInclude Include="platforms\windows\stn_windows_storage.h" /></ItemGroup><ItemGroup><ClCompile Include="src\stn_peer.c" /><ClCompile Include="platforms\windows\stn_peer_windows.c" /><ClInclude Include="includes\stn_peer.h" /><ClInclude Include="platforms\windows\stn_windows_peer.h" /></ItemGroup><ItemGroup><ClInclude Include="platforms\stn_build_config.h" /><ClInclude Include="platforms\stn_backend.h" /></ItemGroup><ItemGroup><ClCompile Include="src\stn_rpc.c" /><ClCompile Include="src\stn_node_service.c" /><ClInclude Include="includes\stn_rpc.h" /><ClInclude Include="includes\stn_node_service.h" /></ItemGroup><ItemGroup><ClCompile Include="src\stn_mining.c" /><ClInclude Include="includes\stn_mining.h" /></ItemGroup><ItemGroup><ClCompile Include="platforms\windows\stn_app_windows.c" /></ItemGroup><ItemGroup><None Include="docs\MINING_WORK.md" /><None Include="tools\test-node.ps1" /><None Include="run-dev.cmd" /></ItemGroup></Project>

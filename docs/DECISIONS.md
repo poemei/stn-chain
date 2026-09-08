@@ -166,3 +166,28 @@ hashing, transport/time, persistence and exclusion without unused abstractions.
 D-034: Enforce boundary/detection probes during the native test-project build;
 retain canonical fixtures and add padding/alignment/endian invariance checks.
 Only Windows Release/x64 is qualified. See [PORTABILITY.md](PORTABILITY.md).
+
+## RPC core increment (2026-09-07)
+
+D-035: Adopt RPC-v1 STNC fixed binary framing with deterministic error codes and
+method shapes. Dispatch only validated requests after explicit capability checks.
+No new protocol transport or public listener is introduced.
+
+D-036: Chain queries use a held immutable snapshot and existing full validation;
+never expose persistence paths or treat cached/remote metadata as authority.
+
+D-037: Intelligence checking uses the existing staged validator; submission
+remains unavailable without an admission path. Mining exposes tip/target context
+and deterministic base-tip freshness only, not templates or accepted solutions.
+
+D-038: RPC is the application/miner integration boundary, separate from P2P.
+Read/submission/admin classification is explicit; authentication and deployment
+remain deferred. See [RPC.md](RPC.md).
+
+## Mining work and development runtime (2026-09-07)
+
+D-039: Bind work to the entire zero-nonce canonical block with domain-separated SHA-256. Permit only the existing 64-bit big-endian nonce to change. Rebuild deterministically from current validated persisted evidence; no job cache or miner-specific validity.
+
+D-040: Existing blocks require content and no admission queue exists. Require explicit configured canonical content, with an explicit --dev fixture for integration tests; introduce neither empty blocks nor inferred transaction selection. Preserve the existing structural/semantic boundary.
+
+D-041: Implement reserved mining RPC successes within existing v1 bounds. Apply solved blocks through ordinary fork evaluation and atomic storage application. Provide a bounded Windows loopback executable for external integration, reusing existing OS adapters. Public deployment, authentication, automatic P2P orchestration and mining remain deferred.

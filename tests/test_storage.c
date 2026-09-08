@@ -9,8 +9,8 @@
 static unsigned checks,failures;
 #define CHECK(e) do { ++checks; if(!(e)){++failures;fprintf(stderr,"storage line %d: %s\n",__LINE__,#e);} } while(0)
 #define CAP 24000u
-static uint8_t a[64][364],b[64][364],encoded[CAP],scratch[CAP],next_bytes[CAP],backup[CAP];
-static stn_block_span as[64],bs[64];
+static uint8_t a[65][364],b[65][364],encoded[CAP],scratch[CAP],next_bytes[CAP],backup[CAP];
+static stn_block_span as[65],bs[65];
 static stn_data_status hash_status=STN_DATA_OK;
 static stn_data_status test_hash(void *u,const uint8_t *d,size_t dn,const uint8_t *p,size_t n,uint8_t out[32])
 {
@@ -31,10 +31,10 @@ static void fixture(uint8_t p[364])
     memcpy(p+184,"STNR",4);p[189]=1;p[191]=1;p[192]=1;p[256]=3;
     memcpy(p+88,commitment,32);memset(p+120,255,32);p[120]=127;
 }
-static void branch(uint8_t blocks[64][364],stn_block_span spans[64],unsigned split)
+static void branch(uint8_t blocks[65][364],stn_block_span spans[65],unsigned split)
 {
     unsigned i;fixture(blocks[0]);
-    for(i=0;i<64;++i) {
+    for(i=0;i<65;++i) {
         if(i!=0) {
             memcpy(blocks[i],blocks[i-1],364);memset(blocks[i]+40,0,32);
             blocks[i][70]=blocks[i-1][87];blocks[i][71]=(uint8_t)i;blocks[i][79]=(uint8_t)i;
@@ -85,11 +85,11 @@ static void codecs(stn_chain_context *c)
     hash_status=STN_DATA_UNRESOLVED;CHECK(stn_storage_decode(c,encoded,n,&view)==STN_STORAGE_UNRESOLVED);
     hash_status=STN_DATA_PROVIDER_ERROR;CHECK(stn_storage_decode(c,encoded,n,&view)!=STN_STORAGE_OK);hash_status=STN_DATA_OK;
     CHECK(stn_storage_encode(c,as,0,encoded,CAP,&n)==STN_STORAGE_ARGUMENT && n==0);
-    CHECK(stn_storage_encode(c,as,65,encoded,CAP,&n)==STN_STORAGE_ARGUMENT && n==0);
+    CHECK(stn_storage_encode(c,as,65,encoded,CAP,&n)==STN_STORAGE_OK && n==23964);
+    CHECK(stn_storage_decode(c,encoded,n,&view)==STN_STORAGE_OK && view.count==65 && view.state.height==64 && view.state.cumulative_work.bytes[31]==130);
     CHECK(stn_storage_encode(c,as,1,encoded,10,&n)==STN_STORAGE_CAPACITY && n==0);
     CHECK(stn_storage_encode(c,as,64,encoded,CAP,&n)==STN_STORAGE_OK && n==23596);
     CHECK(stn_storage_decode(c,encoded,n,&view)==STN_STORAGE_OK && view.count==64 && view.state.height==63 && view.state.cumulative_work.bytes[31]==128);
-    CHECK(stn_storage_decode(c,encoded,(size_t)STN_STORAGE_MAX_SIZE+1,&view)==STN_STORAGE_FORMAT);
     CHECK(stn_storage_decode(NULL,encoded,n,&view)==STN_STORAGE_ARGUMENT);
     CHECK(stn_storage_decode(c,NULL,n,&view)==STN_STORAGE_ARGUMENT);
     CHECK(stn_storage_decode(c,encoded,n,NULL)==STN_STORAGE_ARGUMENT);

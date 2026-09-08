@@ -45,3 +45,8 @@ ipch/
 # Windows Explorer metadata
 Thumbs.db
 Desktop.ini
+
+# Local development chain and adapter sidecars
+/stn-chain-dev.stns
+/stn-chain-dev.stns.lock
+/stn-chain-dev.stns.stage

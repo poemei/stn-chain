@@ -17,8 +17,8 @@ validation context, deterministic transaction/block containers, and local
 chain-state/link validation, Windows SHA-256, and development PoW verification
 with cumulative chain-work accounting, validated fork/reorganization planning,
 bounded Windows persistence with atomic chain application, and a bounded P2P
-exchange with validated synchronization and explicit recovery;
-there is no implemented node, miner, contract runtime, or coin.
+exchange with validated synchronization and explicit recovery, plus a bounded
+RPC core, deterministic mining templates, atomic solved-work acceptance, and a runnable Windows development node with loopback RPC. There is no miner, contract runtime, or coin.
 The redesign has no compatibility requirement
 with the old Go implementation.
 
@@ -28,6 +28,14 @@ Open [stn-chain.sln](stn-chain.sln) in Visual Studio 2026 and build
 Release | x64. Headers are in includes/ and C sources in src/.
 See [Visual Studio build instructions](docs/BUILD.md).
 Planned OS/architecture boundaries are listed in [platforms](platforms/README.md).
+
+## Run for local stratumd integration
+
+After building Release | x64, double-click [run-dev.cmd](run-dev.cmd). The node
+listens on 127.0.0.1:18473 using binary STNC RPC v1. This explicit development
+fixture supplies mining work and accepts valid solutions to multiple concurrent
+loopback clients; it is not Stratum or Bitcoin JSON-RPC. See [running and mining work](docs/MINING_WORK.md) for
+configuration, client protocol, persistence, and limits.
 
 ## Direction
 
@@ -64,6 +72,7 @@ compatibility with either is not currently a requirement.
 - [Persistence and atomic application](docs/PERSISTENCE.md)
 - [Peer protocol, synchronization and recovery](docs/PEER_PROTOCOL.md)
 - [Platform isolation and invariance](docs/PORTABILITY.md)
+- [RPC application/miner interface](docs/RPC.md)
 - [Changelog](docs/CHANGELOG.md)
 
 These documents distinguish established direction from proposed engineering

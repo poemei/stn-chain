@@ -164,3 +164,17 @@ systems and processor architectures.
 The current layout and compile-time selection gates are documented in
 [PORTABILITY.md](PORTABILITY.md). OS-specific declarations and services live
 under platforms/; portable core modules share all consensus/wire behavior.
+
+## RPC service boundary
+
+RPC semantics call explicit node/service interfaces, which use the portable
+validators and immutable snapshots. Transport remains a separate platform
+responsibility. RPC is the supported application/miner integration boundary;
+external tools must not inspect persistence files as an authoritative interface.
+P2P is node-to-node evidence exchange; RPC is application-to-node interaction.
+No RPC client gains consensus authority and no node becomes authoritative merely
+by exposing RPC. See [RPC.md](RPC.md) for implemented and deferred methods.
+
+## Runnable node and mining work
+
+The Windows application composes existing storage and byte-transport adapters with the portable mining service. It provides loopback RPC and strict persisted startup; automatic P2P orchestration remains deferred. Explicit configured transaction content produces deterministic work. Submitted solutions use ordinary full fork evaluation and atomic storage application with production SHA-256. Mining origin grants no authority. See [MINING_WORK.md](MINING_WORK.md).

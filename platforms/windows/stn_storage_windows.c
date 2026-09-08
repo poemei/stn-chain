@@ -34,7 +34,9 @@ static stn_storage_status read_snapshot(void *user,uint8_t *bytes,size_t capacit
         FILE_ATTRIBUTE_NORMAL|FILE_FLAG_OPEN_REPARSE_POINT,NULL);
     if(h==INVALID_HANDLE_VALUE) { return GetLastError()==ERROR_FILE_NOT_FOUND ? STN_STORAGE_NOT_FOUND : STN_STORAGE_IO; }
     if(!ordinary(h) || !GetFileSizeEx(h,&size) || size.QuadPart<0) { goto done; }
-    if((ULONGLONG)size.QuadPart>STN_STORAGE_MAX_SIZE || (ULONGLONG)size.QuadPart>capacity) { result=STN_STORAGE_CAPACITY;goto done; }
+    if((ULONGLONG)size.QuadPart>SIZE_MAX) { result=STN_STORAGE_CAPACITY;goto done; }
+    *length=(size_t)size.QuadPart;
+    if((size_t)size.QuadPart>capacity) { result=STN_STORAGE_CAPACITY;goto done; }
     while(offset<(size_t)size.QuadPart) {
         DWORD got=0,request=(DWORD)(((size_t)size.QuadPart-offset)>65536 ? 65536 : (size_t)size.QuadPart-offset);
         if(!ReadFile(h,bytes+offset,request,&got,NULL) || got==0) { goto done; }
@@ -48,7 +50,7 @@ done:
 static stn_storage_status replace_snapshot(void *user,const uint8_t *bytes,size_t length)
 {
     stn_windows_storage *s=user;HANDLE h;size_t offset=0;int ok=1;
-    if(s->lock_handle==NULL || bytes==NULL || length>STN_STORAGE_MAX_SIZE || length<STN_STORAGE_OVERHEAD) { return STN_STORAGE_IO; }
+    if(s->lock_handle==NULL || bytes==NULL || length<STN_STORAGE_OVERHEAD) { return STN_STORAGE_IO; }
     /* Never truncate/reuse a previous staging file. Same directory and volume. */
     h=CreateFileW(s->staging,GENERIC_WRITE,0,NULL,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,NULL);
     if(h==INVALID_HANDLE_VALUE) { return STN_STORAGE_IO; }

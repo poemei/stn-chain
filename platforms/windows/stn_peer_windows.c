@@ -8,10 +8,9 @@
 
 static stn_peer_status ready(stn_windows_peer *p,int writing)
 {
-    fd_set f,e;TIMEVAL time;uint64_t now=GetTickCount64(),remaining;int result;
-    if(!p->opened){return STN_PEER_IO;}
-    if(now>=p->deadline){return STN_PEER_TIMEOUT;}
-    remaining=p->deadline-now;time.tv_sec=(long)(remaining/1000);time.tv_usec=(long)((remaining%1000)*1000);
+    fd_set f,e;TIMEVAL time;int result;
+    if(!p->opened || p->io_timeout_ms==0){return STN_PEER_IO;}
+    time.tv_sec=(long)(p->io_timeout_ms/1000u);time.tv_usec=(long)((p->io_timeout_ms%1000u)*1000u);
     FD_ZERO(&f);FD_ZERO(&e);FD_SET((SOCKET)p->socket,&f);FD_SET((SOCKET)p->socket,&e);
     result=select(0,writing?NULL:&f,writing?&f:NULL,&e,&time);
     if(result==0){return STN_PEER_TIMEOUT;}
@@ -23,7 +22,8 @@ static stn_peer_status send_all(void *u,const uint8_t *bytes,size_t n)
     stn_windows_peer *p=u;size_t offset=0;
     if(n>STN_PEER_MAX_FRAME){return STN_PEER_CAPACITY;}
     while(offset<n){
-        int sent;stn_peer_status s=ready(p,1);if(s!=STN_PEER_OK){return s;}
+        int sent;stn_peer_status s=ready(p,1);
+        if(s==STN_PEER_TIMEOUT && offset!=0){continue;}if(s!=STN_PEER_OK){return s;}
         sent=send((SOCKET)p->socket,(const char *)bytes+offset,(int)(n-offset),0);
         if(sent==SOCKET_ERROR){if(WSAGetLastError()==WSAEWOULDBLOCK){continue;}return STN_PEER_IO;}
         if(sent==0){return STN_PEER_DISCONNECTED;}offset+=(size_t)sent;
@@ -34,11 +34,16 @@ static stn_peer_status receive_all(void *u,uint8_t *bytes,size_t n)
     stn_windows_peer *p=u;size_t offset=0;
     if(n>STN_PEER_MAX_FRAME){return STN_PEER_CAPACITY;}
     while(offset<n){
-        int got;stn_peer_status s=ready(p,0);if(s!=STN_PEER_OK){return s;}
+        int got;stn_peer_status s=ready(p,0);
+        if(s==STN_PEER_TIMEOUT && offset!=0){continue;}if(s!=STN_PEER_OK){return s;}
         got=recv((SOCKET)p->socket,(char *)bytes+offset,(int)(n-offset),0);
         if(got==SOCKET_ERROR){if(WSAGetLastError()==WSAEWOULDBLOCK){continue;}return STN_PEER_IO;}
         if(got==0){return STN_PEER_DISCONNECTED;}offset+=(size_t)got;
     }return STN_PEER_OK;
+}
+void stn_windows_peer_interrupt(stn_windows_peer *p)
+{
+    if(p!=NULL && p->opened){(void)shutdown((SOCKET)p->socket,SD_BOTH);}
 }
 void stn_windows_peer_close(stn_windows_peer *p)
 {
@@ -48,7 +53,7 @@ static stn_peer_status setup(SOCKET socket_value,unsigned timeout,stn_windows_pe
 {
     u_long mode=1;
     if(ioctlsocket(socket_value,FIONBIO,&mode)!=0){closesocket(socket_value);WSACleanup();return STN_PEER_IO;}
-    out->socket=(uintptr_t)socket_value;out->deadline=GetTickCount64()+timeout;out->opened=1;
+    out->socket=(uintptr_t)socket_value;out->io_timeout_ms=timeout;out->opened=1;
     if(t!=NULL){t->user=out;t->send=send_all;t->receive=receive_all;}return STN_PEER_OK;
 }
 stn_peer_status stn_windows_peer_connect(const char *ip,uint16_t port,unsigned timeout,
@@ -76,7 +81,7 @@ stn_peer_status stn_windows_peer_listen(uint16_t port,stn_windows_peer *out,uint
     s=setup(socket_value,60000,out,NULL);if(s!=STN_PEER_OK){return s;}
     address.sin_family=AF_INET;address.sin_addr.s_addr=htonl(INADDR_LOOPBACK);address.sin_port=htons(port);
     if(setsockopt(socket_value,SOL_SOCKET,SO_EXCLUSIVEADDRUSE,(const char *)&exclusive,sizeof(exclusive))!=0 ||
-        bind(socket_value,(struct sockaddr *)&address,sizeof(address))!=0 || listen(socket_value,1)!=0 ||
+        bind(socket_value,(struct sockaddr *)&address,sizeof(address))!=0 || listen(socket_value,SOMAXCONN)!=0 ||
         getsockname(socket_value,(struct sockaddr *)&address,&n)!=0){stn_windows_peer_close(out);return STN_PEER_IO;}
     *bound=ntohs(address.sin_port);return STN_PEER_OK;
 }
@@ -85,7 +90,7 @@ stn_peer_status stn_windows_peer_accept(stn_windows_peer *listener,unsigned time
 {
     WSADATA data;SOCKET accepted;stn_peer_status s;
     if(listener==NULL || out==NULL || transport==NULL || !listener->opened || timeout==0 || timeout>60000){return STN_PEER_ARGUMENT;}
-    listener->deadline=GetTickCount64()+timeout;s=ready(listener,0);if(s!=STN_PEER_OK){return s;}
+    listener->io_timeout_ms=timeout;s=ready(listener,0);if(s!=STN_PEER_OK){return s;}
     accepted=accept((SOCKET)listener->socket,NULL,NULL);if(accepted==INVALID_SOCKET){return STN_PEER_IO;}
     if(WSAStartup(MAKEWORD(2,2),&data)!=0){closesocket(accepted);return STN_PEER_IO;}
     return setup(accepted,timeout,out,transport);

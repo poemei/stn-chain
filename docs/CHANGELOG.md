@@ -5,6 +5,93 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Runtime chain-server cleanup — 2026-09-07
+
+- Removed the accidental coupling between `STN_CHAIN_MAX_BATCH` (bounded
+  validation/fork work) and total persisted chain history. Storage decode and
+  active-state reconstruction now validate history incrementally instead of
+  rejecting block 65 with RPC CAPACITY.
+- Added a dedicated one-block storage extension path for mined solutions:
+  validate against the current accepted tip, recheck persisted state under
+  exclusion, atomically publish, then update active state. Ordinary extension
+  no longer builds two complete histories merely to invoke fork choice.
+- Changed storage views to dynamically sized block-span tables and removed the
+  Windows storage-size ceiling derived from the 64-block batch constant. The
+  runnable node sizes work buffers from the existing chain and grows them as
+  accepted history requires.
+- Removed the development RPC fixture limits of 64 requests and a 60-second
+  total connection lifetime. Listener polling is now separate from accepted
+  client I/O timeouts, avoiding accidental disconnects caused by the accept poll.
+- Converted the Windows loopback RPC runtime from a blocking single-client loop
+  to bounded concurrent client sessions (16). Stratum and STN Core can remain
+  connected simultaneously. Each client owns its socket and frame buffers; RPC
+  dispatch into the shared mining/storage service remains serialized so state
+  mutation stays deterministic. The Winsock listen backlog now uses SOMAXCONN,
+  and shutdown interrupts active client sockets before joining their threads.
+- Hardened exact socket transfers so an idle timeout is surfaced only before any
+  bytes of that transfer have moved. Partial frame progress is retained until the
+  exact transfer completes, disconnects, or is interrupted; timeout polling can
+  therefore keep long-lived clients alive without desynchronizing STNC framing.
+- Preserved canonical mining semantics: published templates start with nonce 0;
+  miners may change only block bytes 152..159; submitted work is fully validated
+  by the node. A zero template nonce is not itself an error.
+- Added/updated storage regression coverage for histories beyond 64 blocks and
+  updated persistence, RPC and mining documentation. Portable core sources pass
+  strict C17 syntax checking with `-Wall -Wextra -Werror` in this environment.
+  Windows Release/x64 build/test qualification remains to be run on Windows.
+
+
+### Mining work and runnable development node — 2026-09-07
+
+- Added deterministic v3 templates from fully validated persisted tip, fixed
+  target, inherited timestamp and explicit canonical content. Work IDs hash the
+  complete zero-nonce block; only the existing big-endian nonce may change.
+- Implemented mining RPC retrieval and solved submission using real SHA-256,
+  ordinary full fork validation and atomic persistence. Stale tips, changed
+  templates, insufficient work and failed replacement never activate solutions.
+- Added the actual Windows loopback RPC application, explicit --dev fixture and
+  operator-provided genesis/transaction mode, strict startup/reload, bounded
+  sessions, run-dev.cmd and Visual Studio development launch arguments. Runtime
+  uses existing CNG/NTFS/Winsock adapters; no platform APIs enter core semantics.
+- Preserved all 1,126,622 prior runtime checks. Added 937 mining checks and 42
+  actual executable/TCP/NTFS checks, including fragmented framing and persisted
+  restart: 1,127,601 runtime checks plus 34 build probes = 1,127,635 total,
+  zero failures. Release/x64 built with zero warnings/errors.
+- Verified immutable-byte binding, independent work ID, nonce variants, alignment,
+  reorganization/recovered activation staleness, intervening accepted writes,
+  storage failure atomicity and existing regression coverage.
+- Updated mining/RPC/build/architecture/chain/PoW/portability/decision documents
+  and README. No release version assigned; this is an Unreleased increment.
+- Limits remain 64 blocks and 4 MiB runtime storage buffers, single-client
+  loopback RPC. Development fixture is structural test content, not accepted
+  signed intelligence or coin. No existing stratumd compatibility was tested.
+- Deferred miners/hardware, Stratum/shares/payouts, wallets/coins/economics,
+  difficulty adjustment, mempool/admission, contracts/explorer, public RPC/auth,
+  automatic P2P runtime orchestration and additional platform qualification.
+
+### RPC core and deterministic node interface — 2026-09-07
+
+- Added versioned bounded binary RPC request/response codecs, deterministic
+  errors, validated dispatch and explicit read/submission/admin capabilities.
+  No socket or native platform types enter RPC semantics.
+- Added immutable node snapshot services for validated chain identity/status,
+  block lookup by height/calculated ID, and current mining base/target context.
+- Intelligence checking/submission uses the existing staged validator. Actual
+  admission remains unavailable; no queue, persistence or acceptance is invented.
+  Mining templates/solution acceptance and intelligence indexing remain explicitly
+  unavailable. Stale base tips return a deterministic error.
+- Release/x64 clean build: added 237 RPC checks. Runtime total 1,126,622 plus
+  34 build/probe checks = 1,126,656 checks, zero failures. All prior 1,126,385
+  runtime checks preserved. RPC in-process integration and existing localhost
+  P2P real-hash/NTFS integration pass.
+- Added RPC.md and updated architecture, integration, portability, mining and
+  build documentation. RPC is the application/miner boundary; local persistence
+  files and P2P internals are not application interfaces.
+- Deferred: RPC network exposure/authentication, Explorer/Wallet/Contract runtime,
+  accepted intelligence indexing/admission, templates/mining/Stratum/stn-stratumd,
+  difficulty adjustment, issuance/rewards/treasury/economics, gas/fees, mempool,
+  Linux/macOS runtimes and x86/ARM qualification. Windows Release/x64 only qualified.
+
 ### Platform isolation and consensus invariance — 2026-09-07
 
 - Centralized OS/CPU detection and explicit runtime-backend selection. Unknown,

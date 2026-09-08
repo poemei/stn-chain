@@ -104,3 +104,11 @@ authorized increment added transaction/block data containers; see
 [TRANSACTION_BLOCK_FORMAT.md](TRANSACTION_BLOCK_FORMAT.md). PoW, mining backends,
 wallets, contracts, networking, RPC, gas, fees, and coin economics remain
 unimplemented. Block containers do not supply consensus acceptance.
+
+## RPC intelligence boundary
+
+CHECK_INTELLIGENCE serializes this existing staged report. SUBMIT_INTELLIGENCE
+uses the same validator but cannot admit/queue/persist records yet: even a fully
+passing record returns UNAVAILABLE for submission. Missing real providers stay
+unresolved. No RPC request bypasses signature, authority or replay requirements.
+See [RPC.md](RPC.md) for the precise boundary and deferred retrieval/indexing.

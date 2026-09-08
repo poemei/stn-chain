@@ -165,3 +165,7 @@ job distribution, rewards/payouts, issuance, treasury, fees/gas, difficulty
 adjustment, networking, discovery,
 RPC, scalable persistence, wallets, explorers, and contract execution. This increment
 stops at deterministic hashing, work verification and local chain accounting.
+
+## RPC mining work
+
+The configured mining service constructs canonical templates, exposes target and deterministic work ID, and atomically accepts solved blocks through normal full consensus validation and persistence. Only the 8-byte big-endian nonce at block offset 152 may change. See [MINING_WORK.md](MINING_WORK.md). No mining loop, Stratum or economics are implemented.
