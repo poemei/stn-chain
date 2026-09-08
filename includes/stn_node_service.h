@@ -5,7 +5,7 @@
 #include "stn_chain.h"
 /* Node-owned immutable snapshot held for the complete dispatch. Caller owns
  * synchronization/lifetime; no persistence paths or cached work are exposed.
- * Each supported query independently validates full history (1..64 blocks).
+ * Each supported query independently validates full history incrementally.
  * Intelligence context is a separate existing staged-validation snapshot. */
 typedef struct stn_node_service {
     const stn_chain_context *chain;

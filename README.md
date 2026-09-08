@@ -37,6 +37,11 @@ fixture supplies mining work and accepts valid solutions to multiple concurrent
 loopback clients; it is not Stratum or Bitcoin JSON-RPC. See [running and mining work](docs/MINING_WORK.md) for
 configuration, client protocol, persistence, and limits.
 
+The runtime/history increment verifies real mining and restart beyond height 64,
+concurrent long-lived RPC sessions, and paged P2P/recovery through 130 blocks.
+Whole-snapshot storage and explicitly configured development transactions remain;
+streaming persistence and authenticated pending admission are not implemented.
+
 ## Direction
 
 - Implement the portable core primarily in ISO C, with explicit platform

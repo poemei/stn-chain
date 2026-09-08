@@ -46,4 +46,9 @@ stn_fork_report stn_fork_evaluate(const stn_chain_context *context,
     const stn_block_span *current, size_t current_count,
     const stn_block_span *candidate, size_t candidate_count,
     stn_reorg_plan *out);
+/* Complete histories validated incrementally with constant working state.
+ * Unlike the bounded batch wrapper, total history is not capped at 64. */
+stn_fork_report stn_fork_evaluate_history(const stn_chain_context *context,
+    const stn_block_span *current,size_t current_count,
+    const stn_block_span *candidate,size_t candidate_count,stn_reorg_plan *out);
 #endif

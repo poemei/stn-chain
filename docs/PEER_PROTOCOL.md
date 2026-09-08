@@ -34,7 +34,7 @@ All integers are unsigned big-endian. No raw C struct serialization is used.
 | 12 | declared length | Exact payload; no trailing bytes in a decoded frame |
 
 Read the fixed header first and check limits before reading payload. Caller
-buffers are fixed/capacity-bounded; no allocation depends on an incoming length.
+buffers are fixed/capacity-bounded; span allocation is checked against supplied candidate capacity before using peer counts.
 TCP is a stream: exact-transfer adapters handle partial reads/writes. Coalesced
 frames stay in the stream for subsequent framed reads. Incomplete frames fail;
 there is no resynchronization scan that could reinterpret malformed bytes.
@@ -50,7 +50,7 @@ there is no resynchronization scan that could reinterpret malformed bytes.
 
 HELLO must precede other requests. Capability 1 denotes this exact bounded
 snapshot exchange; unknown capability combinations fail rather than being
-silently downgraded. STATE count must be 1..64 and height=count-1. A peer can
+silently downgraded. STATE count must be nonzero u32 and height=count-1. A peer can
 lie consistently about both; subsequent evidence still must validate. No node
 identifier is required: connection scope supplies the session. There is no
 persistent identity, authentication, encryption or reputation system.
@@ -65,7 +65,7 @@ No ERROR response is needed for this initial fail-and-close protocol.
 1. Explicit caller connects to a configured IPv4 endpoint through transport.
 2. Load a complete valid local chain or establish recovery-prefix evidence.
 3. Exchange HELLO, request STATE, reject incompatible/malformed claims.
-4. Fetch all bounded headers. They are hints for avoiding downloads, not work
+4. Fetch headers in pages of at most 64. They are hints for avoiding downloads, not work
    evidence. Compare their exact bytes with independently validated local
    prefix headers, stopping at the first difference.
 5. Reuse full local blocks only for that common prefix; fetch one indexed full
@@ -125,10 +125,10 @@ There is no automatic promotion of leftover staging files or backup fallback.
 
 ## Bounds and transport failures
 
-- Maximum full history: 64 blocks, as in storage/fork evaluation.
+- Full history: limited by actual supplied buffer capacity and v1 u32 indexing, not a validation batch.
 - Maximum headers per response: 64; maximum blocks per response: one.
 - Maximum payload: 1,051,884 bytes; frame: 1,051,896 bytes.
-- Maximum requests per connection session: 67 (HELLO, STATE, headers, 64 blocks).
+- No lifetime request ceiling; each individual request remains bounded.
 - One outstanding request; no peer manager or unbounded peer list.
 - No malformed-message tolerance: close the failed connection.
 - Fixed caller-owned frame, candidate and storage buffers; no buffer growth.
@@ -169,3 +169,20 @@ APIs, wallet/client administration and integration endpoints remain separate
 and unimplemented. Also deferred: scalable chain storage/sync, public listening,
 automatic discovery/gossip, signatures/authority/replay coordination, mempool,
 mining/Stratum, contracts, automatic difficulty, coin/treasury economics, gas/fees.
+
+## Longer-history qualification (2026-09-08)
+
+Synchronization now pages headers while incrementally validating the full history.
+Storage uses the complete-history fork evaluator for adoption; the original bounded
+fork API remains available for batch callers. Regression tests cover 130 blocks,
+64-block prefix reuse with a 66-block catch-up, an 80-block common-prefix reorg,
+disconnect/reconnect, weaker subsequent peers, truncation retaining 129 valid
+blocks, and a complete rebuild from invalid root framing. All failing sync paths
+release allocated view/span ownership without activating partial evidence.
+
+Windows exact-transfer tests retain a partial read across short idle polls. Failed
+streams must still be closed. The executable's RPC loop additionally retains frame
+progress across header/body and chunk boundaries. Automatic P2P connection/discovery
+orchestration is still not part of the runnable RPC server. Longer-history protocol
+coordination is tested in the existing deterministic peer harness; existing real
+localhost/CNG/NTFS peer coverage is preserved.

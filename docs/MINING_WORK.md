@@ -55,9 +55,7 @@ and is used by `tools/test-node.ps1`. No arguments print usage.
 Chain history is no longer bounded by the 64-block validation batch constant,
 and the runnable node grows its storage work buffers as history grows. RPC keeps
 connections alive while I/O remains active rather than enforcing a 64-request or
-60-second total-session fixture. The current listener is still loopback and
-single-client; public binding, authentication, peer discovery and concurrent
-client service remain deferred.
+60-second total-session fixture. The loopback listener supports resource-limited concurrent clients with serialized dispatch. Public binding, authentication and peer discovery remain deferred.
 
 ## Canonical template
 
@@ -143,3 +141,30 @@ Deferred: CPU/GPU/ASIC mining and detection, internal/background mining, Stratum
 stn-stratumd, shares/payouts, wallet/coin/issuance/rewards/treasury, fees/gas/economics,
 difficulty adjustment, mempool/admission, contract runtime, explorer, public RPC
 deployment/authentication, and additional OS/architecture qualification.
+
+## Long-running server reconciliation (2026-09-08)
+
+The executable has been tested through height 70 using independently fixed
+SHA-256 solutions, including work at height 71 after restart. Scratch starts at
+actual required size and grows; externally changed storage is probed before
+loading. Borrowed core buffers never implicitly realloc. A solution binds to the
+freshly validated snapshot, not a stale service cache left by another writer.
+
+Ordinary extension validates the submitted block against the accepted tip and
+uses atomic snapshot replacement; it does not assemble a second history or invoke
+fork choice. The existing persisted prefix is still revalidated under exclusion
+and snapshot bytes are still copied/hashed. Streaming/indexed persistence and
+avoiding full-history reads remain future work; dynamic allocation is not a claim
+of constant-memory chain operation.
+
+Tests keep 21 TCP clients connected, exercise churn and more than 64 requests,
+retain a partial STNC payload across the 60-second idle poll, and verify another
+idle client remains usable after that poll. Client threads own frame buffers;
+shared node operations serialize. Failed new-client resources do not stop the
+listener. Completed sessions are reclaimed during accepts and idle polling.
+Socket interruption is separated from close/join to avoid shutdown races.
+
+Pending accepted submissions/block selection remain deferred in this bounded
+runtime/history increment. Production signature/authority/replay admission is
+still unavailable; no fixture transaction is promoted to authenticated pending
+intelligence. The configured transaction remains explicit development content.

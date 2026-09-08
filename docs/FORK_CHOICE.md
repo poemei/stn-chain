@@ -92,3 +92,12 @@ checks remain unchanged. Only Windows Release/x64 has been executed.
 Deferred: varying/automatic target rules, longer-history storage/indexing,
 scalable persistence, networking/discovery/RPC, mining,
 Stratum, wallet/mempool behavior, contracts, fees/gas/rewards and coin economics.
+
+## Complete-history application (2026-09-08)
+
+The original stn_fork_evaluate API retains its 64-block batch bound and tests.
+stn_fork_evaluate_history validates complete supplied histories incrementally,
+using constant working state and recomputed block IDs for the common ancestor.
+Storage adoption/application uses this history API, so a bounded validation batch
+does not become a maximum reorganization height or blockchain length. Both paths
+retain identical validation, work preference, tie and failure-output rules.

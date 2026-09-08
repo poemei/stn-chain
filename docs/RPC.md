@@ -170,3 +170,14 @@ shutdown and persisted restart. Only Windows Release/x64 has been built/tested.
 Deferred: public RPC deployment/authentication, accepted intelligence admission
 and indexing, miners/Stratum, wallet/coin/economics, contract runtime, explorer,
 mempool, difficulty adjustment, other platform qualification.
+
+## Runtime qualification (2026-09-08)
+
+STNC v1 methods and payloads remain unchanged. Executable tests keep 21 clients
+connected, submit work on one while querying another, exercise connection churn
+and more than 64 requests, and resume a partial payload after an idle-I/O poll.
+A separate idle session remains usable beyond 60 seconds. These are synthetic
+Core/Stratum-role clients; actual STN Core and stn-stratumd binaries were not tested.
+New-connection socket/allocation/thread failures are isolated from existing
+sessions; OS resource exhaustion was not deliberately induced. Node dispatch
+remains serialized. Core borrowed scratch never reallocates without ownership.

@@ -191,3 +191,20 @@ D-039: Bind work to the entire zero-nonce canonical block with domain-separated 
 D-040: Existing blocks require content and no admission queue exists. Require explicit configured canonical content, with an explicit --dev fixture for integration tests; introduce neither empty blocks nor inferred transaction selection. Preserve the existing structural/semantic boundary.
 
 D-041: Implement reserved mining RPC successes within existing v1 bounds. Apply solved blocks through ordinary fork evaluation and atomic storage application. Provide a bounded Windows loopback executable for external integration, reusing existing OS adapters. Public deployment, authentication, automatic P2P orchestration and mining remain deferred.
+
+## Runtime/history reconciliation (2026-09-08)
+
+D-042: Preserve bounded validation/fork APIs and add a complete-history evaluator
+for storage adoption. Header-page size is not chain length. Retain STNP/STNC v1
+wire shapes; paginate headers with their existing indexed requests.
+
+D-043: Keep one serialized node dispatch boundary with resource-limited client
+sessions. Retain partial-frame progress across idle polls; close sockets only
+when their worker has stopped. Explicitly distinguish borrowed scratch from
+runtime-owned reallocatable memory.
+
+D-044: Finish this increment at runtime/history qualification. Pending admission
+and deterministic selection require their own validated signature/authority/replay
+foundation; never label repeated structural fixtures accepted intelligence.
+Contracts remain addressed, signed, sequenced agreements with deterministic state
+transitions, not VM/bytecode/arbitrary execution. Economics remain deferred.

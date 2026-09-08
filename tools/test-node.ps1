@@ -38,10 +38,11 @@ function Request($stream, [int]$method, [byte[]]$payload, [int]$version = 1) {
     Check ($n -le 1051948) 'response bounded'
     return @{ Code = (ReadNumber $header[10..11]); Payload = (ReadExact $stream ([int]$n)) }
 }
-function StartNode([string]$data) {
+function StartNode([string]$data, [bool]$once = $true) {
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = [IO.Path]::GetFullPath($Executable)
     $info.Arguments = '--dev --once --rpc-port 0 --data "' + $data + '"'
+    if (!$once) { $info.Arguments = $info.Arguments.Replace('--once ', '') }
     $info.UseShellExecute = $false; $info.CreateNoWindow = $true
     $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
     $p = [Diagnostics.Process]::Start($info)
@@ -53,7 +54,7 @@ function StartNode([string]$data) {
     $client = [Net.Sockets.TcpClient]::new('127.0.0.1', $port)
     $script:clients += $client
     $client.ReceiveTimeout = 5000; $client.SendTimeout = 5000
-    return @{ Process = $p; Client = $client; Stream = $client.GetStream(); Height = $height }
+    return @{ Process = $p; Client = $client; Stream = $client.GetStream(); Height = $height; Port = $port }
 }
 $directory = Join-Path ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Executable))) ('node-test-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Path $directory
@@ -93,6 +94,64 @@ try {
     Check ($r.Code -eq 0 -and $r.Payload[147] -eq 2) 'next height template'
     $node.Client.Dispose()
     Check ($node.Process.WaitForExit(10000) -and $node.Process.ExitCode -eq 0) 'restart exit'
+    $node = StartNode $data $false
+    $others = @()
+    # More than the old 16-client ceiling, while the original stays connected.
+    for ($i = 0; $i -lt 20; $i++) {
+        $client = [Net.Sockets.TcpClient]::new('127.0.0.1', $node.Port)
+        $client.ReceiveTimeout = 10000; $client.SendTimeout = 10000
+        $script:clients += $client; $others += $client
+        $r = Request $client.GetStream() 1 @()
+        Check ($r.Code -eq 0) 'concurrent client serviced'
+    }
+    for ($i = 0; $i -lt 70; $i++) {
+        $r = Request $node.Stream 1 @()
+        Check ($r.Code -eq 0) 'session survives 64 requests'
+    }
+    # Independently precomputed real-SHA256 fixture solutions, no search loop.
+    $nonces = @(0,0,0,2,1,3,3,6,2,0,0,0,0,1,0,2,2,1,0,0,0,0,0,5,0,1,1,3,0,0,3,0,0,4,2,2,1,0,1,0,0,1,0,0,1,4,0,0,3,1,0,0,0,1,1,1,5,0,0,0,2,3,0,0,0,0,0,1,0,1)
+    for ($height = 2; $height -le 70; $height++) {
+        $r = Request $node.Stream 0x2002 @()
+        Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[140..147]) -eq $height) 'next-height work'
+        [byte[]]$solution = $r.Payload
+        Check ((ReadNumber $solution[220..227]) -eq 0) 'fresh zero nonce'
+        $solution[227] = $nonces[$height - 1]
+        $r = Request $others[0].GetStream() 0x2003 $solution
+        Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[32..39]) -eq $height) 'real mined extension'
+    }
+    $r = Request $node.Stream 0x2003 $solution
+    Check ($r.Code -eq 10) 'cross-client stale work'
+    foreach ($client in $others) { $client.Dispose() }
+    # Exercise reclamation while another session keeps making requests.
+    for ($i = 0; $i -lt 20; $i++) {
+        $client = [Net.Sockets.TcpClient]::new('127.0.0.1', $node.Port)
+        $script:clients += $client; $client.ReceiveTimeout = 10000
+        $r = Request $client.GetStream() 1 @(); Check ($r.Code -eq 0) 'connection churn'
+        $client.Dispose()
+    }
+    # A frame header and one payload byte have arrived. Crossing the transport's
+    # idle poll must retain that frame, while a second healthy session stays alive.
+    $idle = [Net.Sockets.TcpClient]::new('127.0.0.1', $node.Port)
+    $script:clients += $idle; $idle.ReceiveTimeout = 10000
+    $partial = [byte[]]([Text.Encoding]::ASCII.GetBytes('STNC') + (NumberBytes 1 2) +
+        (NumberBytes 1 2) + (NumberBytes 2 2) + (NumberBytes 0 2) +
+        (NumberBytes 123 8) + (NumberBytes 8 4) + (NumberBytes 70 8))
+    $node.Stream.Write($partial, 0, 25)
+    Start-Sleep -Seconds 61
+    $r = Request $idle.GetStream() 1 @(); Check ($r.Code -eq 0) 'idle session survives 60 seconds'
+    $node.Stream.Write($partial, 25, 7)
+    $h = ReadExact $node.Stream 24
+    Check ((ReadNumber $h[10..11]) -eq 0 -and (ReadNumber $h[20..23]) -eq 364) 'partial frame retained across idle timeout'
+    $block = ReadExact $node.Stream 364
+    Check ((ReadNumber $block[72..79]) -eq 70) 'partial request correct block'
+    $idle.Dispose()
+    $node.Client.Dispose(); $node.Process.Kill(); $node.Process.WaitForExit()
+    $node = StartNode $data
+    Check ($node.Height -eq 70) 'restart beyond height 64'
+    $r = Request $node.Stream 0x2002 @()
+    Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[140..147]) -eq 71) 'work after long-history restart'
+    $node.Client.Dispose()
+    Check ($node.Process.WaitForExit(10000) -and $node.Process.ExitCode -eq 0) 'long-history exit'
     Write-Output "Executable/TCP/NTFS: $script:checks checks, 0 failures."
 } finally {
     foreach ($client in $script:clients) { $client.Dispose() }

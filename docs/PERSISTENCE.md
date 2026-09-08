@@ -143,3 +143,19 @@ now support validated-prefix reuse and complete atomic reconstruction; see
 [PEER_PROTOCOL.md](PEER_PROTOCOL.md). The earlier absence of recovery describes
 the persistence-only increment. Provider failures and oversized reads never
 authorize repair. Staging recovery and power-loss guarantees remain absent.
+
+## Runtime/history reconciliation (2026-09-08)
+
+Ordinary extension reuses the already validated canonical prefix under the storage
+lock, validates the single candidate, updates the count/checksum in independent
+scratch, and atomically publishes before changing active state. It no longer
+allocates a second block-span history or revalidates it through encode. Recovery
+of a truncated tail scans the available complete prefix instead of discarding it
+because the declared count no longer fits. Complete-history adoption can now
+reorganize/rebuild beyond the bounded fork API's 64-block limit.
+
+Storage views own their dynamically allocated span tables; callers release them.
+Runtime buffers are explicitly malloc-owned; other callers receive CAPACITY rather
+than an unsafe realloc of borrowed memory. Snapshot replacement and its u32 count
+format remain unchanged. Full-history reads and snapshot rewrite cost remain;
+streaming/segmented storage is intentionally deferred, not claimed implemented.

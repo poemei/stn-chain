@@ -12,6 +12,8 @@ stn_peer_status stn_windows_peer_connect(const char *ipv4,uint16_t port,unsigned
 stn_peer_status stn_windows_peer_listen(uint16_t port,stn_windows_peer *out,uint16_t *bound_port);
 stn_peer_status stn_windows_peer_accept(stn_windows_peer *listener,unsigned timeout_ms,
     stn_windows_peer *out,stn_peer_transport *transport);
+/* May interrupt a live operation from another thread. Join that thread before
+ * close/reuse; the object/socket lifetime must remain stable during interrupt. */
 void stn_windows_peer_interrupt(stn_windows_peer *peer);
 void stn_windows_peer_close(stn_windows_peer *peer);
 #endif

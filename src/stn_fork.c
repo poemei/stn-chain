@@ -23,13 +23,13 @@ static stn_fork_report failure(stn_fork_report r,int side,stn_data_status detail
 }
 
 static stn_fork_report history(const stn_chain_context *c,const stn_block_span *blocks,
-    size_t count,int side,stn_chain_state *state,uint8_t ids[STN_CHAIN_MAX_BATCH][32])
+    size_t count,int side,stn_chain_state *state)
 {
     stn_fork_report r={0};
     stn_data_status status;
     size_t i;
     r.validation.failing_index=SIZE_MAX;
-    if(blocks==NULL || count==0 || count>STN_CHAIN_MAX_BATCH) {
+    if(blocks==NULL || count==0) {
         r.validation.reason=STN_CHAIN_BATCH_LIMIT;
         r.validation.detail=STN_DATA_LENGTH;
         return failure(r,side,STN_DATA_LENGTH);
@@ -45,19 +45,19 @@ static stn_fork_report history(const stn_chain_context *c,const stn_block_span *
             r.validation.failing_index=i;
             return failure(r,side,r.validation.detail);
         }
-        memcpy(ids[i],state->tip_id,32);
+
     }
     r.result=STN_FORK_TIE;
     return r;
 }
 
-stn_fork_report stn_fork_evaluate(const stn_chain_context *context,
+stn_fork_report stn_fork_evaluate_history(const stn_chain_context *context,
     const stn_block_span *current,size_t current_count,
     const stn_block_span *candidate,size_t candidate_count,stn_reorg_plan *out)
 {
     stn_fork_report r={0};
     stn_reorg_plan plan={0};
-    uint8_t current_ids[STN_CHAIN_MAX_BATCH][32],candidate_ids[STN_CHAIN_MAX_BATCH][32];
+
     size_t common=0,limit;
     r.validation.failing_index=SIZE_MAX;
     if(context==NULL || out==NULL) {
@@ -65,18 +65,23 @@ stn_fork_report stn_fork_evaluate(const stn_chain_context *context,
         return failure(r,0,STN_DATA_ARGUMENT);
     }
     if(context->pow_policy==NULL) { r.result=STN_FORK_UNSUPPORTED; return r; }
-    r=history(context,current,current_count,1,&plan.current,current_ids);
+    r=history(context,current,current_count,1,&plan.current);
     if(r.result!=STN_FORK_TIE) { return r; }
-    r=history(context,candidate,candidate_count,2,&plan.candidate,candidate_ids);
+    r=history(context,candidate,candidate_count,2,&plan.candidate);
     if(r.result!=STN_FORK_TIE) { return r; }
     limit=current_count<candidate_count ? current_count : candidate_count;
-    while(common<limit && memcmp(current_ids[common],candidate_ids[common],32)==0) { ++common; }
+    while(common<limit) {
+        uint8_t left[32],right[32];
+        if(stn_chain_block_id(current[common].bytes,current[common].length,&context->hash_provider,left)!=STN_DATA_OK ||
+           stn_chain_block_id(candidate[common].bytes,candidate[common].length,&context->hash_provider,right)!=STN_DATA_OK){return failure(r,0,STN_DATA_PROVIDER_ERROR);}
+        if(memcmp(left,right,32)!=0){break;}++common;
+    }
     if(common==0) {
         r.validation.reason=STN_CHAIN_GENESIS; r.validation.detail=STN_DATA_CONTENT;
         return failure(r,2,STN_DATA_CONTENT);
     }
     plan.ancestor_index=common-1;
-    memcpy(plan.ancestor_id,current_ids[common-1],32);
+    if(stn_chain_block_id(current[common-1].bytes,current[common-1].length,&context->hash_provider,plan.ancestor_id)!=STN_DATA_OK){return failure(r,0,STN_DATA_PROVIDER_ERROR);}
     plan.detach_begin=common; plan.detach_end=current_count;
     plan.attach_begin=common; plan.attach_end=candidate_count;
     plan.detached_count=current_count-common; plan.attached_count=candidate_count-common;
@@ -85,4 +90,16 @@ stn_fork_report stn_fork_evaluate(const stn_chain_context *context,
     plan.resulting_height=plan.actionable ? plan.candidate.height : plan.current.height;
     *out=plan;
     return r;
+}
+
+stn_fork_report stn_fork_evaluate(const stn_chain_context *context,
+    const stn_block_span *current,size_t current_count,
+    const stn_block_span *candidate,size_t candidate_count,stn_reorg_plan *out)
+{
+    if(current_count>STN_CHAIN_MAX_BATCH || candidate_count>STN_CHAIN_MAX_BATCH){
+        stn_fork_report r={0};r.validation.reason=STN_CHAIN_BATCH_LIMIT;
+        r.validation.detail=STN_DATA_LENGTH;r.validation.failing_index=SIZE_MAX;
+        return failure(r,current_count>STN_CHAIN_MAX_BATCH?1:2,STN_DATA_LENGTH);
+    }
+    return stn_fork_evaluate_history(context,current,current_count,candidate,candidate_count,out);
 }

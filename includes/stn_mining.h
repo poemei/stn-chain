@@ -5,7 +5,9 @@
 #include "stn_storage.h"
 /* Explicit operator-selected canonical body, not a mempool/selection policy.
  * Caller serializes calls and keeps inputs immutable. All buffers and inputs
- * must be disjoint. Scratch is unpublished on failure; written remains zero.
+ * must be disjoint. Default scratch remains caller-owned and never reallocates.
+ * owns_buffers explicitly opts in to realloc of malloc-owned scratch; provider
+ * read must report required bytes on CAPACITY for runtime resizing. Scratch is unpublished on failure; written remains zero.
  * Requests originate from validated RPC dispatch, or identical well-formed
  * internal messages. Work submission defensively checks its nested shape.
  * Production SHA-256 is required. Active state changes only after persistence.
@@ -20,6 +22,7 @@ typedef struct stn_mining_service {
     uint8_t *template_bytes; size_t template_capacity;
     stn_storage_workspace workspace;
     stn_chain_state active;
+    int owns_buffers; /* Opt in only for malloc/realloc-owned scratch. */
 } stn_mining_service;
 #define STN_MINING_PREFIX 68u
 #define STN_MINING_NONCE_OFFSET 152u

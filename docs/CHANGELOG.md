@@ -5,6 +5,42 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Long-running RPC and longer-history reconciliation — 2026-09-08
+
+- Continued from 548ea36 without resetting the source. Corrected stale cached
+  mining-state rejection, unsafe implicit realloc of borrowed buffers, missing
+  resizing after external history growth, and unchecked size arithmetic.
+- Ordinary extension validates one candidate and reuses the validated prefix
+  under exclusion, avoiding a second history allocation/revalidation and fork
+  choice. Atomic replacement still precedes active-state publication.
+- Added complete-history fork evaluation for storage adoption while preserving
+  the bounded fork API. P2P pages 64 headers instead of capping total history;
+  all exit paths release dynamic views/spans. Truncated-tail recovery now retains
+  the available validated prefix even when the advertised full count cannot fit.
+- Reconciled concurrent RPC resource handling: failed accepts do not kill the
+  server, completed workers are reaped under connection churn, and sockets close
+  only after worker completion. Preserved partial-frame progress across body and
+  chunk idle polls. STNC v1 and the 64-bit nonce region remain unchanged.
+- Release/x64: zero warnings/errors. 1,127,582 C runtime checks plus 872 actual
+  executable/TCP/NTFS checks = 1,128,454 runtime checks; 34 build/boundary probes;
+  1,128,488 total, zero failures. Prior regression checks remain passing.
+- Verified real SHA-256 solutions through height 70, dynamic buffer growth,
+  persisted restart/work at height 71, 21 simultaneous clients, connection churn,
+  more than 64 requests, idle sessions and partial payloads spanning 60 seconds.
+  Actual STN Core/stn-stratumd binaries and deliberate OS resource exhaustion
+  were not tested; synthetic clients exercise their shared RPC boundary.
+- P2P harness verifies 130-block catch-up, incremental reuse, competing branches,
+  reorganization, disconnect/reconnect, truncated-prefix recovery and full rebuild.
+  Existing real localhost/CNG/NTFS peer tests and atomic-failure tests still pass.
+- Updated authoritative runtime/mining/RPC/storage/peer/fork/decision/build docs.
+  Temporary executable test storage remains private and is removed afterward.
+- Intentionally bounded to runtime/history reconciliation. Whole-snapshot reads
+  and rewriting remain; streaming storage, pending authenticated admission/block
+  selection, production identity providers, automatic P2P orchestration, difficulty
+  adjustment, contracts, economics, wallets/UI and Stratum remain deferred.
+  Explicit structural development transactions are not authenticated intelligence.
+
+
 ### Runtime chain-server cleanup — 2026-09-07
 
 - Removed the accidental coupling between `STN_CHAIN_MAX_BATCH` (bounded

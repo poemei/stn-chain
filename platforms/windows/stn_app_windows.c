@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#define APP_STORAGE_INITIAL (64u*1024u)
+#define APP_STORAGE_INITIAL (STN_STORAGE_OVERHEAD+4u+STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY)
 #define APP_RPC_ACCEPT_POLL_MS 250u
 #define APP_RPC_IO_TIMEOUT_MS 60000u
 static volatile LONG stopping;
@@ -31,8 +31,8 @@ static size_t initial_storage_capacity(const wchar_t *path)
     WIN32_FILE_ATTRIBUTE_DATA a;ULONGLONG n;size_t required=APP_STORAGE_INITIAL;
     if(GetFileAttributesExW(path,GetFileExInfoStandard,&a)){
         n=((ULONGLONG)a.nFileSizeHigh<<32)|a.nFileSizeLow;
-        if(n<=SIZE_MAX-STN_BLOCK_MAX_SIZE-STN_STORAGE_OVERHEAD){
-            size_t existing=(size_t)n+STN_BLOCK_MAX_SIZE+STN_STORAGE_OVERHEAD;
+        if(n<=SIZE_MAX){
+            size_t existing=(size_t)n;
             if(existing>required){required=existing;}
         }
     }
@@ -46,10 +46,12 @@ static void development_genesis(uint8_t *b)
     memcpy(b+184,"STNR",4);b[189]=1;b[191]=1;b[192]=1;b[256]=3;
     memcpy(b+88,commitment,32);memset(b+120,255,32);b[120]=127;
 }
-static stn_peer_status transfer(const stn_peer_transport *t,uint8_t *p,size_t n,int sending)
+static stn_peer_status transfer(const stn_peer_transport *t,uint8_t *p,size_t n,int sending,int idle_allowed)
 {
+    size_t remaining=n;
     while(n!=0){size_t chunk=n>65536 ? 65536 : n;
         stn_peer_status s=sending ? t->send(t->user,p,chunk) : t->receive(t->user,p,chunk);
+        if(s==STN_PEER_TIMEOUT && (!idle_allowed || n!=remaining)){continue;}
         if(s!=STN_PEER_OK){return s;}p+=chunk;n-=chunk;
     }return STN_PEER_OK;
 }
@@ -68,21 +70,21 @@ static DWORD WINAPI rpc_client_thread(void *user)
     uint8_t *request=(uint8_t*)malloc(STN_RPC_MAX_FRAME),*response=(uint8_t*)malloc(STN_RPC_MAX_FRAME);
     if(request!=NULL && response!=NULL){
         while(InterlockedCompareExchange(&stopping,0,0)==0){
-            size_t n,w;stn_peer_status io=transfer(&client->transport,request,24,0);stn_rpc_code dispatch;
+            size_t n,w;stn_peer_status io=transfer(&client->transport,request,24,0,1);stn_rpc_code dispatch;
             if(io==STN_PEER_TIMEOUT){continue;}
             if(io!=STN_PEER_OK){break;}
             n=(size_t)stn_wire_read(request+20,4);
             if(memcmp(request,"STNC",4)!=0 || n>STN_RPC_MAX_PAYLOAD){break;}
-            io=transfer(&client->transport,request+24,n,0);
+            io=transfer(&client->transport,request+24,n,0,0);
             if(io!=STN_PEER_OK){break;}
             EnterCriticalSection(client->dispatch_lock);
             dispatch=stn_rpc_dispatch(request,24+n,STN_RPC_READ|STN_RPC_SUBMISSION,
                 client->service,response,STN_RPC_MAX_FRAME,&w);
             LeaveCriticalSection(client->dispatch_lock);
-            if(dispatch!=STN_RPC_OK || transfer(&client->transport,response,w,1)!=STN_PEER_OK){break;}
+            if(dispatch!=STN_RPC_OK || transfer(&client->transport,response,w,1,0)!=STN_PEER_OK){break;}
         }
     }
-    free(request);free(response);stn_windows_peer_close(&client->peer);
+    free(request);free(response);
     InterlockedExchange(&client->done,1);return 0;
 }
 static void reap_clients(rpc_client **head)
@@ -93,6 +95,7 @@ static void reap_clients(rpc_client **head)
         if(InterlockedCompareExchange(&client->done,0,0)!=0){
             (void)WaitForSingleObject(client->thread,INFINITE);
             (void)CloseHandle(client->thread);
+            stn_windows_peer_close(&client->peer);
             *link=client->next;
             free(client);
         }else{link=&client->next;}
@@ -106,6 +109,7 @@ static void stop_clients(rpc_client **head)
         client=*head;
         (void)WaitForSingleObject(client->thread,INFINITE);
         (void)CloseHandle(client->thread);
+            stn_windows_peer_close(&client->peer);
         *head=client->next;
         free(client);
     }
@@ -117,13 +121,13 @@ static int serve_once(stn_windows_peer *listener,const stn_rpc_service *service)
     request=(uint8_t*)malloc(STN_RPC_MAX_FRAME);response=(uint8_t*)malloc(STN_RPC_MAX_FRAME);
     if(request!=NULL && response!=NULL){
         for(;;){
-            size_t n,w;stn_peer_status io=transfer(&transport,request,24,0);
+            size_t n,w;stn_peer_status io=transfer(&transport,request,24,0,1);
             if(io==STN_PEER_TIMEOUT){continue;}if(io!=STN_PEER_OK){ok=1;break;}
             n=(size_t)stn_wire_read(request+20,4);
             if(memcmp(request,"STNC",4)!=0 || n>STN_RPC_MAX_PAYLOAD){break;}
-            if(transfer(&transport,request+24,n,0)!=STN_PEER_OK){break;}
+            if(transfer(&transport,request+24,n,0,0)!=STN_PEER_OK){break;}
             if(stn_rpc_dispatch(request,24+n,STN_RPC_READ|STN_RPC_SUBMISSION,service,response,STN_RPC_MAX_FRAME,&w)!=STN_RPC_OK ||
-               transfer(&transport,response,w,1)!=STN_PEER_OK){break;}
+               transfer(&transport,response,w,1,0)!=STN_PEER_OK){break;}
         }
     }
     free(request);free(response);stn_windows_peer_close(&peer);return ok;
@@ -172,12 +176,13 @@ int stn_windows_app(int argc,char **argv)
     if(path_length==0 || path_length>=260 || stn_windows_storage_init(&disk,absolute,&storage)!=STN_STORAGE_OK){fprintf(stderr,"Data path requires a trusted existing local NTFS directory.\n");goto cleanup;}
     {
         size_t cap=initial_storage_capacity(absolute);
+        if(cap<STN_STORAGE_OVERHEAD+4u+genesis_length){cap=STN_STORAGE_OVERHEAD+4u+genesis_length;}
         mining.snapshot=(uint8_t*)malloc(cap);mining.workspace.current_bytes=(uint8_t*)malloc(cap);mining.workspace.next_bytes=(uint8_t*)malloc(cap);
         if(mining.snapshot==NULL || mining.workspace.current_bytes==NULL || mining.workspace.next_bytes==NULL){goto cleanup;}
         mining.snapshot_capacity=cap;mining.workspace.current_capacity=cap;mining.workspace.next_capacity=cap;
     }
     mining.chain=&chain;mining.storage=&storage;mining.body=body;mining.body_length=4+transaction_length;mining.transaction_count=1;
-    mining.template_capacity=STN_BLOCK_MAX_SIZE;
+    mining.template_capacity=STN_BLOCK_MAX_SIZE;mining.owns_buffers=1;
     status=stn_storage_load(&chain,&storage,mining.snapshot,mining.snapshot_capacity,&view);
     if(status==STN_STORAGE_NOT_FOUND){stn_block_span anchor={genesis,genesis_length};
         status=stn_storage_create(&chain,&storage,&anchor,1,mining.snapshot,mining.snapshot_capacity,&mining.active);
@@ -195,7 +200,7 @@ int stn_windows_app(int argc,char **argv)
         stn_windows_peer peer={0};stn_peer_transport transport;rpc_client *client;
         stn_peer_status accepted=stn_windows_peer_accept(&listener,APP_RPC_ACCEPT_POLL_MS,&peer,&transport);
         if(accepted==STN_PEER_TIMEOUT){reap_clients(&clients);continue;}
-        if(accepted!=STN_PEER_OK){fprintf(stderr,"RPC accept failed.\n");result=EXIT_FAILURE;break;}
+        if(accepted!=STN_PEER_OK){reap_clients(&clients);Sleep(APP_RPC_ACCEPT_POLL_MS);continue;}
         peer.io_timeout_ms=APP_RPC_IO_TIMEOUT_MS;
         client=(rpc_client*)calloc(1,sizeof(*client));
         if(client==NULL){stn_windows_peer_close(&peer);continue;}
@@ -203,7 +208,7 @@ int stn_windows_app(int argc,char **argv)
         client->service=&service;client->dispatch_lock=&dispatch_lock;client->done=0;
         client->thread=CreateThread(NULL,0,rpc_client_thread,client,0,NULL);
         if(client->thread==NULL){stn_windows_peer_close(&client->peer);free(client);continue;}
-        client->next=clients;clients=client;
+        client->next=clients;clients=client;reap_clients(&clients);
     }
 shutdown:
     InterlockedExchange(&stopping,1);stop_clients(&clients);(void)SetConsoleCtrlHandler(stop,FALSE);

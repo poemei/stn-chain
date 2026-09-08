@@ -68,6 +68,10 @@ int test_mining(void)
     CHECK(store.n==disk_n && memcmp(store.bytes,disk_before,disk_n)==0);
     q.payload=work;q.length=n-1;
     CHECK(stn_mining_handle(&s,&q,out,sizeof(out),&w)==STN_RPC_INVALID && w==0);
+    s.workspace.next_capacity=8;
+    CHECK(rpc(&s,STN_RPC_SUBMIT_WORK,work,n,out,&w)==STN_RPC_CAPACITY && w==0);
+    CHECK(store.n==disk_n && memcmp(&s.active,&before,sizeof(before))==0);
+    s.workspace.next_capacity=sizeof(next);
     store.fail=1;
     CHECK(rpc(&s,STN_RPC_SUBMIT_WORK,work,n,out,&w)==STN_RPC_PROVIDER && w==0);
     CHECK(memcmp(&s.active,&before,sizeof(before))==0 && store.n==disk_n && memcmp(store.bytes,disk_before,disk_n)==0);

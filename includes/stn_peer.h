@@ -15,7 +15,7 @@ typedef enum stn_peer_type {
     STN_PEER_HEADERS=4,STN_PEER_GET_BLOCK=5,STN_PEER_BLOCK=6
 } stn_peer_type;
 typedef struct stn_peer_message { uint16_t type;const uint8_t *payload;size_t length; } stn_peer_message;
-/* Exact bounded transfers. Implementation owns a finite session deadline,
+/* Exact bounded transfers. Implementation owns idle-I/O polling,
  * handles short I/O and distinguishes timeout/disconnect. Close connection on
  * any protocol failure; never reuse a failed byte stream. Caller owns close. */
 typedef struct stn_peer_transport {
@@ -24,7 +24,7 @@ typedef struct stn_peer_transport {
     stn_peer_status (*receive)(void *,uint8_t *,size_t);
 } stn_peer_transport;
 typedef struct stn_peer_session {
-    int handshake;size_t requests; /* Maximum 67 requests including handshake. */
+    int handshake;size_t requests; /* Saturating request counter; no lifetime request ceiling. */
 } stn_peer_session;
 typedef struct stn_peer_report {
     stn_peer_status status;
@@ -49,7 +49,7 @@ stn_peer_status stn_peer_encode(uint16_t type,const uint8_t *payload,size_t leng
 stn_peer_status stn_peer_serve(const stn_chain_context *context,const stn_block_span *blocks,size_t count,
     stn_peer_session *session,const uint8_t *request,size_t length,uint8_t *response,size_t capacity,size_t *written);
 stn_peer_status stn_peer_receive(const stn_peer_transport *transport,uint8_t *frame,size_t capacity,size_t *length);
-/* Explicitly connected peer, one outstanding request, at most 64 blocks.
+/* Explicitly connected peer, one outstanding request, pages of at most 64 headers.
  * Headers locate reusable validated prefixes only; full blocks determine work.
  * Claimed summary never determines acceptance. Buffers/context/candidate/active
  * must be disjoint and immutable where borrowed. Scratch can change on failure.

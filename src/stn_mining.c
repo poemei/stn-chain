@@ -19,16 +19,17 @@ static int storage_bytes_required(const stn_storage_view *v,size_t extra,size_t 
     size_t total=STN_STORAGE_OVERHEAD,i;
     if(v==NULL || required==NULL){return 0;}
     for(i=0;i<v->count;++i){
-        if(v->blocks[i].length>SIZE_MAX-total-4u){return 0;}
+        if(total>SIZE_MAX-4u || v->blocks[i].length>SIZE_MAX-total-4u){return 0;}
         total+=4u+v->blocks[i].length;
     }
-    if(extra>SIZE_MAX-total-4u){return 0;}
+    if(total>SIZE_MAX-4u || extra>SIZE_MAX-total-4u){return 0;}
     *required=total+4u+extra;return 1;
 }
-static int grow(uint8_t **p,size_t *capacity,size_t required)
+static int grow(uint8_t **p,size_t *capacity,size_t required,int owned)
 {
     uint8_t *next;size_t cap;
     if(required<=*capacity){return 1;}
+    if(!owned){return 0;}
     cap=*capacity ? *capacity : 4096u;
     while(cap<required){
         size_t doubled=cap<=SIZE_MAX/2u ? cap*2u : SIZE_MAX;
@@ -41,9 +42,9 @@ static int grow(uint8_t **p,size_t *capacity,size_t required)
 }
 static int ensure_storage_capacity(stn_mining_service *s,size_t required)
 {
-    return grow(&s->snapshot,&s->snapshot_capacity,required) &&
-        grow(&s->workspace.current_bytes,&s->workspace.current_capacity,required) &&
-        grow(&s->workspace.next_bytes,&s->workspace.next_capacity,required);
+    return
+        grow(&s->workspace.current_bytes,&s->workspace.current_capacity,required,s->owns_buffers) &&
+        grow(&s->workspace.next_bytes,&s->workspace.next_capacity,required,s->owns_buffers);
 }
 static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view *v,size_t *length,uint8_t id[32])
 {
@@ -71,11 +72,20 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
 }
 stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t cap,size_t *written)
 {
-    stn_mining_service *s=user;stn_storage_view v={0};stn_rpc_code code;size_t n=0,required=0;
+    stn_mining_service *s=user;stn_storage_view v={0};stn_rpc_code code;size_t n=0,required=0;stn_chain_state accepted;
     uint8_t id[32];stn_node_service query;
     if(written!=NULL){*written=0;}
     if(s==NULL || q==NULL || p==NULL || written==NULL || s->chain==NULL || s->storage==NULL ||
+       s->storage->acquire==NULL || s->storage->release==NULL || s->storage->read==NULL || s->storage->replace==NULL ||
        s->chain->hash_provider.hash!=stn_sha256 || s->chain->pow_policy==NULL || s->template_bytes==NULL){return STN_RPC_PROVIDER;}
+    if(s->owns_buffers){
+        size_t needed=0;stn_storage_status probe=s->storage->acquire(s->storage->user);
+        if(probe!=STN_STORAGE_OK){return storage_code(probe);}
+        probe=s->storage->read(s->storage->user,s->snapshot,0,&needed);
+        s->storage->release(s->storage->user);
+        if(probe!=STN_STORAGE_OK && probe!=STN_STORAGE_CAPACITY){return storage_code(probe);}
+        if(!grow(&s->snapshot,&s->snapshot_capacity,needed,1)){return STN_RPC_CAPACITY;}
+    }
     code=storage_code(stn_storage_load(s->chain,s->storage,s->snapshot,s->snapshot_capacity,&v));
     if(code!=STN_RPC_OK){return code;}
     if(q->method==STN_RPC_SUBMIT_WORK){
@@ -104,8 +114,10 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
               s->template_bytes+STN_MINING_NONCE_OFFSET+STN_MINING_NONCE_SIZE,
               n-STN_MINING_NONCE_OFFSET-STN_MINING_NONCE_SIZE)!=0){code=STN_RPC_REJECTED;goto done;}
     if(!storage_bytes_required(&v,n,&required) || !ensure_storage_capacity(s,required)){code=STN_RPC_CAPACITY;goto done;}
-    code=storage_code(stn_storage_extend(s->chain,s->storage,q->payload+68,n,&s->workspace,&s->active));
+    accepted=v.state;
+    code=storage_code(stn_storage_extend(s->chain,s->storage,q->payload+68,n,&s->workspace,&accepted));
     if(code!=STN_RPC_OK){goto done;}
+    s->active=accepted;
     memcpy(p,s->active.tip_id,32);stn_wire_write(p+32,8,s->active.height);
     memcpy(p+40,s->active.cumulative_work.bytes,32);*written=72;
 done:

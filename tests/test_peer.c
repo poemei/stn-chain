@@ -9,10 +9,10 @@
 #include <string.h>
 static unsigned checks,failures;
 #define CHECK(e) do { ++checks; if(!(e)){++failures;fprintf(stderr,"peer line %d: %s\n",__LINE__,#e);} } while(0)
-#define CAP 24000u
-static uint8_t a[64][364],b[64][364],scratch[CAP],next_bytes[CAP],candidate_bytes[CAP],saved[CAP];
+#define CAP 60000u
+static uint8_t a[130][364],b[130][364],scratch[CAP],next_bytes[CAP],candidate_bytes[CAP],saved[CAP];
 static uint8_t frame[STN_PEER_MAX_FRAME],reply[STN_PEER_MAX_FRAME];
-static stn_block_span as[64],bs[64];
+static stn_block_span as[130],bs[130];
 static stn_data_status hash_status=STN_DATA_OK;
 static stn_data_status test_hash(void *u,const uint8_t *d,size_t dn,const uint8_t *p,size_t n,uint8_t out[32])
 {
@@ -33,10 +33,10 @@ static void fixture(uint8_t p[364])
     memcpy(p+184,"STNR",4);p[189]=1;p[191]=1;p[192]=1;p[256]=3;
     memcpy(p+88,commitment,32);memset(p+120,255,32);p[120]=127;
 }
-static void branch(uint8_t blocks[64][364],stn_block_span spans[64],unsigned split)
+static void branch(uint8_t blocks[130][364],stn_block_span spans[130],unsigned split)
 {
     unsigned i;fixture(blocks[0]);
-    for(i=0;i<64;++i) {
+    for(i=0;i<130;++i) {
         if(i!=0) {
             memcpy(blocks[i],blocks[i-1],364);memset(blocks[i]+40,0,32);
             blocks[i][70]=blocks[i-1][87];blocks[i][71]=(uint8_t)i;blocks[i][79]=(uint8_t)i;
@@ -89,7 +89,7 @@ static void reset(stn_chain_context *c,size_t count,stn_chain_state *active)
 {
     stn_storage_view v;mem.fail=0;mem.exists=1;
     CHECK(stn_storage_encode(c,as,count,mem.bytes,CAP,&mem.n)==STN_STORAGE_OK);
-    CHECK(stn_storage_decode(c,mem.bytes,mem.n,&v)==STN_STORAGE_OK);*active=v.state;
+    CHECK(stn_storage_decode(c,mem.bytes,mem.n,&v)==STN_STORAGE_OK);*active=v.state;stn_storage_view_release(&v);
 }
 static void framing(stn_chain_context *c)
 {
@@ -162,7 +162,24 @@ static void synchronization(stn_chain_context *c)
     for(mode=0;mode<3;++mode){memset(&m.session,0,sizeof(m.session));r=stn_peer_sync(c,&p,&t,&w,&active);CHECK(r.status==STN_PEER_RETAINED && memcmp(&active,&before,sizeof(active))==0);}
     /* Missing store root bootstrap and maximum bounded count. */
     mem.exists=0;m.mode=0;m.count=64;memset(&m.session,0,sizeof(m.session));CHECK(stn_chain_initialize(c,&active)==STN_DATA_OK);
-    r=stn_peer_sync(c,&p,&t,&w,&active);CHECK(r.status==STN_PEER_OK && active.height==63 && r.received_blocks==64 && m.session.requests==67);
+    r=stn_peer_sync(c,&p,&t,&w,&active);CHECK(r.status==STN_PEER_OK && active.height==63 && r.received_blocks==64 && m.session.requests==67);    /* Header pagination, deep catch-up, reconnect, reorg and truncated-prefix
+     * recovery beyond the former lifetime limit. No peer claims are trusted. */
+    m.count=130;memset(&m.session,0,sizeof(m.session));
+    r=stn_peer_sync(c,&p,&t,&w,&active);
+    CHECK(r.status==STN_PEER_OK && active.height==129 && r.reused_blocks==64 && r.received_blocks==66);
+    before=active;m.count=100;memset(&m.session,0,sizeof(m.session));
+    r=stn_peer_sync(c,&p,&t,&w,&active);CHECK(r.status==STN_PEER_RETAINED && memcmp(&active,&before,sizeof(active))==0);
+    reset(c,100,&active);branch(b,bs,80);m.count=130;m.mode=4;memset(&m.session,0,sizeof(m.session));before=active;
+    r=stn_peer_sync(c,&p,&t,&w,&active);CHECK(r.status==STN_PEER_DISCONNECTED && memcmp(&active,&before,sizeof(active))==0);
+    m.mode=0;memset(&m.session,0,sizeof(m.session));r=stn_peer_sync(c,&p,&t,&w,&active);
+    CHECK(r.status==STN_PEER_OK && active.height==129 && r.reused_blocks==80 && r.received_blocks==50);
+    /* The count still advertises 130 but the final block/checksum is truncated. */
+    mem.n-=200;memset(&m.session,0,sizeof(m.session));
+    r=stn_peer_sync(c,&p,&t,&w,&active);
+    CHECK(r.status==STN_PEER_OK && r.recovery && r.reused_blocks==129 && r.received_blocks==1);
+    mem.bytes[0]=0;memset(&m.session,0,sizeof(m.session));
+    r=stn_peer_sync(c,&p,&t,&w,&active);
+    CHECK(r.status==STN_PEER_OK && r.recovery && r.received_blocks==130 && r.reused_blocks==0);
 }
 typedef struct server_args { stn_windows_peer listener;const stn_chain_context *c;stn_peer_status result; } server_args;
 static DWORD WINAPI server_thread(void *u)
@@ -205,6 +222,33 @@ static void localhost(stn_chain_context *c)
     CHECK(stn_windows_peer_connect("127.0.0.1",port,100,&connection,&t)!=STN_PEER_OK);
     CHECK(DeleteFileW(path));CHECK(DeleteFileW(disk.lock_path));CHECK(RemoveDirectoryW(directory));
 }
+typedef struct partial_args {stn_windows_peer listener;HANDLE entered;stn_peer_status status;uint8_t bytes[4];} partial_args;
+static DWORD WINAPI partial_thread(void *u)
+{
+    partial_args *args=u;stn_windows_peer peer={0};stn_peer_transport t;
+    args->status=stn_windows_peer_accept(&args->listener,10000,&peer,&t);
+        if(args->status==STN_PEER_OK){
+        args->status=t.receive(t.user,args->bytes,1);
+        if(args->status==STN_PEER_OK){peer.io_timeout_ms=20;SetEvent(args->entered);args->status=t.receive(t.user,args->bytes+1,3);}
+    }
+    stn_windows_peer_close(&peer);return 0;
+}
+static void partial_io(void)
+{
+    partial_args args={0};stn_windows_peer peer={0};stn_peer_transport t;uint16_t port;HANDLE thread;
+    args.entered=CreateEventW(NULL,TRUE,FALSE,NULL);CHECK(args.entered!=NULL);if(args.entered==NULL){return;}
+    CHECK(stn_windows_peer_listen(0,&args.listener,&port)==STN_PEER_OK);
+    thread=CreateThread(NULL,0,partial_thread,&args,0,NULL);CHECK(thread!=NULL);
+    if(thread==NULL){stn_windows_peer_close(&args.listener);CloseHandle(args.entered);return;}
+    CHECK(stn_windows_peer_connect("127.0.0.1",port,10000,&peer,&t)==STN_PEER_OK);
+    CHECK(t.send(t.user,(const uint8_t*)"ST",2)==STN_PEER_OK);
+    CHECK(WaitForSingleObject(args.entered,10000)==WAIT_OBJECT_0);
+    CHECK(WaitForSingleObject(thread,100)==WAIT_TIMEOUT);
+    CHECK(t.send(t.user,(const uint8_t*)"NC",2)==STN_PEER_OK);
+    CHECK(WaitForSingleObject(thread,10000)==WAIT_OBJECT_0);
+    CHECK(args.status==STN_PEER_OK && memcmp(args.bytes,"STNC",4)==0);
+    CloseHandle(thread);CloseHandle(args.entered);stn_windows_peer_close(&peer);stn_windows_peer_close(&args.listener);
+}
 int test_peer(void);
 int test_peer(void)
 {
@@ -212,6 +256,7 @@ int test_peer(void)
     branch(a,as,99);branch(b,bs,99);memcpy(policy.fixed_target,a[0]+120,32);
     c.network_id[0]=1;c.genesis_bytes=a[0];c.genesis_length=364;c.pow_policy=&policy;c.hash_provider.hash=test_hash;
     framing(&c);synchronization(&c);localhost(&c);
+    partial_io();
     printf("P2P/sync/recovery: %u checks, %u failures (localhost included).\n",checks,failures);
     return failures==0 ? 0 : 1;
 }

@@ -69,7 +69,7 @@ stn_storage_status stn_storage_encode(const stn_chain_context *c,const stn_block
     if(n>UINT32_MAX){return STN_STORAGE_CAPACITY;}
     s=validate(c,b,n,&state);if(s!=STN_STORAGE_OK) { return s; }
     for(i=0;i<n;++i) {
-        if(b[i].length>SIZE_MAX-total-4u){return STN_STORAGE_CAPACITY;}
+        if(total>SIZE_MAX-4u || b[i].length>SIZE_MAX-total-4u){return STN_STORAGE_CAPACITY;}
         total+=4u+b[i].length;
     }
     if(total>capacity) { return STN_STORAGE_CAPACITY; }
@@ -146,7 +146,7 @@ stn_storage_status stn_storage_apply(const stn_chain_context *c,const stn_storag
     s=read_locked(c,p,w->current_bytes,w->current_capacity,&current);
     if(s!=STN_STORAGE_OK) { goto done; }
     if(!state_equal(active,&current.state)) { s=STN_STORAGE_STALE;goto done; }
-    r=stn_fork_evaluate(c,current.blocks,current.count,b,n,&fresh);
+    r=stn_fork_evaluate_history(c,current.blocks,current.count,b,n,&fresh);
     if(r.result!=STN_FORK_CANDIDATE) {
         s=r.result==STN_FORK_CURRENT || r.result==STN_FORK_TIE ? STN_STORAGE_NOT_PREFERRED :
             r.result==STN_FORK_UNRESOLVED ? STN_STORAGE_UNRESOLVED : STN_STORAGE_VALIDATION;
@@ -164,7 +164,7 @@ stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_stora
     const uint8_t *block,size_t block_length,stn_storage_workspace *w,stn_chain_state *active)
 {
     stn_storage_status s;stn_storage_view current={0};stn_chain_state next;stn_chain_report r;
-    stn_block_span *history=NULL;size_t encoded=0;
+    size_t encoded=0,offset,i;uint8_t hash[32];
     if(c==NULL || !provider_valid(p) || block==NULL || w==NULL || active==NULL ||
        w->current_bytes==NULL || w->next_bytes==NULL){return STN_STORAGE_ARGUMENT;}
     s=io_status(p->acquire(p->user));if(s!=STN_STORAGE_OK){return s;}
@@ -174,16 +174,27 @@ stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_stora
     r=stn_chain_validate_candidate(c,&current.state,block,block_length,&next);
     if(r.acceptance==STN_ACCEPTANCE_UNRESOLVED){s=STN_STORAGE_UNRESOLVED;goto done;}
     if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){s=STN_STORAGE_VALIDATION;goto done;}
-    if(current.count==SIZE_MAX/sizeof(*history)){s=STN_STORAGE_CAPACITY;goto done;}
-    history=(stn_block_span*)malloc((current.count+1u)*sizeof(*history));
-    if(history==NULL){s=STN_STORAGE_CAPACITY;goto done;}
-    if(current.count!=0){memcpy(history,current.blocks,current.count*sizeof(*history));}
-    history[current.count].bytes=block;history[current.count].length=block_length;
-    s=stn_storage_encode(c,history,current.count+1u,w->next_bytes,w->next_capacity,&encoded);
+    if(current.count>=UINT32_MAX){s=STN_STORAGE_CAPACITY;goto done;}
+    offset=12;
+    for(i=0;i<current.count;++i){
+        if(offset>SIZE_MAX-4 || current.blocks[i].length>SIZE_MAX-offset-4){s=STN_STORAGE_CAPACITY;goto done;}
+        offset+=4+current.blocks[i].length;
+    }
+    if(offset>SIZE_MAX-36 || block_length>SIZE_MAX-offset-36){s=STN_STORAGE_CAPACITY;goto done;}
+    encoded=offset+4+block_length+32;
+    if(encoded>w->next_capacity){s=STN_STORAGE_CAPACITY;goto done;}
+    /* The prefix was validated under this lock. Do not reconstruct and
+     * revalidate a second full history to append one validated candidate. */
+    memcpy(w->next_bytes,w->current_bytes,offset);
+    stn_wire_write(w->next_bytes+8,4,current.count+1);
+    stn_wire_write(w->next_bytes+offset,4,block_length);
+    memcpy(w->next_bytes+offset+4,block,block_length);
+    s=digest(c,w->next_bytes,encoded-32,hash);
+    if(s==STN_STORAGE_OK){memcpy(w->next_bytes+encoded-32,hash,32);}
     if(s==STN_STORAGE_OK){s=io_status(p->replace(p->user,w->next_bytes,encoded));}
     if(s==STN_STORAGE_OK){*active=next;}
 done:
-    free(history);stn_storage_view_release(&current);p->release(p->user);return s;
+    stn_storage_view_release(&current);p->release(p->user);return s;
 }
 
 static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_storage_provider *p,
@@ -202,9 +213,12 @@ static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_s
     if(n>=12 && memcmp(scratch,"STNS",4)==0 && stn_wire_read(scratch+4,2)==1 && stn_wire_read(scratch+6,2)==0) {
         count=(size_t)stn_wire_read(scratch+8,4);
         if(count!=0 && count<=SIZE_MAX/sizeof(stn_block_span) &&
-           count<=(n>=STN_STORAGE_OVERHEAD ? (n-STN_STORAGE_OVERHEAD)/(4u+STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY) : 0)) {
-            v.blocks=(stn_block_span*)calloc(count,sizeof(*v.blocks));
-            if(v.blocks==NULL){return STN_STORAGE_CAPACITY;}
+           n>=12) {
+            /* A truncated tail must not discard a valid prefix. Allocate only
+             * what the available bytes could possibly contain. */
+            if(count>(n-12)/(4u+STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY)){count=(n-12)/(4u+STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY);}
+            v.blocks=count ? (stn_block_span*)calloc(count,sizeof(*v.blocks)) : NULL;
+            if(count!=0 && v.blocks==NULL){return STN_STORAGE_CAPACITY;}
         } else { count=0; }
     }
     for(i=0;i<count;++i) {
@@ -239,7 +253,7 @@ stn_storage_status stn_storage_adopt(const stn_chain_context *c,const stn_storag
     s=recovery_locked(c,p,w->current_bytes,w->current_capacity,&local,&recovery);
     if(s!=STN_STORAGE_OK) { goto finished; }
     if(local.count!=0) {
-        r=stn_fork_evaluate(c,local.blocks,local.count,b,n,&plan);
+        r=stn_fork_evaluate_history(c,local.blocks,local.count,b,n,&plan);
         if(r.result!=STN_FORK_CANDIDATE && !(recovery && r.result==STN_FORK_TIE &&
             memcmp(plan.current.tip_id,plan.candidate.tip_id,32)==0)) {
             s=r.result==STN_FORK_CURRENT || r.result==STN_FORK_TIE ? STN_STORAGE_NOT_PREFERRED :

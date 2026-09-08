@@ -122,3 +122,13 @@ Build Release | x64, set stn-chain as startup project, and run with the supplied
 Run tools/test-node.ps1 with PowerShell process-local -ExecutionPolicy Bypass for the real executable/TCP/NTFS restart checks. This is separate from the C test executable. No persistent execution-policy change is needed.
 
 Validated: 1,127,559 C runtime checks plus 42 executable integration checks = 1,127,601 runtime checks; 34 build probes; 1,127,635 total; zero failures. The Release/x64 solution built with zero warnings/errors. All 1,126,622 prior runtime checks remain passing.
+
+## Long-running runtime/history qualification (2026-09-08)
+
+Release/x64 built with zero warnings/errors. C test executable: 1,127,582 checks.
+Existing tools/test-node.ps1: 872 checks (includes an intentional 61-second idle
+and partial-frame regression). Runtime total: 1,128,454. Build/boundary probes:
+34. Combined: 1,128,488, zero failures. All prior regressions remain passing.
+Only Windows Release/x64 is qualified. See MINING_WORK.md and PEER_PROTOCOL.md
+for tested chain lengths and runtime/protocol limits. Test artifacts remain in
+private build-directory locations and are removed by the existing test harness.
