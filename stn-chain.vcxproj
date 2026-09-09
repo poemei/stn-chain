@@ -55,6 +55,13 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
+  <PropertyGroup Condition="'$(Phase9TestRuntime)'=='true'">
+    <TargetName>stn-chain-phase9-test</TargetName>
+    <IntDir>$(ProjectDir)build\obj\phase9-test\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Phase9TestRuntime)'=='true'">
+    <ClCompile><PreprocessorDefinitions>STN_PHASE9_TEST_RUNTIME;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="includes\stn_platform.h" />
     <ClInclude Include="src\stn_wire_internal.h" />

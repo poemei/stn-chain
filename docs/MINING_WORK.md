@@ -16,7 +16,9 @@ stn-chain.exe --dev --data stn-chain-dev.stns --rpc-port 18473
 The listener is **127.0.0.1:18473**, binary RPC v1 `STNC` (see [RPC.md](RPC.md)).
 It is not HTTP/JSON-RPC, Bitcoin RPC, Ethereum RPC, or Stratum. stn-stratumd must
 implement this documented node-facing protocol; compatibility with an existing
-stratumd implementation has not been tested. No stratumd source was supplied.
+stratumd miner-facing lifecycle is not qualified. The actual current STN-Stratum
+server and production STNC client are now qualified for the Chain-facing contract
+in Phase 10 Chunk 1; see RPC.md and tools/test-stratum-interface.ps1.
 There is no background mining. Ctrl+C requests shutdown. Socket timeouts are
 idle I/O bounds; a healthy connection is no longer killed by a fixed total
 session lifetime.

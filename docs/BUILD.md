@@ -1,5 +1,32 @@
 # Visual Studio Build
 
+## Phase 9 test-only runtime
+
+The normal Release/x64 build excludes scripted providers. For the authorized
+integration proof, build the same application project with the explicit property
+`Phase9TestRuntime=true`. This produces `stn-chain-phase9-test.exe` and uses a
+separate intermediate directory; it does not replace `stn-chain.exe`.
+
+From a Visual Studio developer command prompt:
+
+```text
+MSBuild stn-chain.sln /m:1 /p:Configuration=Release /p:Platform=x64
+MSBuild stn-chain.vcxproj /m:1 /p:Configuration=Release /p:Platform=x64 /p:Phase9TestRuntime=true
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/test-phase9.ps1
+```
+
+The fixture requires the script's private named shutdown event, announces its
+scripted identity hooks on stderr, and binds only to loopback through the existing
+runtime. It asserts signature success for a fixed test marker, resolves one test
+signer, and supplies a scripted replay hook; existing active-chain replay checks
+still execute. It performs no real signature verification. The script separately
+proves production admission stays unavailable, then exercises real TCP, CNG PoW,
+atomic NTFS persistence, clean shutdown/restart, concurrency, and height 65.
+Temporary chain files and processes are cleaned up. Test outputs remain in build/.
+This test fixture is not a production deployment or identity-provider implementation.
+
+## Normal Visual Studio build
+
 Open stn-chain.sln in the repository root with Visual Studio 2026 and the
 Desktop development with C++ workload. The project compiles .c files as
 ISO C17, not C++.
@@ -132,3 +159,15 @@ and partial-frame regression). Runtime total: 1,128,454. Build/boundary probes:
 Only Windows Release/x64 is qualified. See MINING_WORK.md and PEER_PROTOCOL.md
 for tested chain lengths and runtime/protocol limits. Test artifacts remain in
 private build-directory locations and are removed by the existing test harness.
+
+## Phase 10 final integration qualification
+
+After building Release/x64, the separate Phase9TestRuntime=true target and
+STN-Stratum with its build.cmd, run tools/test-stratum-interface.ps1
+-FullLifecycleOnly for the 125-check complete persistence/recovery proof.
+Run the same script without switches and with -JobMappingOnly, -MinerResultOnly,
+and -FailureStateOnly separately for the prior 437 checks. These runs must be
+sequential: configured loopback ports 18473/18475 must be free. Fixtures use
+private temporary state and clean their processes/files. Also run test-phase9.ps1,
+stn-chain-tests.exe and Stratum's parser/session tests. Qualification is limited
+to Windows Release/x64 with test-only identity/result fixtures.

@@ -5,6 +5,138 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 10 Chunk 5 — full integration COMPLETE — 2026-09-09
+
+- Added 125 actual-process checks (-FullLifecycleOnly) covering Chain template,
+  deterministic Stratum jobs, fixture results, STNC solved-work, independent
+  Chain acceptance, exact persistence and new work from recovered accepted state.
+  Work ID, full target and candidate remain exact except the 64-bit nonce.
+- One bounded interruption stops both processes. Chain recovers identical INFO
+  and accepted block bytes before Stratum restarts. No unavailable placeholder
+  or accepted old job becomes current; invalid/stale results remain rejected.
+- No production defect found or production code changed in this chunk. Phase 10
+  COMPLETE is documented in roadmap, architecture and protocol documentation.
+- Windows Release/x64 rebuilds: zero warnings/errors. All 125 new and 437 prior
+  Phase 10 checks, 1,544 Phase 9 checks, 1,130,094 Chain C checks, 27 parser checks,
+  two session assertions and 34 build probes pass with zero failures.
+- Scripted identity/result fixtures remain test-only. Hardware, production
+  identity, accounting, performance and other platforms remain unqualified.
+  No commit or push performed. Phase 11 not started.
+
+
+### Phase 10 Chunk 4 — failure/reconnect state — 2026-09-09
+
+- Extended the existing integration script with -FailureStateOnly: 148 checks
+  prove real Chain loss, an attempted miner result returning provider rather than
+  accepted, no fabricated/current cached work, empty reconnect, identical and
+  changed authoritative work recovery, partial miner-frame disposal, stale results,
+  bounded session isolation and actual Stratum process restart.
+- Fixed Stratum's delayed invalidation after failed/uncertain solved-work calls;
+  shared current-work and session flags now clear immediately. Chain consensus,
+  wire formats and stale identities remain unchanged. An initial test expected
+  only EOF after process termination; it now correctly also accepts TCP reset.
+- Release/x64 builds: zero warnings/errors. New 148 and prior 115/93/81 Phase 10
+  checks pass, alongside 1,544 Phase 9 runtime checks, 1,130,094 Chain C checks,
+  27 Stratum parser checks, two session assertions and 34 build probes. Zero
+  failures; no new Chain C checks or additional platform qualification.
+- Updated roadmap/RPC and Stratum protocol/changelog. Scripted identity fixtures
+  remain explicitly test-only. No hardware-miner, performance, discovery, queue,
+  economic or Chunk 5 work. Temporary files/processes cleaned; current work and
+  independent Stratum changes preserved. No commit or push performed.
+
+### Phase 10 Chunk 3 — miner result return path — 2026-09-09
+
+- Added -MinerResultOnly to the existing actual-Stratum integration script;
+  shared existing fixed-target result/digest helpers rather than copying fixtures.
+  Results travel through actual STNM sessions, Stratum's current cached-work
+  reconstruction and STNC 0x2003; no direct internal acceptance path is used.
+- 115 new checks prove correct work association, nonce-only reconstruction,
+  big-endian nonce above 2^32, unchanged full target/candidate read back from
+  accepted Chain storage, rejection of forwarded invalid PoW, unknown/stale/
+  malformed/reserved-bit handling, two-session isolation and session reconnect,
+  accepted two-item cleanup and Chain restart. Stratum fixes enforce reserved
+  bytes and its existing protocol-error mapping; Chain consensus is unchanged.
+- Windows Release/x64 builds have zero warnings/errors. All new checks plus
+  prior 93 mapping, 81 interface, 1,544 Phase 9 executable lifecycle checks,
+  1,130,094 Chain C checks, 27 Stratum parser checks, two session assertions and
+  34 build probes pass, zero failures. No other platform qualification.
+- Updated roadmap and RPC documentation and Stratum protocol/architecture/
+  changelog. Production identity remains fail-closed; the test-only identity
+  hooks and bounded result generator do not qualify hardware miners or accounting.
+  No Chunk 4, discovery, economics or unrelated architecture. Temporary test
+  state/processes removed; existing work preserved. No commit or push performed.
+
+### Phase 10 Chunk 2 — deterministic Stratum job mapping — 2026-09-09
+
+- Extended the existing actual-Stratum integration script with -JobMappingOnly.
+  Shared the existing canonical transaction fixture helper with the Phase 9
+  script instead of duplicating fixtures. Current working trees are preserved.
+- Added 93 checks proving actual 0x2002-to-STNM mapping: exact candidate/target/
+  work ID/nonce and embedded metadata, identical jobs across three observation
+  sessions, replacement from a second pending submission, and initial/subsequent
+  unavailable without placeholder or cached current jobs. No miner computation,
+  share, or solved-work submission occurs in the new mapping proof.
+- No production mapping defect was discovered; no consensus, protocol or live
+  Stratum code changes were needed. The authorized test runtime supplies scripted
+  identity validation only; its real RPC/template/runtime paths are exercised.
+- Windows Release/x64 builds: zero warnings/errors. New 93 checks and prior 81
+  Chunk 1 integration checks pass; Stratum's 27 parser checks and two existing
+  session assertions pass. All 1,130,094 Chain C checks and 34 build probes pass,
+  zero failures. No new C checks or other platform qualification.
+- Updated roadmap/RPC documentation and Stratum protocol/architecture/changelog.
+  Chunk 2 complete; no Chunk 3, external miners or share work. Temporary test
+  processes/files removed. No commit or push performed.
+
+### Phase 10 Chunk 1 — actual STN-Stratum interface — 2026-09-09
+
+- Qualified current C:\poes_projects\stn-stratum production server/client through
+  STNC without Chain protocol or consensus changes. Added one bounded integration
+  script and a configurable test-helper port. Existing Phase 9 work is preserved.
+- Fixed Stratum-side undersized maximum, missing INFO API, missing successful
+  response shape/bounds checks, unbounded socket send/receive, and unsafe mutation
+  retransmission. Its driver links the actual production client/Windows transport;
+  the actual server runs concurrently and proves endpoint recovery/work polling.
+- 81 cross-process checks pass: INFO endian/length, complete work/target/nonce
+  identity, accepted/rejected/stale solved-work contracts, unsupported opcode,
+  no-work, concurrent clients, outage/reconnect and lost mutation reply isolation.
+  Fixed test-only log observation to use redirected stdout rather than a log file
+  held exclusively by Stratum. Temporary processes/state/logs are removed.
+- Both affected optimized Windows x64 builds: zero warnings/errors. Stratum's
+  27 new parser/status checks and two existing session assertions pass. All
+  1,130,094 Chain C checks and 34 build probes pass; zero remaining failures.
+  No new Chain C checks or other platform qualification.
+- Updated RPC.md, MINING_WORK.md and ROADMAP.md; Stratum protocol/architecture
+  and changelog also updated. Chunk 1 marked complete, not the full miner lifecycle.
+  No Chunk 2, production identity, share/economic/difficulty work, commit or push.
+
+### Phase 9 lifecycle integration proof — 2026-09-09
+
+- Added an explicitly authorized test-only runtime build of the existing Windows
+  application with scripted signature/authority/replay hooks. Separate executable
+  and intermediate paths preserve the production binary, which still fails closed.
+  A private test-only event requests the existing orderly shutdown path; no RPC
+  shutdown method, production provider, or protocol feature was added.
+- Added tools/test-phase9.ps1 using the existing executable-test helpers. All
+  submissions use STNC 0x1005. The real runtime proves IDs/status, duplicates,
+  malformed/unresolved/replay rejection, concurrent submission/status clients,
+  canonical ordering of 17 pending items with 16 selected, stable candidate/work
+  bytes, changed-candidate staleness, invalid PoW, and valid 64-bit nonce solutions.
+- Proven local atomic acceptance removes exactly included entries and preserves
+  the remaining item's ID. Clean shutdown/restart reconstructs the exact accepted
+  block; volatile pending does not return. Subsequent RPC admissions/mining proceed
+  through height 65, restart restores that block, and another admission builds
+  candidate 66 from the restored tip. No production integration defect was found.
+- Windows Release/x64: production and test runtime builds have zero warnings/errors.
+  1,544 new executable/TCP/CNG/NTFS checks pass. Existing 1,130,094 C checks and
+  34 build probes pass, zero failures. Peer cleanup/unrelated preservation,
+  persistence/activation failures, capacity, P2P catch-up/reorg and other prior
+  regressions remain passing. No new C checks or other platform qualification.
+- Phase 9 marked COMPLETE in ROADMAP.md for this explicitly scripted-identity
+  integration proof. BUILD.md documents reproducible commands and limitations.
+  Test files/processes are cleaned up; no standalone report or scratch artifacts.
+  Production identity qualification, reorg re-addition, pending persistence/gossip,
+  Stratum and Phase 10 remain deferred. No commit or push performed.
+
 ### Accepted-block pending cleanup — 2026-09-08
 
 - Inclusion preparation now derives protocol transaction IDs through the existing

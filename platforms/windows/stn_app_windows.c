@@ -10,6 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#ifdef STN_PHASE9_TEST_RUNTIME
+#include "../../tests/stn_phase9_runtime.h"
+#endif
 #define APP_STORAGE_INITIAL (STN_STORAGE_OVERHEAD+4u+STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY)
 #define APP_RPC_ACCEPT_POLL_MS 250u
 #define APP_RPC_IO_TIMEOUT_MS 60000u
@@ -184,6 +187,9 @@ int stn_windows_app(int argc,char **argv)
     mining.chain=&chain;mining.storage=&storage;mining.body=body;mining.body_length=4+transaction_length;mining.transaction_count=1;
     if(!dev){mining.pending=&pending;mining.pending_body=body;mining.pending_body_capacity=STN_BLOCK_MAX_BODY;mining.body=NULL;mining.body_length=0;mining.transaction_count=0;}
     mining.template_capacity=STN_BLOCK_MAX_SIZE;mining.owns_buffers=1;
+#ifdef STN_PHASE9_TEST_RUNTIME
+    if(!phase9_setup(&mining)){fprintf(stderr,"Test runtime requires its private stop event.\n");goto cleanup;}
+#endif
     status=stn_storage_load(&chain,&storage,mining.snapshot,mining.snapshot_capacity,&view);
     if(status==STN_STORAGE_NOT_FOUND){stn_block_span anchor={genesis,genesis_length};
         status=stn_storage_create(&chain,&storage,&anchor,1,mining.snapshot,mining.snapshot_capacity,&mining.active);
@@ -198,6 +204,9 @@ int stn_windows_app(int argc,char **argv)
     result=EXIT_SUCCESS;
     if(once){if(!serve_once(&listener,&service)){result=EXIT_FAILURE;}goto shutdown;}
     while(InterlockedCompareExchange(&stopping,0,0)==0){
+#ifdef STN_PHASE9_TEST_RUNTIME
+        if(WaitForSingleObject(phase9_stop_event,0)==WAIT_OBJECT_0){break;}
+#endif
         stn_windows_peer peer={0};stn_peer_transport transport;rpc_client *client;
         stn_peer_status accepted=stn_windows_peer_accept(&listener,APP_RPC_ACCEPT_POLL_MS,&peer,&transport);
         if(accepted==STN_PEER_TIMEOUT){reap_clients(&clients);continue;}
@@ -214,6 +223,9 @@ int stn_windows_app(int argc,char **argv)
 shutdown:
     InterlockedExchange(&stopping,1);stop_clients(&clients);(void)SetConsoleCtrlHandler(stop,FALSE);
 cleanup:
+#ifdef STN_PHASE9_TEST_RUNTIME
+    if(phase9_stop_event!=NULL){CloseHandle(phase9_stop_event);phase9_stop_event=NULL;}
+#endif
     stn_windows_peer_close(&listener);if(lock_ready){DeleteCriticalSection(&dispatch_lock);}
     stn_pending_clear(&pending);free(genesis);free(body);free(mining.snapshot);free(mining.workspace.current_bytes);free(mining.workspace.next_bytes);free(mining.template_bytes);
     return result;

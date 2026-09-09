@@ -11,6 +11,74 @@ No node becomes authoritative because it exposes RPC.
 
 ## Protocol version 1
 
+### Qualified STN-Stratum client
+
+Phase 10 Chunk 1 qualifies the actual current STN-Stratum Windows server and
+its client/transport sources for INFO (0x0001), MINING_TEMPLATE (0x2002), and
+SUBMIT_WORK (0x2003). The server polls templates; INFO is exposed by the client
+API. Stratum's payload bound now matches this specification, and it checks
+correlation/framing, method response lengths, nested template length and v3 magic.
+It preserves Chain base/work identities, target and immutable candidate bytes.
+
+Accepted, rejected, stale, unavailable and transport failures remain distinct.
+Five-second send/receive timeouts bound stalled socket operations; connection
+establishment uses OS behavior. One automatic reconnect/retry is allowed for
+reads only. A lost mutation reply remains an uncertain transport failure, never
+an inferred acceptance or an automatic second submission. The actual server
+recovers at its configured endpoint and coexists with other Chain RPC clients.
+
+Reproduce with tools/test-stratum-interface.ps1 after building both projects;
+the default Stratum checkout is C:\poes_projects\stn-stratum. Ports 18473 and
+18475 must be free; the test never evicts existing services. Temporary Chain
+state/logs are isolated and removed. Explicit development work fixtures qualify
+the contract; no external miner or production identity qualification is implied.
+
+### Phase 10 — Chain ↔ Stratum Integration COMPLETE
+
+Qualified on Windows Release/x64 (2026-09-09). Chain-issued work passes through
+actual STNC 0x2002, deterministic STNM jobs, fixture miner results and Stratum's
+STNC 0x2003 submission into independent Chain validation and persistence. Work
+identity, full target and canonical candidate remain exact except the permitted
+64-bit nonce. Invalid/stale results remain rejected; bounded sessions agree.
+
+The final 125-check lifecycle stops Chain and Stratum once, recovers identical
+accepted INFO and block bytes with Stratum absent, then starts a fresh coordinator.
+Unavailable work yields no placeholder/cached current job. New height-two work
+extends the recovered accepted tip with a new Chain work ID. Stratum coordinates
+mining; STN Chain remains consensus authority. No production fix was necessary.
+
+All 562 Phase 10 process checks (81/93/115/148/125), 1,544 Phase 9 checks,
+1,130,094 Chain C checks, 27 parser checks, two session assertions and 34 build
+probes pass. Release/x64 builds have zero warnings/errors. Identity and result
+fixtures remain test-only; hardware, production identity, accounting, performance
+and other platforms are not qualified. Phase 11 has not started.
+
+### Frame layout
+
+Phase 10 Chunk 4 qualifies failure-state recovery with the actual Stratum server.
+Failed/uncertain solved-work calls invalidate Stratum's current-job flags before
+further distribution. Recovery consumes a fresh Chain template; identical
+authoritative inputs retain identity and changed inputs replace it. Unavailable
+work is never substituted with a cached current job. Partial miner frames are
+discarded with their sessions. Existing polling/timeouts bound detection;
+transport failure never means Chain acceptance. No Chain protocol change.
+
+Phase 10 Chunk 3 qualifies actual miner-result forwarding: Stratum copies the
+original 0x2002 candidate and changes only its defined big-endian 64-bit nonce
+before 0x2003. The accepted block read back from Chain matches those bytes exactly;
+forwarded insufficient PoW is rejected by Chain. No STNC format or consensus
+rule changed. Miner-facing malformed/unknown/stale handling is documented in
+Stratum PROTOCOL.md and exercised by -MinerResultOnly in the existing integration
+script. Chain acceptance, not Stratum forwarding, remains authoritative.
+
+Phase 10 Chunk 2 also qualifies the actual Stratum server's existing miner-job
+mapping from 0x2002: its STNM job ID is exactly Chain's work ID, the full target
+is copied, and the complete candidate block (including version/network/height/tip
+and the initial 64-bit nonce) is unchanged. Three observation-only sessions
+receive identical jobs. Changed pending content replaces the job; unavailable
+work is not fabricated or resent as current. Stratum's PROTOCOL.md specifies the
+84-byte job wrapper and fixed nonce rule. Chain wire and consensus are unchanged.
+
 All multibyte fields are unsigned big-endian. Field order is fixed; no optional
 implicit fields, locale-dependent text, floating point or struct serialization.
 

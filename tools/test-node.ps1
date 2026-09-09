@@ -1,6 +1,6 @@
 # Copyright (c) 2026 STN-Labz. See docs/LICENSE.md.
 # Real executable / TCP / CNG / NTFS integration. No mining search loop.
-param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly)
+param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly, [switch]$LibraryOnly)
 $ErrorActionPreference = 'Stop'
 $script:checks = 0
 function Check($condition, $message) {
@@ -38,10 +38,11 @@ function Request($stream, [int]$method, [byte[]]$payload, [int]$version = 1) {
     Check ($n -le 1051948) 'response bounded'
     return @{ Code = (ReadNumber $header[10..11]); Payload = (ReadExact $stream ([int]$n)) }
 }
-function StartNode([string]$data, [bool]$once = $true, [string]$genesis = '') {
+function StartNode([string]$data, [bool]$once = $true, [string]$genesis = '', [int]$rpcPort = 0) {
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = [IO.Path]::GetFullPath($Executable)
     $info.Arguments = '--dev --once --rpc-port 0 --data "' + $data + '"'
+    $info.Arguments = $info.Arguments.Replace('--rpc-port 0', '--rpc-port ' + $rpcPort)
     if ($genesis) { $info.Arguments = $info.Arguments.Replace('--dev', '--genesis "' + $genesis + '"') }
     if (!$once) { $info.Arguments = $info.Arguments.Replace('--once ', '') }
     $info.UseShellExecute = $false; $info.CreateNoWindow = $true
@@ -57,6 +58,33 @@ function StartNode([string]$data, [bool]$once = $true, [string]$genesis = '') {
     $client.ReceiveTimeout = 5000; $client.SendTimeout = 5000
     return @{ Process = $p; Client = $client; Stream = $client.GetStream(); Height = $height; Port = $port }
 }
+function Transaction([int]$nonce) {
+    $tx=[byte[]]::new(244)
+    [Text.Encoding]::ASCII.GetBytes('STNT').CopyTo($tx,0); $tx[5]=1;$tx[7]=1;$tx[11]=232
+    [Text.Encoding]::ASCII.GetBytes('STNR').CopyTo($tx,12)
+    $fields=@{5=1;7=1;8=1;40=2;72=3;103=$nonce;111=10;115=52;117=1;125=5;126=1;128=1;129=97;131=1;132=98;134=1;135=99;136=1;168=4}
+    foreach($key in $fields.Keys){$tx[12+$key]=$fields[$key]}
+    return ,$tx
+}
+function Digest([string]$domain,[byte[]]$bytes) {
+    return ,$sha.ComputeHash([byte[]]([Text.Encoding]::ASCII.GetBytes($domain)+[byte]0+$bytes))
+}
+function Hex([byte[]]$bytes) { return [BitConverter]::ToString($bytes).Replace('-','') }
+function Solve([byte[]]$work,[bool]$valid) {
+    $solved=[byte[]]$work.Clone(); $found=$false
+    for([UInt64]$nonce=4294967296;$nonce -lt 4294968320;$nonce++) {
+        (NumberBytes $nonce 8).CopyTo($solved,220)
+        $digest=Digest 'STN-CHAIN:BLOCK:ID:1' $solved[68..235]
+        # The existing fixture target is 7fff...; no alternate work rule.
+        if(($digest[0] -lt 128) -eq $valid){$found=$true;break}
+    }
+    Check $found 'bounded fixed-target solution'
+    Check ((Hex $solved[0..219]) -eq (Hex $work[0..219]) -and
+        (Hex $solved[228..($work.Length-1)]) -eq (Hex $work[228..($work.Length-1)])) 'nonce-only mutation'
+    Check ((ReadNumber $solved[220..227]) -ge 4294967296) '64-bit nonce exercised'
+    return ,$solved
+}
+if ($LibraryOnly) { return }
 $directory = Join-Path ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Executable))) ('node-test-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Path $directory
 $data = Join-Path $directory 'chain.stns'

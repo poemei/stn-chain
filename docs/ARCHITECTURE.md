@@ -273,3 +273,23 @@ Both use the existing serialized service dispatch boundary and current validated
 history. See [RPC.md](RPC.md). No new mining or assembly integration is involved.
 
 The Windows application composes existing storage and byte-transport adapters with the portable mining service. It provides loopback RPC and strict persisted startup; automatic P2P orchestration remains deferred. Explicit configured transaction content produces deterministic work. Submitted solutions use ordinary full fork evaluation and atomic storage application with production SHA-256. Mining origin grants no authority. See [MINING_WORK.md](MINING_WORK.md).
+
+## Phase 10 — Chain ↔ Stratum Integration COMPLETE
+
+Qualified on Windows Release/x64 (2026-09-09). Chain-issued work passes through
+actual STNC 0x2002, deterministic STNM jobs, fixture miner results and Stratum's
+STNC 0x2003 submission into independent Chain validation and persistence. Work
+identity, full target and canonical candidate remain exact except the permitted
+64-bit nonce. Invalid/stale results remain rejected; bounded sessions agree.
+
+The final 125-check lifecycle stops Chain and Stratum once, recovers identical
+accepted INFO and block bytes with Stratum absent, then starts a fresh coordinator.
+Unavailable work yields no placeholder/cached current job. New height-two work
+extends the recovered accepted tip with a new Chain work ID. Stratum coordinates
+mining; STN Chain remains consensus authority. No production fix was necessary.
+
+All 562 Phase 10 process checks (81/93/115/148/125), 1,544 Phase 9 checks,
+1,130,094 Chain C checks, 27 parser checks, two session assertions and 34 build
+probes pass. Release/x64 builds have zero warnings/errors. Identity and result
+fixtures remain test-only; hardware, production identity, accounting, performance
+and other platforms are not qualified. Phase 11 has not started.
