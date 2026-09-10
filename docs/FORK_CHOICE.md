@@ -1,5 +1,16 @@
 # Fork Choice and Reorganization Planning
 
+
+Current work representation is 320 bits / 40 canonical big-endian bytes (Phase 11
+Chunk 3). This supersedes historical 256-bit work limits below. STNC/STNP version
+2 carries widened work fields; block, target, hash and mining-job formats remain.
+
+
+Current Phase 11 Chunk 2 supersedes fixed-target-only statements below: validation
+and mining use the same activated branch-derived required target; persistence
+and fork evaluation rebuild its history. Per-block work remains checked and
+summed. See [POW.md](POW.md#phase-11-chunk-2--required-target-consensus-activated).
+
 Status: implemented local ISO C17 evaluation and in-memory planning. No
 reorganization application, persistent mutation, or distributed node exists.
 
@@ -101,3 +112,7 @@ using constant working state and recomputed block IDs for the common ancestor.
 Storage adoption/application uses this history API, so a bounded validation batch
 does not become a maximum reorganization height or blockchain length. Both paths
 retain identical validation, work preference, tie and failure-output rules.
+
+## Phase 11 Chunk 4 — final qualification (2026-09-10)
+
+Two independent NTFS node states exchange competing 61-block histories over real Winsock connections after one bounded partition. Each validates the other branch; the harder adjusted branch wins by reconstructed work, and the other node atomically replaces 60 blocks from genesis. A wrong-target branch with fabricated maximal advertised work cannot alter accepted state or disk bytes. A separate scripted-hash run covers work beyond 256 bits. Both reopened stores reconstruct byte-identical winning history. See ROADMAP.md for final Phase 11 evidence and limits.

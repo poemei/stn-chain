@@ -26,7 +26,7 @@ function ReadExact($stream, [int]$n) {
     }
     return ,$b
 }
-function Request($stream, [int]$method, [byte[]]$payload, [int]$version = 1) {
+function Request($stream, [int]$method, [byte[]]$payload, [int]$version = 2) {
     $frame = [byte[]]([Text.Encoding]::ASCII.GetBytes('STNC') + (NumberBytes $version 2) +
         (NumberBytes 1 2) + (NumberBytes $method 2) + (NumberBytes 0 2) +
         (NumberBytes 123 8) + (NumberBytes $payload.Length 4) + $payload)
@@ -75,10 +75,11 @@ function Solve([byte[]]$work,[bool]$valid) {
     for([UInt64]$nonce=4294967296;$nonce -lt 4294968320;$nonce++) {
         (NumberBytes $nonce 8).CopyTo($solved,220)
         $digest=Digest 'STN-CHAIN:BLOCK:ID:1' $solved[68..235]
-        # The existing fixture target is 7fff...; no alternate work rule.
-        if(($digest[0] -lt 128) -eq $valid){$found=$true;break}
+        # Exact unsigned big-endian comparison against Chain-issued target.
+        $meets=([String]::CompareOrdinal((Hex $digest),(Hex $work[188..219])) -le 0)
+        if($meets -eq $valid){$found=$true;break}
     }
-    Check $found 'bounded fixed-target solution'
+    Check $found 'bounded Chain-target solution'
     Check ((Hex $solved[0..219]) -eq (Hex $work[0..219]) -and
         (Hex $solved[228..($work.Length-1)]) -eq (Hex $work[228..($work.Length-1)])) 'nonce-only mutation'
     Check ((ReadNumber $solved[220..227]) -ge 4294967296) '64-bit nonce exercised'
@@ -113,7 +114,7 @@ try {
         }
         # Queue all clients before reading any reply; one has a bad STNC version.
         for ($i=0; $i -lt 3; $i++) {
-            $version = if ($i -eq 0) { 2 } else { 1 }
+            $version = if ($i -eq 0) { 1 } else { 2 }
             $frame = [byte[]]([Text.Encoding]::ASCII.GetBytes('STNC') + (NumberBytes $version 2) +
                 (NumberBytes 1 2) + (NumberBytes 0x1005 2) + (NumberBytes 0 2) +
                 (NumberBytes 123 8) + (NumberBytes $submission.Length 4) + $submission)
@@ -148,12 +149,12 @@ try {
     $r = Request $node.Stream 0x2003 $bad
     Check ($r.Code -eq 7 -and $r.Payload.Length -eq 0) 'insufficient real PoW'
     $r = Request $node.Stream 0x2003 $work
-    Check ($r.Code -eq 0 -and $r.Payload.Length -eq 72 -and $r.Payload[39] -eq 1) 'atomic solved work'
+    Check ($r.Code -eq 0 -and $r.Payload.Length -eq 80 -and $r.Payload[39] -eq 1) 'atomic solved work'
     $r = Request $node.Stream 0x2003 $work
     Check ($r.Code -eq 10) 'stale work'
     $r = Request $node.Stream 1 @()
     Check ($r.Code -eq 0 -and $r.Payload[71] -eq 1) 'updated info'
-    $r = Request $node.Stream 1 @() 2
+    $r = Request $node.Stream 1 @() 1
     Check ($r.Code -eq 2) 'unsupported version'
     $r = Request $node.Stream 0x3000 @()
     Check ($r.Code -eq 4) 'admin forbidden'
@@ -206,7 +207,7 @@ try {
     # idle poll must retain that frame, while a second healthy session stays alive.
     $idle = [Net.Sockets.TcpClient]::new('127.0.0.1', $node.Port)
     $script:clients += $idle; $idle.ReceiveTimeout = 10000
-    $partial = [byte[]]([Text.Encoding]::ASCII.GetBytes('STNC') + (NumberBytes 1 2) +
+    $partial = [byte[]]([Text.Encoding]::ASCII.GetBytes('STNC') + (NumberBytes 2 2) +
         (NumberBytes 1 2) + (NumberBytes 2 2) + (NumberBytes 0 2) +
         (NumberBytes 123 8) + (NumberBytes 8 4) + (NumberBytes 70 8))
     $node.Stream.Write($partial, 0, 25)

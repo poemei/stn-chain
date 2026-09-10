@@ -63,7 +63,7 @@ static int ensure_storage_capacity(stn_mining_service *s,size_t required)
 static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view *v,size_t *length,uint8_t id[32])
 {
     static const uint8_t domain[]="STN-CHAIN:WORK:ID:1";
-    stn_block b={0};size_t offset=0,i;stn_work increment,total;
+    stn_block b={0};size_t offset=0,i;stn_work increment,total;uint8_t required_target[32];
     const uint8_t *body=s->body;size_t body_length=s->body_length;uint32_t transaction_count=s->transaction_count;
     if(s->pending!=NULL){
         stn_data_status assembled=stn_pending_assemble(s->pending,s->intelligence,v,s->pending_body,s->pending_body_capacity,&body_length,&transaction_count);
@@ -79,11 +79,12 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
         if(memcmp(body+offset+4+20,s->chain->network_id,32)!=0){return STN_RPC_REJECTED;}
         offset+=4+n;
     }
-    if(stn_target_work(v->state.current_target,&increment)!=STN_DATA_OK ||
+    if(stn_chain_required_target(s->chain,&v->state,required_target)!=STN_DATA_OK){return STN_RPC_UNAVAILABLE;}
+    if(stn_target_work(required_target,&increment)!=STN_DATA_OK ||
        stn_work_add(&v->state.cumulative_work,&increment,&total)!=STN_DATA_OK){return STN_RPC_REJECTED;}
     b.header.version=3;memcpy(b.header.network_id,v->state.network_id,32);
     memcpy(b.header.previous_hash,v->state.tip_id,32);b.header.height=v->state.height+1;
-    b.header.timestamp=v->state.timestamp;memcpy(b.header.reserved_target,v->state.current_target,32);
+    b.header.timestamp=v->state.timestamp;memcpy(b.header.reserved_target,required_target,32);
     b.header.transaction_count=transaction_count;b.header.body_length=(uint32_t)body_length;b.body=body;
     if(stn_block_body_commitment(b.body,body_length,transaction_count,&s->chain->hash_provider,b.header.transaction_commitment)!=STN_DATA_OK){return STN_RPC_REJECTED;}
     if(s->template_capacity<168+body_length){return STN_RPC_CAPACITY;}
@@ -169,7 +170,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         memcpy(p,v.state.tip_id,32);memcpy(p+32,id,32);stn_wire_write(p+64,4,n);
         memcpy(p+68,s->template_bytes,n);*written=68+n;code=STN_RPC_OK;goto done;
     }
-    if(cap<72){code=STN_RPC_CAPACITY;goto done;}
+    if(cap<80){code=STN_RPC_CAPACITY;goto done;}
     if(s->pending!=NULL && memcmp(q->payload+32,id,32)!=0){code=STN_RPC_STALE;goto done;}
     if(q->length!=68+n || memcmp(q->payload+32,id,32)!=0 ||
        memcmp(q->payload+68,s->template_bytes,STN_MINING_NONCE_OFFSET)!=0 ||
@@ -187,7 +188,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
     s->active=accepted;
     if(s->pending!=NULL){stn_pending_prune(s->pending,remove);}
     memcpy(p,s->active.tip_id,32);stn_wire_write(p+32,8,s->active.height);
-    memcpy(p+40,s->active.cumulative_work.bytes,32);*written=72;
+    memcpy(p+40,s->active.cumulative_work.bytes,STN_WORK_SIZE);*written=80;
 done:
     stn_storage_view_release(&v);return code;
 }

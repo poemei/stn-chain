@@ -1,5 +1,10 @@
 # Development Peer Protocol, Synchronization and Recovery
 
+
+Current work representation is 320 bits / 40 canonical big-endian bytes (Phase 11
+Chunk 3). This supersedes historical 256-bit work limits below. STNC/STNP version
+2 carries widened work fields; block, target, hash and mining-job formats remain.
+
 Status: implemented bounded protocol/server handling, synchronous client sync,
 explicit recovery coordination and Windows Winsock transport. Windows localhost
 integration is tested, including real SHA-256 and NTFS persistence. No public
@@ -28,7 +33,7 @@ All integers are unsigned big-endian. No raw C struct serialization is used.
 | Offset | Width | Rule |
 | --- | --- | --- |
 | 0 | 4 | STNP magic |
-| 4 | 2 | Protocol version 1 only |
+| 4 | 2 | Protocol version 2 only |
 | 6 | 2 | Type 1 through 6; unknown types rejected |
 | 8 | 4 | Payload byte length, at most 1,051,884 |
 | 12 | declared length | Exact payload; no trailing bytes in a decoded frame |
@@ -42,7 +47,7 @@ there is no resynchronization scan that could reinterpret malformed bytes.
 | Type | Payload and semantics |
 | --- | --- |
 | 1 HELLO | network ID 32, genesis ID 32, capabilities u32=1; echoed only on exact compatibility |
-| 2 STATE | Empty request; response height u64, tip ID 32, cumulative work 32, block count u32 (76 bytes) |
+| 2 STATE | Empty request; response height u64, tip ID 32, cumulative work 40, block count u32 (84 bytes) |
 | 3 GET_HEADERS | start index u32, count u32; count 1..64 within server snapshot |
 | 4 HEADERS | start u32, count u32, exactly count canonical 168-byte headers |
 | 5 GET_BLOCK | Full-history index u32 |
@@ -186,3 +191,7 @@ progress across header/body and chunk boundaries. Automatic P2P connection/disco
 orchestration is still not part of the runnable RPC server. Longer-history protocol
 coordination is tested in the existing deterministic peer harness; existing real
 localhost/CNG/NTFS peer coverage is preserved.
+
+## Phase 11 Chunk 4 — final qualification (2026-09-10)
+
+Phase 11 final qualification uses actual loopback Winsock HELLO/STATE/header/block exchange between two independent NTFS-backed node states. Divergent histories cross height 60 and converge by independent target/work validation. Wrong-target evidence remains ineligible despite encoded-target-valid PoW and fabricated maximal work. Separate scripted-hash transport/reconstruction covers sums beyond 256 bits. No protocol or production changes were needed. State teardown/reload is in-process; separate existing process regressions qualify Chain/Stratum restart. Automatic P2P orchestration and Internet operation remain unqualified. See ROADMAP.md.

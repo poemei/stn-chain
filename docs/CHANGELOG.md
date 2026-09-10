@@ -5,6 +5,96 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 11 Chunk 4 — network convergence / Phase 11 COMPLETE — 2026-09-10
+
+- Added 1,109 existing-harness checks: two NTFS-backed node states, actual
+  Winsock exchange, one bounded partition, distinct height-60 adjusted branches,
+  independent validation, deterministic greater-work choice and 60-block reorg.
+- Rejected wrong-target evidence with valid encoded-target PoW and fabricated
+  maximum advertised work without changing accepted state or stored bytes.
+  Reopened both stores and compared all accepted block bytes, tip, current/next
+  targets and exact 320-bit work. Fresh STNC work follows the converged target;
+  pre-reorg work is stale. A separate scripted-hash fixture covers work beyond
+  256 bits; the ordinary scenario uses real SHA-256.
+- Passed 1,133,277 Chain C checks, 34 probes, 1,544 Phase 9, 562 Phase 10, 834
+  adjusted-target process checks, 27 parser checks and two session assertions.
+  The process lifecycle separately proves actual Chain/Stratum restart and
+  continued mining. Windows Release/x64: zero warnings/errors/failures.
+- No production defect or production-code change was required. Corrected an
+  uninitialized test-local length caught by the warning-as-error build.
+  Updated roadmap, decisions, PoW, fork/P2P, architecture and build documentation.
+  Preserved strict legacy-history revalidation and all authorized consensus.
+- Phase 11 COMPLETE for bounded Windows qualification. No hardware, production
+  identity, Internet, performance or other-platform qualification; no automatic
+  P2P orchestration. No commit/push. Phase 12 not started.
+
+### Phase 11 Chunk 3 — 320-bit work/domain consistency — 2026-09-10
+
+- Implemented the owner's authorized unsigned 320-bit cumulative-work rule:
+  exact 40-byte big-endian addition, reconstruction and comparison. Targets remain
+  1..2^255-1. Maximum work for 2^64 blocks is 2^319, which fits without an artificial
+  ceiling. Target-one successors no longer fail at the former 256-bit boundary.
+- Versioned affected transports explicitly: STNC v2 INFO=184 bytes, accepted
+  solved-work=80 bytes; STNP v2 STATE=84 payload bytes. Widened only cumulative
+  work and shifted following fields. Old versions/wrong lengths fail closed.
+  Canonical block storage contains no work cache and needs no format change.
+- Added 220 domain/history checks and three reorg/reload checks: 223 new C checks.
+  Cover minimum/adjacent targets, maximum height, exact carry/order, 320-bit API
+  overflow atomicity, 61 minimum-target blocks, storage reconstruction, high-work
+  STNC/P2P transport, invalid lengths and strict legacy-history TARGET failure.
+- All 1,132,168 Chain C checks, 34 probes, 1,544 Phase 9, 562 Phase 10 and 834
+  adjusted-target process checks pass. Stratum's 27 parser checks and two session
+  assertions pass. Windows Release/x64 builds have zero warnings/errors/failures.
+- Corrected transport capacities/offsets, old-width assertions and handcrafted
+  v1 fixture requests. Updated the Stratum client, response buffers and its docs;
+  STNM, target, nonce and work-ID semantics are unchanged. Legacy fixed-target
+  development evidence receives current-rule validation, with no rewriting,
+  migration, exception or claim that historical incompatibility is corruption.
+- Updated roadmap, decisions, consensus/protocol architecture, build instructions
+  and both changelogs. Scripted minimum-target hashes are qualification fixtures,
+  not hardware/production identity evidence. No commit or push. Chunk 4 not started.
+
+
+### Phase 11 Chunk 2 — consensus difficulty activation — 2026-09-09
+
+- Activated one branch-derived required-target boundary in ordinary validation
+  and mining templates. Targets must match exactly independently of raw PoW.
+  Bootstrap, 60-block boundaries and all authorized calculation constants remain.
+- Added bounded validated-window state, rebuilt by storage/fork replay. Removed
+  the fixed-target cumulative-work formula beyond bootstrap; retained exact
+  checked per-block work, fork ordering, canonical storage and work identity.
+- 1,658 new C checks prove real-PoW wrong-target rejection, span/target bounds,
+  STNC bytes, missing/corrupt history failure, branch-specific reorg, persistence
+  and second-boundary continuity. Existing minimum-target arithmetic/overflow
+  regressions pass; no impossible minimum-target 60-block history is claimed.
+- Added -DifficultyOnly to the existing harness: 834 checks pass through actual
+  Stratum at height 60 and independent persistence/restart to new work at 61.
+  Updated old fixed-target long-history fixtures and full-target fixture solving.
+- All 1,131,945 Chain C, 34 probes, 1,544 Phase 9 and 562 prior Phase 10 checks
+  pass. Windows Release/x64 builds: zero warnings/errors/failures. No additional
+  platform, hardware or production identity qualification; Stratum unchanged.
+- Updated roadmap, PoW, architecture, decision, state/fork/mining documentation
+  and build instructions. Earlier fixed-target histories may fail revalidation
+  beyond adjustment boundaries; no reset/migration or bypass was introduced.
+  No commit/push performed. Phase 11 remains open; Chunk 3 not started.
+
+### Phase 11 Chunk 1 — difficulty calculation foundation — 2026-09-09
+
+- Added standalone stn_target_next using owner-authorized 60-second/60-block
+  timing, H-60/H-1 endpoints, 3600-second expectation, 900/14400-second clamps,
+  integer floor and existing 1..2^255-1 target limits. No unresolved calculation
+  parameters remain. Bootstrap/insufficient/malformed history handling is explicit.
+- Uses bounded 34-byte multiplication/division with uint32_t steps, canonical
+  big-endian bytes, no allocation/dependency/float, unchanged output on failure.
+- Added 193 focused checks in the existing PoW harness. All 1,130,287 Chain C
+  checks, 34 build probes, 1,544 Phase 9 and 562 Phase 10 process checks pass.
+  Windows Release/x64 builds: zero warnings/errors, zero test failures.
+- Updated POW, decision register, roadmap and build instructions. Calculation
+  is qualified but not activated: ordinary validation, mining, STNC, cumulative
+  work and fork choice retain their fixed-target behavior. Stratum unchanged.
+  No other platform qualification, commit/push or Chunk 2 work.
+
+
 ### Phase 10 Chunk 5 — full integration COMPLETE — 2026-09-09
 
 - Added 125 actual-process checks (-FullLifecycleOnly) covering Chain template,

@@ -23,11 +23,11 @@ static stn_rpc_code handler(void *u,const stn_rpc_message *q,uint8_t *p,size_t c
     if(s->mode==1){*n=cap+1;return STN_RPC_OK;}
     if(s->mode==2){*n=0;return (stn_rpc_code)99;}
     if(s->mode==3){memset(p,0x55,8);*n=8;return STN_RPC_REJECTED;}
-    if(cap<176){return STN_RPC_CAPACITY;}memset(p,0,176);*n=176;return STN_RPC_OK;
+    if(cap<184){return STN_RPC_CAPACITY;}memset(p,0,184);*n=184;return STN_RPC_OK;
 }
 static void codecs(void)
 {
-    static const uint8_t independent[24]={'S','T','N','C',0,1,0,1,0,1,0,0,1,2,3,4,5,6,7,8,0,0,0,0};
+    static const uint8_t independent[24]={'S','T','N','C',0,2,0,1,0,1,0,0,1,2,3,4,5,6,7,8,0,0,0,0};
     stn_rpc_message q,before,r;size_t n,w,i;spy s={0};stn_rpc_service service={&s,handler};uint8_t copy[64];
     CHECK(stn_rpc_decode(independent,24,&q)==STN_RPC_OK && q.kind==1 && q.method==1 && q.request_id==UINT64_C(0x0102030405060708));
     CHECK(stn_rpc_encode(&q,copy,sizeof(copy),&n)==STN_RPC_OK && n==24 && memcmp(copy,independent,24)==0);before=q;
@@ -37,7 +37,7 @@ static void codecs(void)
         CHECK(stn_rpc_decode(response,w,&r)==STN_RPC_OK && r.code==STN_RPC_INVALID && r.request_id==0 && s.calls==0);
     }
     for(i=0;i<8;++i){memcpy(request+i,independent,24);CHECK(stn_rpc_decode(request+i,24,&q)==STN_RPC_OK && q.request_id==before.request_id);}
-    memcpy(copy,independent,24);copy[5]=2;
+    memcpy(copy,independent,24);copy[5]=1;
     CHECK(stn_rpc_dispatch(copy,24,7,&service,response,sizeof(response),&w)==STN_RPC_OK);
     CHECK(stn_rpc_decode(response,w,&r)==STN_RPC_OK && r.code==STN_RPC_VERSION && s.calls==0);
     memcpy(copy,independent,24);copy[0]=0;CHECK(stn_rpc_decode(copy,24,&q)==STN_RPC_INVALID);
@@ -110,7 +110,7 @@ static void node(void)
     node_service.chain=&c;node_service.blocks=blocks;node_service.count=2;node_service.intelligence=&v;
     service.user=&node_service;service.handle=stn_node_service_handle;
     r=call(STN_RPC_INFO,NULL,0,STN_RPC_READ,&service);
-    CHECK(r.code==STN_RPC_OK && r.length==176 && r.payload[71]==1 && r.payload[135]==4 && r.payload[175]==2);
+    CHECK(r.code==STN_RPC_OK && r.length==184 && r.payload[71]==1 && r.payload[143]==4 && r.payload[183]==2);
     CHECK(memcmp(r.payload,c.network_id,32)==0 && memcmp(r.payload+32,id,32)==0);
     height[7]=1;r=call(STN_RPC_BLOCK_HEIGHT,height,8,STN_RPC_READ,&service);
     CHECK(r.code==STN_RPC_OK && r.length==364 && memcmp(r.payload,child,364)==0);

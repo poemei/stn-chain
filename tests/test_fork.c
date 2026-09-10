@@ -59,7 +59,7 @@ int test_fork(void)
     CHECK(r.result==STN_FORK_CANDIDATE && p.actionable);
     CHECK(p.ancestor_index==1 && p.detached_count==0 && p.attached_count==1);
     CHECK(p.attach_begin==2 && p.attach_end==3 && p.resulting_height==2);
-    CHECK(p.current.cumulative_work.bytes[31]==4 && p.candidate.cumulative_work.bytes[31]==6);
+    CHECK(p.current.cumulative_work.bytes[39]==4 && p.candidate.cumulative_work.bytes[39]==6);
     CHECK(memcmp(saved,a,sizeof(a))==0);
     r=stn_fork_evaluate(&c,as,4,bs,2,&p);
     CHECK(r.result==STN_FORK_CURRENT && !p.actionable && p.resulting_height==3);
@@ -125,9 +125,9 @@ int test_fork(void)
     CHECK(r.result==STN_FORK_UNRESOLVED && r.failed_side==2);
     h.bad_pow=0;
     /* Claimed output work is never an input to evaluation. */
-    memset(p.candidate.cumulative_work.bytes,255,32);
+    memset(p.candidate.cumulative_work.bytes,255,STN_WORK_SIZE);
     r=stn_fork_evaluate(&c,as,3,bs,2,&p);
-    CHECK(r.result==STN_FORK_CURRENT && p.candidate.cumulative_work.bytes[31]==4);
+    CHECK(r.result==STN_FORK_CURRENT && p.candidate.cumulative_work.bytes[39]==4);
     /* Arithmetic qualification only: three easy blocks lose to one harder
      * block. These different-policy totals are NOT eligible competing chains. */
     CHECK(stn_work_at_height(policy.fixed_target,2,&easy)==STN_DATA_OK);
@@ -142,15 +142,15 @@ int test_fork(void)
     fixture(a[0]);memcpy(a[0]+120,policy.fixed_target,32);
     memcpy(a[1],a[0],364);a[1][79]=1;a[1][71]=1;h.bad_pow=2;before=p;
     r=stn_fork_evaluate(&c,as,1,as,2,&p);
-    CHECK(r.result==STN_FORK_INVALID_CANDIDATE && r.validation.detail==STN_DATA_OVERFLOW);
-    CHECK(memcmp(&p,&before,sizeof(p))==0);
+    CHECK(r.result==STN_FORK_CANDIDATE && p.candidate.cumulative_work.bytes[7]==1);
+    CHECK(p.actionable);
     /* Real production SHA-256 genesis and direct child, independently fixed. */
     fixture(a[0]);memcpy(a[1],a[0],364);a[1][79]=1;
     c.hash_provider.hash=stn_sha256;c.hash_provider.user=NULL;
     memcpy(policy.fixed_target,a[0]+120,32);
     CHECK(stn_chain_block_id(a[0],364,&c.hash_provider,a[1]+40)==STN_DATA_OK);
     r=stn_fork_evaluate(&c,as,1,as,2,&p);
-    CHECK(r.result==STN_FORK_CANDIDATE && p.candidate.cumulative_work.bytes[31]==4);
+    CHECK(r.result==STN_FORK_CANDIDATE && p.candidate.cumulative_work.bytes[39]==4);
     printf("Fork choice/planning: %u checks, %u failures.\n",checks,failures);
     return failures==0 ? 0 : 1;
 }

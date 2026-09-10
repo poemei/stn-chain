@@ -31,13 +31,13 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
     switch(method){
     case STN_RPC_SUBMIT_TRANSACTION:return n==36 && stn_wire_read(p,2)==1 && stn_wire_read(p+2,2)<=8;
     case STN_RPC_MINING_TEMPLATE:return shape(STN_RPC_SUBMIT_WORK,p,n);
-    case STN_RPC_SUBMIT_WORK:return n==72;
+    case STN_RPC_SUBMIT_WORK:return n==80;
     case STN_RPC_SUBMIT_INTELLIGENCE:return n==56 && stn_wire_read(p,2)==1 && stn_wire_read(p+2,2)<=STN_PENDING_UNSUPPORTED;
     case STN_RPC_PENDING:return n==16 &&
         stn_wire_read(p,4)<=(uint64_t)STN_PENDING_MAX_ENTRIES &&
         stn_wire_read(p+4,4)==STN_PENDING_MAX_ENTRIES && stn_wire_read(p+8,4)<=STN_PENDING_MAX_BYTES &&
         stn_wire_read(p+n-4,4)==STN_PENDING_MAX_BYTES;
-    case STN_RPC_INFO:return n==176;
+    case STN_RPC_INFO:return n==184;
     case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:return n>=STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY && n<=STN_BLOCK_MAX_SIZE;
     case STN_RPC_CHECK_INTELLIGENCE:return n==20;
     case STN_RPC_MINING_CONTEXT:case STN_RPC_CHECK_WORK_BASE:return n==76;
@@ -55,7 +55,7 @@ stn_rpc_code stn_rpc_decode(const uint8_t *p,size_t n,stn_rpc_message *out)
     stn_rpc_message m;
     if(p==NULL || out==NULL || n<24 || n>STN_RPC_MAX_FRAME){return STN_RPC_INVALID;}
     if(memcmp(p,"STNC",4)!=0){return STN_RPC_INVALID;}
-    if(stn_wire_read(p+4,2)!=1){return STN_RPC_VERSION;}
+    if(stn_wire_read(p+4,2)!=2){return STN_RPC_VERSION;}
     m.kind=(uint16_t)stn_wire_read(p+6,2);m.method=(uint16_t)stn_wire_read(p+8,2);
     m.code=(stn_rpc_code)stn_wire_read(p+10,2);m.request_id=stn_wire_read(p+12,8);
     m.length=(size_t)stn_wire_read(p+20,4);m.payload=p+24;
@@ -67,7 +67,7 @@ stn_rpc_code stn_rpc_encode(const stn_rpc_message *m,uint8_t *p,size_t cap,size_
     if(written!=NULL){*written=0;}
     if(m==NULL || p==NULL || written==NULL || !message_valid(m)){return STN_RPC_INVALID;}
     if(cap<24 || m->length>cap-24){return STN_RPC_CAPACITY;}
-    memcpy(p,"STNC",4);stn_wire_write(p+4,2,1);stn_wire_write(p+6,2,m->kind);
+    memcpy(p,"STNC",4);stn_wire_write(p+4,2,2);stn_wire_write(p+6,2,m->kind);
     stn_wire_write(p+8,2,m->method);stn_wire_write(p+10,2,m->code);stn_wire_write(p+12,8,m->request_id);stn_wire_write(p+20,4,m->length);
     if(m->length!=0){memmove(p+24,m->payload,m->length);}*written=24+m->length;return STN_RPC_OK;
 }

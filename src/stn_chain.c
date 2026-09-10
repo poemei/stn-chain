@@ -83,13 +83,16 @@ static stn_data_status prior_valid(const stn_chain_context *c,const stn_chain_st
     stn_data_status status;
     if (memcmp(s->network_id,c->network_id,32)!=0 || (s->has_tip!=0 && s->has_tip!=1)) { return STN_DATA_CONTENT; }
     if(!s->has_tip || c->pow_policy==NULL) {
-        if(!zero32(s->current_target) || !zero32(s->cumulative_work.bytes)) { return STN_DATA_CONTENT; }
+        if(!zero32(s->current_target) || !(zero32(s->cumulative_work.bytes) && zero32(s->cumulative_work.bytes+8))) { return STN_DATA_CONTENT; }
     } else {
         stn_work expected;
-        status=stn_work_at_height(c->pow_policy->fixed_target,s->height,&expected);
-        if(status!=STN_DATA_OK) { return status; }
-        if(memcmp(s->current_target,c->pow_policy->fixed_target,32)!=0 ||
-           memcmp(s->cumulative_work.bytes,expected.bytes,32)!=0) { return STN_DATA_CONTENT; }
+        if(stn_target_validate(s->current_target,32)!=STN_DATA_OK || (zero32(s->cumulative_work.bytes) && zero32(s->cumulative_work.bytes+8))) { return STN_DATA_CONTENT; }
+        if(s->height<60) {
+            status=stn_work_at_height(c->pow_policy->fixed_target,s->height,&expected);
+            if(status!=STN_DATA_OK) { return status; }
+            if(memcmp(s->current_target,c->pow_policy->fixed_target,32)!=0 ||
+               memcmp(s->cumulative_work.bytes,expected.bytes,STN_WORK_SIZE)!=0) { return STN_DATA_CONTENT; }
+        }
     }
     if (!s->has_tip) {
         return s->height==0 && s->timestamp==0 && zero32(s->tip_id) && zero32(s->genesis_id) ?
@@ -105,6 +108,32 @@ static stn_data_status prior_valid(const stn_chain_context *c,const stn_chain_st
         return STN_DATA_CONTENT;
     }
     return STN_DATA_OK;
+}
+
+stn_data_status stn_chain_required_target(const stn_chain_context *context,
+    const stn_chain_state *prior,uint8_t target[32])
+{
+    uint64_t height;size_t count,i;const stn_block_header *history;
+    stn_data_status status;
+    if(prior==NULL || target==NULL) { return STN_DATA_ARGUMENT; }
+    status=context_valid(context);if(status!=STN_DATA_OK) { return status; }
+    if(context->pow_policy==NULL) { return STN_DATA_UNRESOLVED; }
+    status=prior_valid(context,prior);if(status!=STN_DATA_OK) { return status; }
+    if(prior->has_tip && prior->height==UINT64_MAX) { return STN_DATA_OVERFLOW; }
+    height=prior->has_tip ? prior->height+1 : 0;
+    count=prior->target_history_count;
+    if(count!=(prior->has_tip ? (size_t)(prior->height%60)+1 : 0)) { return STN_DATA_UNRESOLVED; }
+    for(i=0;i<count;++i) {
+        const stn_block_header *h=&prior->target_history[i];
+        if(h->height!=height-(uint64_t)count+(uint64_t)i || h->version!=3 ||
+           memcmp(h->reserved_target,prior->current_target,32)!=0 ||
+           (i!=0 && h->timestamp<prior->target_history[i-1].timestamp)) { return STN_DATA_CONTENT; }
+    }
+    if(count!=0 && prior->target_history[count-1].timestamp!=prior->timestamp) { return STN_DATA_CONTENT; }
+    history=count==0 ? NULL : &prior->target_history[count-1];
+    if(height!=0 && height%60==0) { history=prior->target_history; }
+    else { count=count==0 ? 0 : 1; }
+    return stn_target_next(height,context->pow_policy->fixed_target,history,count,target);
 }
 
 stn_chain_report stn_chain_validate_candidate(const stn_chain_context *context,
@@ -149,7 +178,10 @@ stn_chain_report stn_chain_validate_candidate(const stn_chain_context *context,
     }
     r.link=STN_STAGE_PASS;
     if(context->pow_policy!=NULL) {
-        r.target=memcmp(b.header.reserved_target,context->pow_policy->fixed_target,32)==0 ? STN_STAGE_PASS : STN_STAGE_REJECT;
+        uint8_t required[32];
+        status=stn_chain_required_target(context,prior,required);r.target=stage(status);
+        if(status!=STN_DATA_OK) { return fail(r,STN_CHAIN_TARGET,status); }
+        r.target=memcmp(b.header.reserved_target,required,32)==0 ? STN_STAGE_PASS : STN_STAGE_REJECT;
         if(r.target!=STN_STAGE_PASS) { return fail(r,STN_CHAIN_TARGET,STN_DATA_TARGET); }
     }
     status=stn_block_check_integrity(bytes,length,&context->hash_provider); r.body=stage(status);
@@ -182,6 +214,12 @@ stn_chain_report stn_chain_validate_candidate(const stn_chain_context *context,
         r.work=stage(status);
         if(status!=STN_DATA_OK) { return fail(r,STN_CHAIN_WORK,status); }
         memcpy(next.current_target,b.header.reserved_target,32);
+        if(b.header.height%60==0) { memset(next.target_history,0,sizeof(next.target_history));next.target_history_count=0; }
+        {
+            stn_block_header *h=&next.target_history[next.target_history_count++];
+            memset(h,0,sizeof(*h));h->version=3;h->height=b.header.height;h->timestamp=b.header.timestamp;
+            memcpy(h->reserved_target,b.header.reserved_target,32);
+        }
     }
     memcpy(next.tip_id,id,32);
     if (!prior->has_tip) { memcpy(next.genesis_id,id,32); }

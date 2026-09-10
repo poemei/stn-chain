@@ -1,6 +1,8 @@
 # Actual current Stratum executable and its linked production STNC client.
-param([string]$StratumDirectory='C:\poes_projects\stn-stratum',[switch]$JobMappingOnly,[switch]$MinerResultOnly,[switch]$FailureStateOnly,[switch]$FullLifecycleOnly)
+param([string]$StratumDirectory='C:\poes_projects\stn-stratum',[switch]$JobMappingOnly,[switch]$MinerResultOnly,[switch]$FailureStateOnly,[switch]$FullLifecycleOnly,[switch]$DifficultyOnly)
 . "$PSScriptRoot\test-node.ps1" -LibraryOnly
+$baseHeight=0
+if($DifficultyOnly){$FullLifecycleOnly=$true;$baseHeight=59}
 $script:processes=@();$script:clients=@()
 $directory=Join-Path ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Executable))) ('stratum-interface-'+[Guid]::NewGuid().ToString('N'))
 $null=New-Item -ItemType Directory -Path $directory
@@ -78,36 +80,47 @@ try {
         $env:STN_PHASE9_STOP_EVENT=$eventName
         $Executable=Join-Path ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Executable))) 'stn-chain-phase9-test.exe'
         $node=StartNode $data $false $genesisPath 18473
+        if($DifficultyOnly){
+            $sha=[Security.Cryptography.SHA256]::Create()
+            for($height=1;$height -le 59;$height++){
+                $r=Request $node.Stream 0x1005 (Transaction $height);Check ($r.Code -eq 0 -and $r.Payload[3] -eq 0) 'boundary setup admission'
+                $r=Request $node.Stream 0x2002 @();Check ($r.Code -eq 0 -and $r.Payload[188] -eq 127) 'bootstrap target before height sixty'
+                $solution=Solve $r.Payload $true
+                $r=Request $node.Stream 0x2003 $solution;Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[32..39]) -eq $height) 'accepted bootstrap ancestry'
+            }
+            $sha.Dispose();$sha=$null
+        }
         $server=StartStratumProcess 'stn-stratum.exe'
         WaitLog 'connection still unavailable code=5'
         $a=Observer;$b=Observer
         Start-Sleep -Milliseconds 300
         Check (!$a.GetStream().DataAvailable -and !$b.GetStream().DataAvailable) 'no placeholder jobs with unavailable Chain work'
         if($FullLifecycleOnly){
-            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq 0) 'initial accepted height'
+            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq $baseHeight) 'initial accepted height'
             $initialTip=$r.Payload[72..103]
             $r=Request $node.Stream 0x2002 @();Check ($r.Code -eq 5) 'initial authoritative work unavailable'
         }
-        $r=Request $node.Stream 0x1005 (Transaction 1);Check ($r.Code -eq 0 -and $r.Payload[3] -eq 0) 'first canonical content admitted'
+        $r=Request $node.Stream 0x1005 (Transaction ($baseHeight+1));Check ($r.Code -eq 0 -and $r.Payload[3] -eq 0) 'first canonical content admitted'
         $r=Request $node.Stream 0x2002 @();Check ($r.Code -eq 0) 'authoritative template A'
         $templateA=$r.Payload;$jobA=Job $a $templateA;$jobA2=Job $b $templateA
         Check ([Convert]::ToBase64String($jobA) -eq [Convert]::ToBase64String($jobA2)) 'identical job across two sessions'
         if($FullLifecycleOnly){
             $sha=[Security.Cryptography.SHA256]::Create()
-            Check ((Hex $templateA[0..31]) -eq (Hex $initialTip) -and (ReadNumber $templateA[140..147]) -eq 1) 'first work derives from accepted genesis tip'
+            if($DifficultyOnly){Check ($templateA[188] -eq 31 -and (Hex $templateA[189..219]) -eq ('FF'*31)) 'STNC and Stratum carry exact first adjusted target'}
+            Check ((Hex $templateA[0..31]) -eq (Hex $initialTip) -and (ReadNumber $templateA[140..147]) -eq ($baseHeight+1)) 'first work derives from accepted genesis tip'
             $bad=Solve $templateA $false
             MinerResult $a $jobA[8..39] (ReadNumber $bad[220..227]) 1
             WaitLog 'Chain result=7 response=0'
-            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq 0 -and (Hex $r.Payload[72..103]) -eq (Hex $initialTip)) 'forwarded invalid evidence cannot change accepted state'
+            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq $baseHeight -and (Hex $r.Payload[72..103]) -eq (Hex $initialTip)) 'forwarded invalid evidence cannot change accepted state'
             $r=Request $node.Stream 0x2002 @();Check ($r.Code -eq 0 -and (Hex $r.Payload) -eq (Hex $templateA) -and !$b.GetStream().DataAvailable) 'rejected session result preserves other session current work'
             $solved=Solve $templateA $true;$nonce=ReadNumber $solved[220..227]
             MinerResult $b $jobA2[8..39] $nonce 0
-            WaitLog 'Chain result=0 response=72'
+            WaitLog 'Chain result=0 response=80'
             $acceptedBlock=$solved[68..($solved.Length-1)]
-            $r=Request $node.Stream 2 (NumberBytes 1 8)
+            $r=Request $node.Stream 2 (NumberBytes ($baseHeight+1) 8)
             Check ($r.Code -eq 0 -and (Hex $r.Payload) -eq (Hex $acceptedBlock)) 'accepted block exactly original candidate plus returned nonce'
             Check ((ReadNumber $r.Payload[152..159]) -eq $nonce -and $nonce -ge 4294967296 -and (Hex $r.Payload[120..151]) -eq (Hex $jobA[40..71])) 'accepted full-width nonce and full target preserved'
-            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq 1) 'Chain alone reports acceptance'
+            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq ($baseHeight+1)) 'Chain alone reports acceptance'
             $acceptedInfo=$r.Payload
             Check ((Hex $acceptedInfo[72..103]) -eq (Hex (Digest 'STN-CHAIN:BLOCK:ID:1' $acceptedBlock[0..167]))) 'accepted tip is canonical solved header identity'
             $r=Request $node.Stream 0x1004 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[0..3]) -eq 0) 'accepted pending content cleaned'
@@ -119,26 +132,26 @@ try {
             $node.Client.Close();$null=$stopEvent.Set()
             Check ($node.Process.WaitForExit(10000) -and $node.Process.ExitCode -eq 0) 'accepted Chain clean persistence shutdown'
             $null=$stopEvent.Reset();$node=StartNode $data $false $genesisPath 18473
-            Check ($server.HasExited -and $node.Height -eq 1) 'accepted state recovered while coordinator absent'
+            Check ($server.HasExited -and $node.Height -eq ($baseHeight+1)) 'accepted state recovered while coordinator absent'
             $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (Hex $r.Payload) -eq (Hex $acceptedInfo)) 'complete INFO state reconstructed independently and exactly'
-            $r=Request $node.Stream 2 (NumberBytes 1 8);Check ($r.Code -eq 0 -and (Hex $r.Payload) -eq (Hex $acceptedBlock)) 'persisted accepted bytes recovered exactly without Stratum'
+            $r=Request $node.Stream 2 (NumberBytes ($baseHeight+1) 8);Check ($r.Code -eq 0 -and (Hex $r.Payload) -eq (Hex $acceptedBlock)) 'persisted accepted bytes recovered exactly without Stratum'
             $r=Request $node.Stream 0x2002 @();Check ($r.Code -eq 5) 'recovery does not revive accepted work'
             $script:serverReadTask=$null;$script:serverOutput=''
             $server=StartStratumProcess 'stn-stratum.exe';WaitLog 'connection still unavailable code=5'
             $c=Observer;$d=Observer;Start-Sleep -Milliseconds 300
             Check (!$c.GetStream().DataAvailable -and !$d.GetStream().DataAvailable) 'fresh coordinator sends no placeholder or cached current job'
             MinerResult $c $jobA[8..39] $nonce 2
-            $r=Request $node.Stream 0x1005 (Transaction 2);Check ($r.Code -eq 0 -and $r.Payload[3] -eq 0) 'new eligible content after recovery'
+            $r=Request $node.Stream 0x1005 (Transaction ($baseHeight+2));Check ($r.Code -eq 0 -and $r.Payload[3] -eq 0) 'new eligible content after recovery'
             $r=Request $node.Stream 0x2002 @();Check ($r.Code -eq 0) 'new authoritative work retrieved after recovery'
             $templateB=$r.Payload;$jobC=Job $c $templateB;$jobD=Job $d $templateB
-            Check ((Hex $templateB[0..31]) -eq (Hex $acceptedInfo[72..103]) -and (ReadNumber $templateB[140..147]) -eq 2) 'new work extends recovered accepted tip at height two'
+            Check ((Hex $templateB[0..31]) -eq (Hex $acceptedInfo[72..103]) -and (ReadNumber $templateB[140..147]) -eq ($baseHeight+2)) 'new work extends recovered accepted tip at height two'
             Check ((Hex $jobC) -eq (Hex $jobD) -and (Hex $jobC[8..39]) -ne (Hex $jobA[8..39])) 'fresh work identity deterministic across recovered sessions'
             MinerResult $c $jobA[8..39] $nonce 2
             $r=Request $node.Stream 0x2002 @();Check ($r.Code -eq 0 -and (Hex $r.Payload) -eq (Hex $templateB) -and !$d.GetStream().DataAvailable) 'stale session cannot replace other session authoritative work'
-            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (Hex $r.Payload[64..135]) -eq (Hex $acceptedInfo[64..135])) 'recovery and stale results preserve height tip and cumulative work'
+            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (Hex $r.Payload[64..143]) -eq (Hex $acceptedInfo[64..143])) 'recovery and stale results preserve height tip and cumulative work'
             $node.Client.Close();$null=$stopEvent.Set()
             Check ($node.Process.WaitForExit(10000) -and $node.Process.ExitCode -eq 0) 'final lifecycle teardown'
-            Write-Output "Full Chain/Stratum lifecycle: $script:checks checks, 0 failures; exact persistence, independent recovery, one interruption cycle."
+            Write-Output "Full Chain/Stratum lifecycle (starting height $baseHeight): $script:checks checks, 0 failures; exact persistence, independent recovery, one interruption cycle."
             return
         }
         if($FailureStateOnly){
@@ -214,7 +227,7 @@ try {
             MinerResult $c $jobA[8..39] 0 2
             $solved=Solve $templateB $true;$nonce=ReadNumber $solved[220..227]
             MinerResult $c $jobC[8..39] $nonce 0
-            WaitLog 'Chain result=0 response=72'
+            WaitLog 'Chain result=0 response=80'
             $r=Request $node.Stream 2 (NumberBytes 1 8)
             Check ($r.Code -eq 0 -and (Hex $r.Payload) -eq (Hex $solved[68..($solved.Length-1)])) 'persisted Chain block equals exact job plus permitted nonce'
             Check ((ReadNumber $r.Payload[152..159]) -eq $nonce -and $nonce -ge 4294967296) 'full-width nonce round trip and big-endian preservation'
@@ -259,14 +272,14 @@ try {
     $server=StartStratumProcess 'stn-stratum.exe'
     WaitLog 'CHAIN RPC connected'
     $driver=StartStratumProcess 'test-chain-interface.exe' '18473'
-    $r=ClientCall 'info';Check ($r.Code -eq 0 -and $r.Payload.Length -eq 176 -and (ReadNumber $r.Payload[64..71]) -eq 0) 'actual client INFO height/endian'
+    $r=ClientCall 'info';Check ($r.Code -eq 0 -and $r.Payload.Length -eq 184 -and (ReadNumber $r.Payload[64..71]) -eq 0) 'actual client INFO height/endian'
     $r=ClientCall 'template';Check ($r.Code -eq 0 -and $r.Payload.Length -eq 432) 'actual client mining template'
     $work=$r.Payload;$r=Request $node.Stream 0x2002 @()
     Check ([Convert]::ToBase64String($work) -eq [Convert]::ToBase64String($r.Payload)) 'same complete candidate/work identity'
     Check ((ReadNumber $work[220..227]) -eq 0 -and $work[188] -eq 127 -and (ReadNumber $work[140..147]) -eq 1) 'published target, height and nonce offsets'
     $r=ClientCall 'unknown';Check ($r.Code -eq 3) 'unsupported opcode clear METHOD'
     $r=ClientCall 'submit 1';Check ($r.Code -eq 7 -and $r.Payload.Length -eq 0) 'Chain rejects invalid solved work'
-    $r=ClientCall 'submit 0';Check ($r.Code -eq 0 -and $r.Payload.Length -eq 72 -and (ReadNumber $r.Payload[32..39]) -eq 1) 'Chain accepts deterministic fixture via actual Stratum client'
+    $r=ClientCall 'submit 0';Check ($r.Code -eq 0 -and $r.Payload.Length -eq 80 -and (ReadNumber $r.Payload[32..39]) -eq 1) 'Chain accepts deterministic fixture via actual Stratum client'
     $r=ClientCall 'submit 0';Check ($r.Code -eq 10) 'actual Stratum maps STALE'
     $driver.StandardInput.WriteLine('info');$driver.StandardInput.Flush()
     $r=Request $node.Stream 1 @();Check ($r.Code -eq 0) 'additional STNC client responsive with Stratum connected'
@@ -294,8 +307,8 @@ try {
         $accept=$faultListener.AcceptTcpClientAsync();Check ($accept.Wait(5000)) 'fault fixture connected'
         $faultClient=$accept.Result;$faultClient.ReceiveTimeout=5000;$script:clients+=$faultClient
         $stream=$faultClient.GetStream();$header=ReadExact $stream 24
-        $header[7]=2;(NumberBytes 176 4).CopyTo($header,20)
-        $stream.Write($header,0,24);$stream.Write($infoPayload,0,176)
+        $header[7]=2;(NumberBytes 184 4).CopyTo($header,20)
+        $stream.Write($header,0,24);$stream.Write($infoPayload,0,184)
         $r=DriverResult;Check ($r.Code -eq 0) 'reconnected read before mutation fault'
         $driver.StandardInput.WriteLine('submit 0');$driver.StandardInput.Flush()
         $header=ReadExact $stream 24;$null=ReadExact $stream ([int](ReadNumber $header[20..23]))

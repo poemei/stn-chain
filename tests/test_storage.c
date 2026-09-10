@@ -40,6 +40,7 @@ static void branch(uint8_t blocks[65][364],stn_block_span spans[65],unsigned spl
             blocks[i][70]=blocks[i-1][87];blocks[i][71]=(uint8_t)i;blocks[i][79]=(uint8_t)i;
             if(i>=split) { blocks[i][87]=1; }
         }
+        if(i>=60) { blocks[i][120]=31; }
         spans[i].bytes=blocks[i];spans[i].length=364;
     }
 }
@@ -56,7 +57,7 @@ static void codecs(stn_chain_context *c)
     CHECK(stn_storage_decode(c,encoded,n,&view)==STN_STORAGE_OK && view.count==3);
     CHECK(stn_chain_initialize(c,&empty)==STN_DATA_OK);
     CHECK(stn_chain_validate_sequence(c,&empty,as,3,&expected).acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
-    CHECK(memcmp(expected.tip_id,view.state.tip_id,32)==0 && memcmp(expected.cumulative_work.bytes,view.state.cumulative_work.bytes,32)==0 && expected.height==view.state.height);
+    CHECK(memcmp(expected.tip_id,view.state.tip_id,32)==0 && memcmp(expected.cumulative_work.bytes,view.state.cumulative_work.bytes,STN_WORK_SIZE)==0 && expected.height==view.state.height);
     before=view;memcpy(backup,encoded,n);
     for(i=0;i<n;++i) {
         CHECK(stn_storage_decode(c,encoded,i,&view)!=STN_STORAGE_OK);
@@ -86,10 +87,10 @@ static void codecs(stn_chain_context *c)
     hash_status=STN_DATA_PROVIDER_ERROR;CHECK(stn_storage_decode(c,encoded,n,&view)!=STN_STORAGE_OK);hash_status=STN_DATA_OK;
     CHECK(stn_storage_encode(c,as,0,encoded,CAP,&n)==STN_STORAGE_ARGUMENT && n==0);
     CHECK(stn_storage_encode(c,as,65,encoded,CAP,&n)==STN_STORAGE_OK && n==23964);
-    CHECK(stn_storage_decode(c,encoded,n,&view)==STN_STORAGE_OK && view.count==65 && view.state.height==64 && view.state.cumulative_work.bytes[31]==130);
+    CHECK(stn_storage_decode(c,encoded,n,&view)==STN_STORAGE_OK && view.count==65 && view.state.height==64 && view.state.cumulative_work.bytes[39]==160);
     CHECK(stn_storage_encode(c,as,1,encoded,10,&n)==STN_STORAGE_CAPACITY && n==0);
     CHECK(stn_storage_encode(c,as,64,encoded,CAP,&n)==STN_STORAGE_OK && n==23596);
-    CHECK(stn_storage_decode(c,encoded,n,&view)==STN_STORAGE_OK && view.count==64 && view.state.height==63 && view.state.cumulative_work.bytes[31]==128);
+    CHECK(stn_storage_decode(c,encoded,n,&view)==STN_STORAGE_OK && view.count==64 && view.state.height==63 && view.state.cumulative_work.bytes[39]==152);
     CHECK(stn_storage_decode(NULL,encoded,n,&view)==STN_STORAGE_ARGUMENT);
     CHECK(stn_storage_decode(c,NULL,n,&view)==STN_STORAGE_ARGUMENT);
     CHECK(stn_storage_decode(c,encoded,n,NULL)==STN_STORAGE_ARGUMENT);
@@ -161,7 +162,7 @@ static void application(stn_chain_context *c)
         bad=plan;bad.candidate.cumulative_work.bytes[0]=255;
         CHECK(stn_storage_apply(c,&p,bs,6,&bad,&w,&active)==STN_STORAGE_STALE);
         CHECK(stn_storage_apply(c,&p,bs,6,&plan,&w,&active)==STN_STORAGE_OK && active.height==5);
-        CHECK(stn_storage_load(c,&p,scratch,CAP,&v)==STN_STORAGE_OK && v.state.cumulative_work.bytes[31]==12 && memcmp(v.state.tip_id,active.tip_id,32)==0);
+        CHECK(stn_storage_load(c,&p,scratch,CAP,&v)==STN_STORAGE_OK && v.state.cumulative_work.bytes[39]==12 && memcmp(v.state.tip_id,active.tip_id,32)==0);
     }
     saved_view=v;mem.data[0]^=1;
     CHECK(stn_storage_load(c,&p,scratch,CAP,&v)==STN_STORAGE_FORMAT && memcmp(&v,&saved_view,sizeof(v))==0);
@@ -209,7 +210,7 @@ static void windows_disk(stn_chain_context *c)
     CHECK(stn_storage_create(c,&p,as,1,next_bytes,CAP,&active)==STN_STORAGE_OK);
     CHECK(stn_fork_evaluate(c,as,1,as,2,&plan).result==STN_FORK_CANDIDATE);
     CHECK(stn_storage_apply(c,&p,as,2,&plan,&w,&active)==STN_STORAGE_OK);
-    CHECK(stn_storage_load(c,&q,scratch,CAP,&v)==STN_STORAGE_OK && v.state.height==1 && v.state.cumulative_work.bytes[31]==4);
+    CHECK(stn_storage_load(c,&q,scratch,CAP,&v)==STN_STORAGE_OK && v.state.height==1 && v.state.cumulative_work.bytes[39]==4);
     CHECK(DeleteFileW(path));CHECK(DeleteFileW(store.lock_path));CHECK(RemoveDirectoryW(directory));
 }
 int test_storage(void);

@@ -41,10 +41,10 @@ stn_rpc_code stn_node_service_handle(void *user,const stn_rpc_message *q,uint8_t
     code=snapshot(s,&state);if(code!=STN_RPC_OK){return code;}
     switch(q->method){
     case STN_RPC_INFO:
-        if(cap<176){return STN_RPC_CAPACITY;}
+        if(cap<184){return STN_RPC_CAPACITY;}
         memcpy(p,state.network_id,32);memcpy(p+32,state.genesis_id,32);stn_wire_write(p+64,8,state.height);
-        memcpy(p+72,state.tip_id,32);memcpy(p+104,state.cumulative_work.bytes,32);memcpy(p+136,state.current_target,32);
-        stn_wire_write(p+168,4,1);stn_wire_write(p+172,4,s->count);*written=176;return STN_RPC_OK;
+        memcpy(p+72,state.tip_id,32);memcpy(p+104,state.cumulative_work.bytes,STN_WORK_SIZE);memcpy(p+144,state.current_target,32);
+        stn_wire_write(p+176,4,1);stn_wire_write(p+180,4,s->count);*written=184;return STN_RPC_OK;
     case STN_RPC_BLOCK_HEIGHT:
         if(stn_wire_read(q->payload,8)>=s->count){return STN_RPC_NOT_FOUND;}
         index=(size_t)stn_wire_read(q->payload,8);break;

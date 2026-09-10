@@ -5,6 +5,7 @@
 #include "stn_windows_peer.h"
 #include "stn_windows_storage.h"
 #include "stn_sha256.h"
+#include "stn_mining.h"
 #include <stdio.h>
 #include <string.h>
 static unsigned checks,failures;
@@ -42,6 +43,7 @@ static void branch(uint8_t blocks[130][364],stn_block_span spans[130],unsigned s
             blocks[i][70]=blocks[i-1][87];blocks[i][71]=(uint8_t)i;blocks[i][79]=(uint8_t)i;
             if(i>=split) { blocks[i][87]=1; }
         }
+        if(i>=60) { blocks[i][120]=(uint8_t)(i>=120 ? 7 : 31); }
         spans[i].bytes=blocks[i];spans[i].length=364;
     }
 }
@@ -58,13 +60,13 @@ static stn_peer_status mock_send(void *u,const uint8_t *p,size_t n)
     mock *m=u;stn_peer_status s=stn_peer_serve(m->c,bs,m->count,&m->session,p,n,reply,sizeof(reply),&m->n);size_t i;
     m->offset=0;if(s!=STN_PEER_OK){return s;}
     if(m->mode==2 && reply[7]==STN_PEER_HELLO){reply[12]^=1;}
-    if(m->mode==3){reply[5]=2;}
+    if(m->mode==3){reply[5]=1;}
     if(reply[7]==STN_PEER_STATE){
         if(m->mode==1){memset(reply+20,255,64);}
         if(m->mode==6){reply[7]=STN_PEER_HELLO;}
-        if(m->mode==11){reply[87]=65;}
+        if(m->mode==11){reply[95]=65;}
         if(m->mode==12){memset(reply+8,255,4);}
-        if(m->mode==15){reply[19]=2;reply[87]=3;}
+        if(m->mode==15){reply[19]=2;reply[95]=3;}
     }
     if(m->mode==7 || m->mode==8){
         if(reply[7]==STN_PEER_HEADERS){for(i=1;i<m->count;++i){reply[20+i*168+(m->mode==7?159:120)]=255;}}
@@ -93,7 +95,7 @@ static void reset(stn_chain_context *c,size_t count,stn_chain_state *active)
 }
 static void framing(stn_chain_context *c)
 {
-    static const uint8_t independent[]={0x53,0x54,0x4e,0x50,0,1,0,5,0,0,0,4,0,0,0,1};
+    static const uint8_t independent[]={0x53,0x54,0x4e,0x50,0,2,0,5,0,0,0,4,0,0,0,1};
     stn_peer_message m,before;uint8_t out[128];size_t n,i;stn_peer_session session={0};
     CHECK(stn_peer_decode(independent,sizeof(independent),&m)==STN_PEER_OK && m.type==5 && m.length==4);
     CHECK(stn_peer_encode(m.type,m.payload,m.length,out,sizeof(out),&n)==STN_PEER_OK && n==16 && memcmp(out,independent,16)==0);
@@ -101,7 +103,7 @@ static void framing(stn_chain_context *c)
     for(i=0;i<16;++i){CHECK(stn_peer_decode(independent,i,&m)!=STN_PEER_OK && memcmp(&m,&before,sizeof(m))==0);}
     out[16]=0;CHECK(stn_peer_decode(out,17,&m)==STN_PEER_PROTOCOL);
     out[0]=0;CHECK(stn_peer_decode(out,16,&m)==STN_PEER_PROTOCOL);out[0]=0x53;
-    out[5]=2;CHECK(stn_peer_decode(out,16,&m)==STN_PEER_PROTOCOL);out[5]=1;
+    out[5]=1;CHECK(stn_peer_decode(out,16,&m)==STN_PEER_PROTOCOL);out[5]=2;
     out[7]=99;CHECK(stn_peer_decode(out,16,&m)==STN_PEER_PROTOCOL);out[7]=5;
     memset(out+8,255,4);CHECK(stn_peer_decode(out,16,&m)==STN_PEER_PROTOCOL);
     CHECK(stn_peer_encode(1,NULL,68,out,sizeof(out),&n)==STN_PEER_ARGUMENT && n==0);
@@ -231,7 +233,7 @@ static void localhost(stn_chain_context *c)
     thread=CreateThread(NULL,0,server_thread,&args,0,NULL);CHECK(thread!=NULL);
     CHECK(stn_windows_peer_connect("127.0.0.1",port,10000,&connection,&t)==STN_PEER_OK);
     r=stn_peer_sync(c,&p,&t,&w,&active);
-    CHECK(r.status==STN_PEER_OK && active.height==1 && active.cumulative_work.bytes[31]==4 && r.reused_blocks==1);
+    CHECK(r.status==STN_PEER_OK && active.height==1 && active.cumulative_work.bytes[39]==4 && r.reused_blocks==1);
     CHECK(stn_storage_load(c,&p,scratch,CAP,&loaded)==STN_STORAGE_OK && memcmp(loaded.state.tip_id,active.tip_id,32)==0);
     stn_windows_peer_close(&connection);CHECK(WaitForSingleObject(thread,15000)==WAIT_OBJECT_0);CHECK(args.result==STN_PEER_OK);CHECK(CloseHandle(thread));
     stn_windows_peer_close(&args.listener);
@@ -269,6 +271,152 @@ static void partial_io(void)
     CHECK(args.status==STN_PEER_OK && memcmp(args.bytes,"STNC",4)==0);
     CloseHandle(thread);CloseHandle(args.entered);stn_windows_peer_close(&peer);stn_windows_peer_close(&args.listener);
 }
+typedef struct convergence_server {
+    stn_windows_peer listener;
+    const stn_chain_context *chain;const stn_block_span *blocks;size_t count;
+    const uint8_t *wrong;stn_peer_status result;
+} convergence_server;
+static DWORD WINAPI convergence_serve(void *user)
+{
+    convergence_server *s=user;stn_windows_peer peer={0};stn_peer_transport t;
+    stn_peer_session session={0};size_t n,w,i;unsigned requests;
+    s->result=stn_windows_peer_accept(&s->listener,10000,&peer,&t);
+    for(requests=0;s->result==STN_PEER_OK && requests<132;++requests){
+        s->result=stn_peer_receive(&t,reply,sizeof(reply),&n);if(s->result!=STN_PEER_OK){break;}
+        s->result=stn_peer_serve(s->chain,s->blocks,s->count,&session,reply,n,reply,sizeof(reply),&w);
+        if(s->result!=STN_PEER_OK){break;}
+        if(s->wrong!=NULL){
+            if(reply[7]==STN_PEER_STATE){memset(reply+52,255,40);} /* untrusted work claim */
+            if(reply[7]==STN_PEER_HEADERS){
+                size_t first=((size_t)reply[12]<<24)|((size_t)reply[13]<<16)|((size_t)reply[14]<<8)|reply[15];
+                for(i=0;i<(w-20)/168;++i){if(first+i==60){memcpy(reply+20+i*168,s->wrong,168);}}
+            }
+            if(reply[7]==STN_PEER_BLOCK && reply[15]==60){memcpy(reply+16,s->wrong,364);}
+        }
+        s->result=t.send(t.user,reply,w);
+    }
+    stn_windows_peer_close(&peer);return 0;
+}
+static stn_peer_report exchange_branch(const stn_chain_context *c,const stn_block_span *blocks,size_t count,
+    const uint8_t *wrong,const stn_storage_provider *storage,stn_peer_workspace *workspace,stn_chain_state *active)
+{
+    convergence_server server={0};stn_windows_peer peer={0};stn_peer_transport t;
+    uint16_t port;HANDLE thread;stn_peer_report report={0};
+    server.chain=c;server.blocks=blocks;server.count=count;server.wrong=wrong;
+    CHECK(stn_windows_peer_listen(0,&server.listener,&port)==STN_PEER_OK);
+    thread=CreateThread(NULL,0,convergence_serve,&server,0,NULL);CHECK(thread!=NULL);
+    if(thread==NULL){stn_windows_peer_close(&server.listener);report.status=STN_PEER_IO;return report;}
+    CHECK(stn_windows_peer_connect("127.0.0.1",port,10000,&peer,&t)==STN_PEER_OK);
+    report=stn_peer_sync(c,storage,&t,workspace,active);stn_windows_peer_close(&peer);
+    CHECK(WaitForSingleObject(thread,15000)==WAIT_OBJECT_0);
+    CHECK(server.result==STN_PEER_DISCONNECTED);CloseHandle(thread);stn_windows_peer_close(&server.listener);
+    return report;
+}
+static void convergence_u64(uint8_t *p,uint64_t value)
+{size_t i;for(i=8;i!=0;){--i;p[i]=(uint8_t)value;value>>=8;}}
+static stn_data_status convergence_hash(void *u,const uint8_t *d,size_t dn,const uint8_t *p,size_t n,uint8_t out[32])
+{
+    (void)u;
+    if(dn==sizeof("STN-CHAIN:BLOCK:ID:1") && memcmp(d,"STN-CHAIN:BLOCK:ID:1",dn)==0){
+        uint64_t height=0,time=0;size_t i;for(i=0;i<8;++i){height=(height<<8)|p[72+i];time=(time<<8)|p[80+i];}
+        memset(out,0,32);out[31]=(uint8_t)(time>height*60 ? 2 : 1);return STN_DATA_OK;
+    }
+    return stn_sha256(NULL,d,dn,p,n,out);
+}
+static int convergence_solve(uint8_t *p,const stn_hash_provider *hash)
+{
+    uint8_t digest[32];uint64_t nonce;
+    for(nonce=0;nonce<65536;++nonce){convergence_u64(p+152,nonce);if(stn_pow_verify(p,364,hash,digest)==STN_DATA_OK){return 1;}}
+    return 0;
+}
+static stn_rpc_code convergence_rpc(stn_mining_service *s,uint16_t method,const uint8_t *input,size_t length,uint8_t *out,size_t *n)
+{
+    uint8_t request[512],response[512];size_t rn,wn;stn_rpc_message q={1,0,STN_RPC_OK,1,NULL,0},r;
+    stn_rpc_service service={s,stn_mining_handle};q.method=method;q.payload=input;q.length=length;
+    CHECK(stn_rpc_encode(&q,request,sizeof(request),&rn)==STN_RPC_OK);
+    CHECK(stn_rpc_dispatch(request,rn,3,&service,response,sizeof(response),&wn)==STN_RPC_OK);
+    CHECK(stn_rpc_decode(response,wn,&r)==STN_RPC_OK);*n=r.length;
+    if(r.length!=0){memcpy(out,r.payload,r.length);}return r.code;
+}
+static void convergence(void)
+{
+    stn_windows_storage disks[2];stn_storage_provider providers[2];stn_chain_context c={0};stn_pow_policy policy;
+    stn_chain_state states[2],before[2],prefix;stn_peer_report report;stn_reorg_plan plan;stn_fork_report fork;
+    stn_storage_view view;stn_peer_workspace workspace={{scratch,CAP,next_bytes,CAP},candidate_bytes,CAP,frame,sizeof(frame)};
+    stn_mining_service mining={0};static uint8_t snapshot[CAP],template_buffer[512],disk_copy[CAP];
+    uint8_t target[2][32],wrong[364],stale[512],fresh[512],out[512];size_t n=0,w,i,j,old_size;
+    wchar_t temp[260],directory[260],paths[2][260];unsigned high,initial_checks=checks;
+    for(high=0;high<2;++high){
+        fixture(a[0]);if(high){memset(a[0]+120,0,32);a[0][151]=15;}else{a[0][120]=31;}
+        memcpy(policy.fixed_target,a[0]+120,32);c.network_id[0]=1;c.genesis_bytes=a[0];c.genesis_length=364;c.pow_policy=&policy;
+        c.hash_provider.hash=high ? convergence_hash : stn_sha256;c.hash_provider.user=NULL;
+        CHECK(convergence_solve(a[0],&c.hash_provider));memcpy(b[0],a[0],364);
+        as[0].bytes=a[0];as[0].length=364;bs[0].bytes=b[0];bs[0].length=364;
+        CHECK(GetTempPathW(260,temp)>0);CHECK(GetTempFileNameW(temp,L"stn",0,directory)!=0);
+        CHECK(DeleteFileW(directory));CHECK(CreateDirectoryW(directory,NULL));
+        for(j=0;j<2;++j){
+            CHECK(swprintf_s(paths[j],260,L"%ls\\node-%u.stns",directory,(unsigned)j)>0);
+            CHECK(stn_windows_storage_init(&disks[j],paths[j],&providers[j])==STN_STORAGE_OK);
+            CHECK(stn_storage_create(&c,&providers[j],as,1,next_bytes,CAP,&states[j])==STN_STORAGE_OK);
+            CHECK(stn_chain_required_target(&c,&states[j],target[j])==STN_DATA_OK);
+        }
+        CHECK(memcmp(states[0].tip_id,states[1].tip_id,32)==0 && memcmp(states[0].current_target,states[1].current_target,32)==0 && memcmp(states[0].cumulative_work.bytes,states[1].cumulative_work.bytes,40)==0 && memcmp(target[0],target[1],32)==0);
+        report=exchange_branch(&c,as,1,NULL,&providers[1],&workspace,&states[1]);CHECK(report.status==STN_PEER_RETAINED);
+        prefix=states[0];
+        if(!high){
+            stn_windows_peer listener={0},connection={0};stn_peer_transport transport;uint16_t port;
+            CHECK(stn_windows_peer_listen(0,&listener,&port)==STN_PEER_OK);stn_windows_peer_close(&listener);
+            CHECK(stn_windows_peer_connect("127.0.0.1",port,100,&connection,&transport)!=STN_PEER_OK);
+            CHECK(memcmp(&states[0],&prefix,sizeof(prefix))==0 && memcmp(&states[1],&prefix,sizeof(prefix))==0);
+        }
+        /* No peer exchange while each node validates and persists its own branch. */
+        for(j=0;j<2;++j){
+            uint8_t (*blocks)[364]=j==0 ? a : b;stn_block_span *spans=j==0 ? as : bs;
+            for(i=1;i<=60;++i){
+                memcpy(blocks[i],blocks[0],364);memcpy(blocks[i]+40,states[j].tip_id,32);
+                convergence_u64(blocks[i]+72,(uint64_t)i);convergence_u64(blocks[i]+80,(j==0 ? 1800u : 7200u)*(uint64_t)(i>59 ? 59 : i)/59);
+                CHECK(stn_chain_required_target(&c,&states[j],blocks[i]+120)==STN_DATA_OK);
+                CHECK(convergence_solve(blocks[i],&c.hash_provider));spans[i].bytes=blocks[i];spans[i].length=364;
+                CHECK(stn_chain_validate_candidate(&c,&states[j],blocks[i],364,&states[j]).acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+            }
+            CHECK(stn_storage_adopt(&c,&providers[j],spans,61,&workspace.storage,&states[j])==STN_STORAGE_OK);
+            CHECK(stn_chain_required_target(&c,&states[j],target[j])==STN_DATA_OK);
+        }
+        CHECK(memcmp(target[0],a[60]+120,32)==0 && memcmp(target[1],b[60]+120,32)==0 && memcmp(target[0],target[1],32)!=0);
+        CHECK(high ? (target[0][31]==7 && target[1][31]==30 && states[0].cumulative_work.bytes[7]!=0) : (target[0][0]==15 && target[1][0]==63));
+        fork=stn_fork_evaluate_history(&c,bs,61,as,61,&plan);CHECK(fork.result==STN_FORK_CANDIDATE && plan.ancestor_index==0 && plan.detached_count==60 && plan.attached_count==60);
+        before[0]=states[0];before[1]=states[1];
+        if(!high){
+            memset(&mining,0,sizeof(mining));mining.chain=&c;mining.storage=&providers[1];mining.body=a[0]+168;mining.body_length=196;mining.transaction_count=1;
+            mining.snapshot=snapshot;mining.snapshot_capacity=CAP;mining.template_bytes=template_buffer;mining.template_capacity=sizeof(template_buffer);mining.workspace=workspace.storage;
+            CHECK(convergence_rpc(&mining,STN_RPC_MINING_TEMPLATE,NULL,0,stale,&n)==STN_RPC_OK && memcmp(stale+188,target[1],32)==0);
+        }
+        /* Invalid peer evidence includes a maximal fabricated work advertisement. */
+        memcpy(wrong,b[60],364);memcpy(wrong+120,policy.fixed_target,32);CHECK(convergence_solve(wrong,&c.hash_provider));
+        CHECK(stn_storage_load(&c,&providers[0],snapshot,CAP,&view)==STN_STORAGE_OK);stn_storage_view_release(&view);
+        CHECK(providers[0].acquire(providers[0].user)==STN_STORAGE_OK);CHECK(providers[0].read(providers[0].user,disk_copy,CAP,&old_size)==STN_STORAGE_OK);providers[0].release(providers[0].user);
+        report=exchange_branch(&c,bs,61,wrong,&providers[0],&workspace,&states[0]);CHECK(report.status==STN_PEER_VALIDATION && memcmp(&states[0],&before[0],sizeof(states[0]))==0);
+        CHECK(providers[0].acquire(providers[0].user)==STN_STORAGE_OK);CHECK(providers[0].read(providers[0].user,snapshot,CAP,&w)==STN_STORAGE_OK && w==old_size && memcmp(snapshot,disk_copy,w)==0);providers[0].release(providers[0].user);
+        report=exchange_branch(&c,bs,61,NULL,&providers[0],&workspace,&states[0]);CHECK(report.status==STN_PEER_RETAINED && memcmp(states[0].cumulative_work.bytes,before[0].cumulative_work.bytes,40)==0);
+        report=exchange_branch(&c,as,61,NULL,&providers[1],&workspace,&states[1]);CHECK(report.status==STN_PEER_OK && report.reused_blocks==1 && report.received_blocks==60);
+        CHECK(memcmp(states[0].tip_id,states[1].tip_id,32)==0 && memcmp(states[0].current_target,states[1].current_target,32)==0 && memcmp(states[0].cumulative_work.bytes,states[1].cumulative_work.bytes,40)==0);
+        for(j=0;j<2;++j){
+            memset(&states[j],0,sizeof(states[j])); /* discard runtime state; reopen canonical storage */
+            CHECK(stn_windows_storage_init(&disks[j],paths[j],&providers[j])==STN_STORAGE_OK);
+            CHECK(stn_storage_load(&c,&providers[j],snapshot,CAP,&view)==STN_STORAGE_OK);
+            states[j]=view.state;CHECK(view.count==61 && memcmp(states[j].current_target,before[0].current_target,32)==0 && memcmp(states[j].tip_id,before[0].tip_id,32)==0 && memcmp(states[j].cumulative_work.bytes,before[0].cumulative_work.bytes,40)==0);
+            for(i=0;i<61;++i){CHECK(view.blocks[i].length==364 && memcmp(view.blocks[i].bytes,a[i],364)==0);}
+            stn_storage_view_release(&view);CHECK(stn_chain_required_target(&c,&states[j],target[j])==STN_DATA_OK && memcmp(target[j],a[60]+120,32)==0);
+        }
+        if(!high){
+            CHECK(convergence_rpc(&mining,STN_RPC_SUBMIT_WORK,stale,n,out,&w)==STN_RPC_STALE && w==0);
+            CHECK(convergence_rpc(&mining,STN_RPC_MINING_TEMPLATE,NULL,0,fresh,&w)==STN_RPC_OK && memcmp(fresh+188,target[0],32)==0 && memcmp(fresh+32,stale+32,32)!=0);
+        }
+        for(j=0;j<2;++j){CHECK(DeleteFileW(paths[j]));CHECK(DeleteFileW(disks[j].lock_path));}CHECK(RemoveDirectoryW(directory));
+    }
+    printf("Difficulty network convergence: %u targeted checks (real sockets/NTFS; high-work hash fixture separately).\n",checks-initial_checks);
+}
+
 int test_peer(void);
 int test_peer(void)
 {
@@ -276,7 +424,7 @@ int test_peer(void)
     branch(a,as,99);branch(b,bs,99);memcpy(policy.fixed_target,a[0]+120,32);
     c.network_id[0]=1;c.genesis_bytes=a[0];c.genesis_length=364;c.pow_policy=&policy;c.hash_provider.hash=test_hash;
     framing(&c);synchronization(&c);localhost(&c);
-    partial_io();
+    partial_io();convergence();
     printf("P2P/sync/recovery: %u checks, %u failures (localhost included).\n",checks,failures);
     return failures==0 ? 0 : 1;
 }

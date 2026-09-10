@@ -123,3 +123,74 @@ Update docs/CHANGELOG.md with each meaningful change. Keep protocol decisions
 and implementation status accurate. Run checks suited to each increment;
 documentation-only changes require link and diff checks, not invented runtime
 tests. Do not treat prototypes as evidence of production readiness.
+
+## Phase 11 — Deterministic Difficulty Adjustment — COMPLETE
+
+Windows Release/x64, 2026-09-10. The following chunk checkpoints are historical;
+the final Chunk 4 qualification below completes this phase.
+
+**Chunk 1 COMPLETE: calculation foundation only (2026-09-09).** The owner supplied
+60-second spacing, 60-block windows, boundary height 60, accepted H-60/H-1
+endpoints, 3600-second expectation, 900/14400-second clamps, floor arithmetic and
+existing target limits. See POW.md for the exact API, arithmetic and bootstrap rules.
+193 targeted checks qualify canonical deterministic next-target calculation;
+1,130,287 Chain C checks and 34 probes pass. Phase 9 (1,544) and all Phase 10 (562)
+process checks remain passing. Release/x64 builds have zero warnings/errors.
+Normal acceptance and templates still use the qualified fixed target. Dynamic
+adjustment is not operational. Chunk 2 has not started.
+### Phase 11 Chunk 2 — COMPLETE (Windows Release/x64, 2026-09-09)
+
+Required-target consensus is activated. Validation and mining share one
+branch-derived rule; target equality remains separate from real SHA-256 PoW.
+Adjusted state reconstructs from canonical persistence, branch-specific reorgs
+retain ordinary cumulative-work preference, and the actual Stratum path preserves
+the changed target through acceptance/restart. See POW.md for exact rules and limits.
+1,658 new C checks and 834 adjusted-target process checks pass; total Chain C
+checks are 1,131,945. Prior Phase 9 (1,544), Phase 10 (562), and 34 probes pass.
+Builds have zero warnings/errors. Phase 11 as a whole is not marked complete;
+later qualification remains outside this increment. Chunk 3 has not started.
+### Phase 11 Chunk 3 — COMPLETE (Windows Release/x64, 2026-09-10)
+
+The authorized 320-bit cumulative-work representation preserves the full target
+and height domains. STNC/STNP v2 transport 40-byte work without truncation;
+canonical block storage reconstructs it without a format change. Legacy
+fixed-target development evidence receives strict current-rule validation.
+See POW.md for the exact mathematical bound and qualification scope.
+Chunk 4 has not started; Phase 11 as a whole remains open.
+Evidence: 223 new C checks; 1,132,168 total C checks, 34 probes, 1,544 Phase 9,
+562 Phase 10 and 834 adjusted-target process checks, 27 Stratum parser checks
+and two session assertions. Zero warnings/errors/failures. No Chunk 4 work.
+
+## Phase 11 Chunk 4 — final convergence qualification COMPLETE (2026-09-10)
+
+Deterministic difficulty adjustment is qualified on Windows Release/x64.
+Required targets follow validated branch ancestry through validation, mining,
+STNC/Stratum, actual P2P, reorganization and reconstruction. Cumulative work
+remains exact unsigned 320-bit / 40-byte canonical big-endian. Consensus,
+protocol layouts and the strict legacy-history boundary are unchanged.
+
+The existing C peer harness adds 1,109 checks with two independent NTFS-backed
+node states and actual loopback Winsock exchange. Both start at shared genesis.
+One bounded partition permits independent 60-block branches: 1,800/7,200-second
+ancestry spans derive harder/easier targets at height 60. Both nodes validate
+received evidence independently and converge on the greater-work branch. One
+node replaces 60 blocks from the common genesis through existing atomic storage
+adoption. A wrong-target block satisfying its encoded-target PoW, accompanied
+by a fabricated maximum advertised work value, is rejected with accepted state
+and stored bytes unchanged.
+
+Both node states are discarded and reconstructed by reopening canonical stores;
+all 61 block byte sequences, tips, current targets, 40-byte work and next targets
+agree. Fresh STNC mining work uses the converged target; the pre-reorg job is
+stale. A separate scripted block-hash fixture repeats exchange/reconstruction
+above the former 256-bit work limit. The ordinary scenario uses real SHA-256.
+Node-state teardown/reload is in-process; the existing 834-check adjusted-target
+process lifecycle additionally stops/restarts Chain and Stratum and proves
+continued mining. This does not add automatic P2P process orchestration.
+
+Final evidence: 1,133,277 Chain C checks, 34 build probes, 1,544 Phase 9 checks,
+562 Phase 10 checks, 834 adjusted-target process checks, 27 Stratum parser checks
+and two session assertions. Windows Release/x64: zero warnings/errors/failures.
+No production defect or production-code change was required in Chunk 4.
+Production identities, hardware, Internet operation, performance and other
+platforms remain unqualified. Phase 12 was not started. No commit or push.

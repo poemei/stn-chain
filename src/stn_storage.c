@@ -109,10 +109,18 @@ stn_storage_status stn_storage_load(const stn_chain_context *c,const stn_storage
 }
 static int state_equal(const stn_chain_state *a,const stn_chain_state *b)
 {
+    size_t i;
+    if(a->target_history_count!=b->target_history_count || a->target_history_count>60) { return 0; }
+    for(i=0;i<a->target_history_count;++i) {
+        if(a->target_history[i].version!=b->target_history[i].version ||
+           a->target_history[i].height!=b->target_history[i].height ||
+           a->target_history[i].timestamp!=b->target_history[i].timestamp ||
+           memcmp(a->target_history[i].reserved_target,b->target_history[i].reserved_target,32)!=0) { return 0; }
+    }
     return a->height==b->height && a->timestamp==b->timestamp && a->has_tip==b->has_tip &&
         memcmp(a->network_id,b->network_id,32)==0 && memcmp(a->genesis_id,b->genesis_id,32)==0 &&
         memcmp(a->tip_id,b->tip_id,32)==0 && memcmp(a->current_target,b->current_target,32)==0 &&
-        memcmp(a->cumulative_work.bytes,b->cumulative_work.bytes,32)==0;
+        memcmp(a->cumulative_work.bytes,b->cumulative_work.bytes,STN_WORK_SIZE)==0;
 }
 static int plan_equal(const stn_reorg_plan *a,const stn_reorg_plan *b)
 {

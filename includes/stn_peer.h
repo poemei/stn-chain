@@ -41,7 +41,7 @@ typedef struct stn_peer_workspace {
      * Only successful adoption applies prepared canonical-ID removals. */
     stn_pending *pending;
 } stn_peer_workspace;
-/* STNP,u16 version=1,u16 type,u32 payload length; big-endian, exact framing.
+/* STNP,u16 version=2,u16 type,u32 payload length; big-endian, exact framing.
  * Header-only parse gives bounded payload length before reading/allocating.
  * Decode outputs unchanged on failure; encode permits payload at bytes+12. */
 stn_peer_status stn_peer_header(const uint8_t *bytes,size_t length,uint16_t *type,size_t *payload_length);

@@ -459,12 +459,19 @@ int test_pending(void)
         for(i=1;i<71;++i){
             memcpy(long_blocks[i],long_blocks[i-1],364);long_blocks[i][79]=(uint8_t)i;long_blocks[i][159]=nonces[i-1];
             if(stn_chain_block_id(long_blocks[i-1],364,&c.hash_provider,long_blocks[i]+40)!=STN_DATA_OK){all=0;}
+            if(i>=60){
+                unsigned nonce;uint8_t digest[32];long_blocks[i][120]=31;
+                for(nonce=0;nonce<65536;++nonce){long_blocks[i][158]=(uint8_t)(nonce>>8);long_blocks[i][159]=(uint8_t)nonce;
+                    if(stn_pow_verify(long_blocks[i],364,&c.hash_provider,digest)==STN_DATA_OK){break;}}
+                if(nonce==65536){all=0;}
+            }
             long_history[i].bytes=long_blocks[i];long_history[i].length=364;
         }
         CHECK(all && stn_storage_adopt(&c,&provider,long_history,71,&s.workspace,&s.active)==STN_STORAGE_OK && s.active.height==70);
         record(bytes,1);r=call(&s,STN_RPC_SUBMIT_INTELLIGENCE,bytes,232);CHECK(r.code==STN_RPC_OK && r.payload[3]==STN_PENDING_ACCEPTED);
         r=call(&s,STN_RPC_MINING_TEMPLATE,NULL,0);CHECK(r.code==STN_RPC_OK && r.length==484 && r.payload[147]==71);
         memcpy(work,r.payload,r.length);n=r.length;
+        {unsigned nonce;uint8_t digest[32];for(nonce=0;nonce<65536;++nonce){work[226]=(uint8_t)(nonce>>8);work[227]=(uint8_t)nonce;if(stn_pow_verify(work+68,n-68,&c.hash_provider,digest)==STN_DATA_OK){break;}}}
         r=call(&s,STN_RPC_SUBMIT_WORK,work,n);CHECK(r.code==STN_RPC_OK && s.active.height==71 && first.count==0);
         CHECK(stn_storage_load(&c,&provider,snapshot,CAP,&active)==STN_STORAGE_OK && active.state.height==71);
         stn_storage_view_release(&active);

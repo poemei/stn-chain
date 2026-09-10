@@ -7,7 +7,7 @@ stn_data_status stn_work_order(const stn_work *current,const stn_work *candidate
 {
     int order;
     if(current==NULL || candidate==NULL || out==NULL) { return STN_DATA_ARGUMENT; }
-    order=memcmp(candidate->bytes,current->bytes,32);
+    order=memcmp(candidate->bytes,current->bytes,STN_WORK_SIZE);
     *out=order>0 ? STN_FORK_CANDIDATE : order<0 ? STN_FORK_CURRENT : STN_FORK_TIE;
     return STN_DATA_OK;
 }

@@ -293,3 +293,61 @@ All 562 Phase 10 process checks (81/93/115/148/125), 1,544 Phase 9 checks,
 probes pass. Release/x64 builds have zero warnings/errors. Identity and result
 fixtures remain test-only; hardware, production identity, accounting, performance
 and other platforms are not qualified. Phase 11 has not started.
+
+## Activated required-target flow — Phase 11 Chunk 2
+
+Accepted branch blocks rebuild a bounded current-window history in chain state.
+stn_chain_required_target supplies both candidate validation and mining templates;
+stn_target_next remains the sole adjustment calculation. A submitted target must
+match before PoW can authorize a state transition. Persistence/reorg paths replay
+canonical blocks and reconstruct the window rather than trust a local cache.
+Cumulative work remains a checked per-block sum. STNC transports canonical target
+bytes unchanged, and Stratum retains its coordinator role. See POW.md for evidence
+and the compatibility consequences for earlier fixed-target histories.
+## Phase 11 Chunk 3 — 320-bit work and development-history boundary
+
+Authorized consensus rule (2026-09-10): cumulative work is an exact unsigned
+320-bit integer encoded as exactly 40 big-endian bytes. Target/hash/work-ID widths
+remain 32 bytes. The target domain remains 1 through 2^255-1, and per-block work
+remains floor(2^256/(T+1)). At most 2^64 blocks, including height-zero genesis,
+each contribute at most 2^255 work, so every supported history fits within 2^319.
+No valid history needs saturation, wrapping, truncation or an artificial ceiling.
+The generic addition API still rejects out-of-domain 320-bit overflow atomically;
+that guard cannot be reached by valid cumulative work over supported heights.
+
+stn_work now holds 40 canonical bytes. Addition visits every byte; target work
+is zero-extended into that representation. Fork comparison compares all 40 bytes.
+Genesis and target-one successors can accumulate past 2^256 with exact ordering.
+Current-window difficulty and the authorized adjustment formula are unchanged.
+
+STNC and STNP use wire version 2, explicitly rejecting version 1 rather than
+silently interpreting its narrower work fields. STNC INFO is 184 bytes: work
+at 104..143, target at 144..175, status at 176 and count at 180. SUBMIT_WORK success
+is 80 bytes: block ID 32, height 8, work 40. STNP STATE is 84 payload bytes:
+height 8, tip 32, work 40, count 4. All work fields are unsigned big-endian with
+leading zeros required. Wrong lengths are rejected at the relevant message
+boundary. Other payload layouts, STNM, target bytes and work-ID semantics remain.
+
+Persistence stores canonical blocks rather than cumulative-work metadata, so its
+format is unchanged. Reload and reorganization reconstruct exact 40-byte sums
+from accepted history; no serialized difficulty/work cache becomes authoritative.
+The Stratum client version and affected response bounds were updated, including
+the historical adapter buffer. Mining job/result formats were not redesigned.
+
+Pre-Phase-11 fixed-target chains were explicit development/test evidence, with
+no established compatibility guarantee. If their targets violate the activated
+rule, revalidation rejects TARGET at the actual boundary. They are not described
+as byte-corrupted merely because consensus evolved. No rewriting, bypass,
+automatic migration or alternate work ordering is introduced. Development history
+that already satisfies current rules remains eligible for normal revalidation.
+
+Qualification uses arithmetic boundaries and scripted block-ID fixtures for
+otherwise computationally infeasible target-one blocks. The tests cover full
+height range at target one, adjacent minimum targets, high-bit comparison,
+addition boundary/failure atomicity, 61 minimum-target blocks, canonical storage
+reconstruction, high-work STNC/P2P serialization and invalid lengths/old versions.
+Real SHA-256 adjusted branches retain reorg preference after storage reload.
+No hardware or production-identity qualification is implied.
+## Phase 11 Chunk 4 — final qualification (2026-09-10)
+
+Phase 11 deterministic difficulty adjustment is COMPLETE on Windows Release/x64. Branch ancestry determines validation and mining targets; actual P2P evidence is independently validated before 320-bit work comparison and atomic adoption. Two NTFS node states converge after a bounded partition and reconstruct identical canonical history on reopen. Existing process regressions separately prove Chain/Stratum restart and continued mining. This qualification adds tests only, not production orchestration or consensus design. See ROADMAP.md for exact evidence, scripted-fixture boundaries and deferred qualification.

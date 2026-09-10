@@ -1,5 +1,16 @@
 # Deterministic Development Chain State
 
+
+Current work representation is 320 bits / 40 canonical big-endian bytes (Phase 11
+Chunk 3). This supersedes historical 256-bit work limits below. STNC/STNP version
+2 carries widened work fields; block, target, hash and mining-job formats remain.
+
+
+Current Phase 11 Chunk 2 supersedes fixed-target-only statements below: validation
+and mining use the same activated branch-derived required target; persistence
+and fork evaluation rebuild its history. Per-block work remains checked and
+summed. See [POW.md](POW.md#phase-11-chunk-2--required-target-consensus-activated).
+
 Status: implemented local structural/linkage validation with provider-bound
 integrity. Not distributed consensus, semantic record acceptance, persistent
 chain storage, or signature verification. The original version-1 profile below

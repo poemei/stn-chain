@@ -208,3 +208,68 @@ and deterministic selection require their own validated signature/authority/repl
 foundation; never label repeated structural fixtures accepted intelligence.
 Contracts remain addressed, signed, sequenced agreements with deterministic state
 transitions, not VM/bytecode/arbitrary execution. Economics remain deferred.
+
+## Phase 11 calculation parameters (2026-09-09)
+
+The owner's Authorized Development Parameters for Phase 11 resolve the timing,
+window, clamp, rounding, history and bootstrap portions of O-011 as recorded in
+POW.md. They authorize the standalone calculation only. Consensus activation,
+mining-template enforcement and deployment choices remain open. No economic
+policy or software release version is assigned by these calculation parameters.
+## Phase 11 consensus activation (2026-09-09)
+
+The owner authorized Chunk 2 to activate the Chunk 1 rule at candidate height 60
+and subsequent 60-block boundaries. Validation and mining share
+stn_chain_required_target. Its bounded branch-local calculation history is derived
+only from validated blocks and reconstructed on reload, never trusted from disk.
+The fixed_target field is bootstrap configuration only. Checked cumulative work
+and greater-work fork choice are unchanged. Older fixed-target histories receive
+ordinary revalidation; no compatibility bypass or migration is authorized.
+See POW.md for qualification, overflow-domain limits and outstanding scope.
+## Phase 11 Chunk 3 — 320-bit work and development-history boundary
+
+Authorized consensus rule (2026-09-10): cumulative work is an exact unsigned
+320-bit integer encoded as exactly 40 big-endian bytes. Target/hash/work-ID widths
+remain 32 bytes. The target domain remains 1 through 2^255-1, and per-block work
+remains floor(2^256/(T+1)). At most 2^64 blocks, including height-zero genesis,
+each contribute at most 2^255 work, so every supported history fits within 2^319.
+No valid history needs saturation, wrapping, truncation or an artificial ceiling.
+The generic addition API still rejects out-of-domain 320-bit overflow atomically;
+that guard cannot be reached by valid cumulative work over supported heights.
+
+stn_work now holds 40 canonical bytes. Addition visits every byte; target work
+is zero-extended into that representation. Fork comparison compares all 40 bytes.
+Genesis and target-one successors can accumulate past 2^256 with exact ordering.
+Current-window difficulty and the authorized adjustment formula are unchanged.
+
+STNC and STNP use wire version 2, explicitly rejecting version 1 rather than
+silently interpreting its narrower work fields. STNC INFO is 184 bytes: work
+at 104..143, target at 144..175, status at 176 and count at 180. SUBMIT_WORK success
+is 80 bytes: block ID 32, height 8, work 40. STNP STATE is 84 payload bytes:
+height 8, tip 32, work 40, count 4. All work fields are unsigned big-endian with
+leading zeros required. Wrong lengths are rejected at the relevant message
+boundary. Other payload layouts, STNM, target bytes and work-ID semantics remain.
+
+Persistence stores canonical blocks rather than cumulative-work metadata, so its
+format is unchanged. Reload and reorganization reconstruct exact 40-byte sums
+from accepted history; no serialized difficulty/work cache becomes authoritative.
+The Stratum client version and affected response bounds were updated, including
+the historical adapter buffer. Mining job/result formats were not redesigned.
+
+Pre-Phase-11 fixed-target chains were explicit development/test evidence, with
+no established compatibility guarantee. If their targets violate the activated
+rule, revalidation rejects TARGET at the actual boundary. They are not described
+as byte-corrupted merely because consensus evolved. No rewriting, bypass,
+automatic migration or alternate work ordering is introduced. Development history
+that already satisfies current rules remains eligible for normal revalidation.
+
+Qualification uses arithmetic boundaries and scripted block-ID fixtures for
+otherwise computationally infeasible target-one blocks. The tests cover full
+height range at target one, adjacent minimum targets, high-bit comparison,
+addition boundary/failure atomicity, 61 minimum-target blocks, canonical storage
+reconstruction, high-work STNC/P2P serialization and invalid lengths/old versions.
+Real SHA-256 adjusted branches retain reorg preference after storage reload.
+No hardware or production-identity qualification is implied.
+## Phase 11 Chunk 4 — final qualification (2026-09-10)
+
+Phase 11 is COMPLETE for Windows Release/x64 bounded development qualification. Chunk 4 required no consensus or production changes. Peers remain evidence providers: each node reconstructs branch-specific targets and exact 320-bit work before existing fork choice. The full target domain, canonical 40-byte big-endian work and strict revalidation of legacy fixed-target development history remain controlling. See ROADMAP.md for the final evidence and limits; Phase 12 is not started.

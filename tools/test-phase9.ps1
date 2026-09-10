@@ -58,7 +58,7 @@ try {
         $client=[Net.Sockets.TcpClient]::new('127.0.0.1',$node.Port);$client.ReceiveTimeout=5000
         $script:clients+=$client;$streams+=$client.GetStream()
         $method=if($i -eq 2){0x1004}else{0x1005};$payload=if($i -eq 2){[byte[]]@()}else{$first}
-        $frame=[byte[]]([Text.Encoding]::ASCII.GetBytes('STNC')+(NumberBytes 1 2)+(NumberBytes 1 2)+
+        $frame=[byte[]]([Text.Encoding]::ASCII.GetBytes('STNC')+(NumberBytes 2 2)+(NumberBytes 1 2)+
             (NumberBytes $method 2)+(NumberBytes 0 2)+(NumberBytes 7 8)+(NumberBytes $payload.Length 4)+$payload)
         $streams[$i].Write($frame,0,$frame.Length)
     }

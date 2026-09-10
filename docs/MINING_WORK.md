@@ -1,5 +1,11 @@
 # Deterministic mining work and runnable development node
 
+
+Current Phase 11 Chunk 2 supersedes fixed-target-only statements below: validation
+and mining use the same activated branch-derived required target; persistence
+and fork evaluation rebuild its history. Per-block work remains checked and
+summed. See [POW.md](POW.md#phase-11-chunk-2--required-target-consensus-activated).
+
 Implemented on Windows Release/x64. This is a node-side work interface, not a
 miner, Stratum server, public network, wallet, or coin. Production CNG SHA-256
 and the existing v3 block rules validate submitted work regardless of its source.

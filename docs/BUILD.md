@@ -171,3 +171,35 @@ sequential: configured loopback ports 18473/18475 must be free. Fixtures use
 private temporary state and clean their processes/files. Also run test-phase9.ps1,
 stn-chain-tests.exe and Stratum's parser/session tests. Qualification is limited
 to Windows Release/x64 with test-only identity/result fixtures.
+## Phase 11 Chunk 1 calculation checks
+
+Build the existing Release/x64 solution and run stn-chain-tests.exe as before.
+The existing PoW suite includes 193 targeted difficulty-calculation checks (516
+PoW-suite checks total); total Chain C checks are 1,130,287. No additional test
+executable or build dependency is required. The separate Phase 9/10 process suites
+continue to qualify unchanged fixed-target behavior, not dynamic activation.
+## Phase 11 Chunk 2 activation checks
+
+The existing mining test suite adds 1,658 C checks (1,131,945 Chain C total).
+Build the solution Release/x64 and the separate Phase9TestRuntime=true executable.
+Run tools/test-stratum-interface.ps1 -DifficultyOnly after building Stratum:
+834 real-process checks exercise the height-60 adjustment and restart to new
+height-61 work. Run it separately from other process tests because the same
+loopback ports are used. The shared fixture solver now compares all 32 target
+bytes. Earlier storage/peer/long-history fixtures now obey active retarget rules.
+No new executable, temporary harness or Stratum source change is needed.
+## Phase 11 Chunk 3 — protocol v2 builds
+
+Build Chain Release/x64 and the separate Phase9TestRuntime=true runtime, then
+rebuild Stratum before the existing cross-process tests. Both endpoints now
+require STNC v2; STNP peers require v2. Old v1 tools are explicitly incompatible.
+The same C harness and process scripts qualify 40-byte work. No new dependency
+or standalone test executable is required; target-one tests use scripted block
+hashes, while existing adjusted-window integration retains real SHA-256.
+Chunk 3 results: 1,132,168 total C checks (223 new), 34 probes, 1,544 Phase 9,
+562 Phase 10, 834 adjusted-target process checks, 27 Stratum parser checks and
+two session assertions. Windows Release/x64 only; zero warnings/errors/failures.
+
+## Phase 11 Chunk 4 — final qualification (2026-09-10)
+
+The existing stn-chain-tests.exe includes 1,109 new peer convergence checks (1,282 peer checks; 1,133,277 total C checks). Build/rebuild the Release/x64 solution in Visual Studio and run the existing executable. No new executable or dependency is needed. The harness uses ephemeral loopback sockets and private NTFS directories, then removes its files. Run the existing Phase 9 script, all five Phase 10 modes, and -DifficultyOnly sequentially as described above. Results: 34 probes, 1,544 Phase 9, 562 Phase 10, 834 adjusted-target process checks, 27 Stratum parser checks and two session assertions, all passing. Windows Release/x64 only; zero warnings/errors/failures. See ROADMAP.md for the real-hash versus scripted high-work fixture distinction.

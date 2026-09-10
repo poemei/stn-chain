@@ -26,6 +26,10 @@ typedef struct stn_chain_state {
     int has_tip; /* 0 for canonical empty state, 1 for validated prefix. */
     uint8_t current_target[32];
     stn_work cumulative_work;
+    /* Derived from validated blocks only; never serialized as trusted state.
+     * Current window's calculation fields (version/height/time/target). */
+    stn_block_header target_history[60];
+    size_t target_history_count;
 } stn_chain_state;
 
 typedef enum stn_chain_reason {
@@ -57,6 +61,9 @@ typedef struct stn_block_span { const uint8_t *bytes; size_t length; } stn_block
  * Output unchanged on failure. Existing accepted state must originate from
  * this validation path; never deserialize metadata and assume it is trusted. */
 stn_data_status stn_chain_initialize(const stn_chain_context *context, stn_chain_state *out);
+/* Same branch-derived rule for validation and mining. Unchanged on failure. */
+stn_data_status stn_chain_required_target(const stn_chain_context *context,
+    const stn_chain_state *prior,uint8_t target[32]);
 
 /* Block ID = configured SHA-256 provider(domain || 168-byte canonical header).
  * Full structural validation first; integrity remains a separate requirement.

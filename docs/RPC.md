@@ -1,5 +1,10 @@
 # RPC Core and Deterministic Node Interface
 
+
+Current work representation is 320 bits / 40 canonical big-endian bytes (Phase 11
+Chunk 3). This supersedes historical 256-bit work limits below. STNC/STNP version
+2 carries widened work fields; block, target, hash and mining-job formats remain.
+
 Status: portable codec/dispatch, snapshot queries, mining templates and atomic solved-work submission are implemented, with a Windows loopback TCP runtime. HTTP/JSON, public deployment and authentication remain deferred.
 
 RPC is the supported application/miner integration boundary.
@@ -9,7 +14,7 @@ RPC remains application-to-node interaction.
 No RPC client gains consensus authority.
 No node becomes authoritative because it exposes RPC.
 
-## Protocol version 1
+## Protocol version 2
 
 ### Qualified STN-Stratum client
 
@@ -85,7 +90,7 @@ implicit fields, locale-dependent text, floating point or struct serialization.
 | Offset | Width | Meaning |
 | --- | --- | --- |
 | 0 | 4 | STNC magic (distinct from STNP peer framing and STNS storage) |
-| 4 | 2 | Version 1 |
+| 4 | 2 | Version 2 |
 | 6 | 2 | Kind: 1 request, 2 response |
 | 8 | 2 | Method identifier |
 | 10 | 2 | Result code; requests require 0 |
@@ -125,7 +130,7 @@ This classification is not authentication. No remote policy is configured.
 
 | Method | Capability | Request payload | Implemented result |
 | --- | --- | --- | --- |
-| 0x0001 INFO | READ | empty | 176-byte validated active chain summary |
+| 0x0001 INFO | READ | empty | 184-byte validated active chain summary |
 | 0x0002 BLOCK_HEIGHT | READ | height u64 | Canonical full block or NOT_FOUND |
 | 0x0003 BLOCK_ID | READ | ID 32 | Bounded scan by calculated block ID or NOT_FOUND |
 | 0x1000 CHECK_INTELLIGENCE | READ | Whole STNR record, 180..65,716 bytes | 20-byte existing validation report; no admission |
@@ -137,7 +142,7 @@ This classification is not authentication. No remote policy is configured.
 | 0x2000 MINING_CONTEXT | READ | empty | 76-byte tip/target/height context, template availability=1 when configured (0 in snapshot-only adapter) |
 | 0x2001 CHECK_WORK_BASE | READ | Base tip 32 | Current mining context if matching; otherwise STALE |
 | 0x2002 MINING_TEMPLATE | READ | empty | Parent 32, work ID 32, block length u32, canonical block |
-| 0x2003 SUBMIT_WORK | SUBMISSION | Base tip 32, template ID 32, block length u32, block bytes | Validated atomic acceptance: block ID 32, height u64, cumulative work 32; otherwise explicit error |
+| 0x2003 SUBMIT_WORK | SUBMISSION | Base tip 32, template ID 32, block length u32, block bytes | Validated atomic acceptance: block ID 32, height u64, cumulative work 40; otherwise explicit error |
 | 0x3000 ADMIN_CONTROL | ADMIN | empty | UNAVAILABLE; no administrative action is exposed |
 
 SUBMIT_WORK requires the nested block length to match the remaining payload
@@ -210,8 +215,8 @@ This snapshot-only adapter does not mutate state. The configured mining service
 uses storage providers and can atomically accept solved blocks.
 
 INFO payload offsets: network 0..31, genesis 32..63, height u64 at 64,
-tip 72..103, cumulative work 104..135, target 136..167, status u32 at 168,
-block count u32 at 172. Status 1 means validated under current local development
+tip 72..103, cumulative work 104..143, target 144..175, status u32 at 176,
+block count u32 at 180. Status 1 means validated under current local development
 rules, not full distributed consensus or intelligence semantic acceptance.
 Height lookup compares the u64 value to the bounded count before size_t conversion.
 ID lookup currently scans loaded history; no persistent index/search is claimed.
@@ -252,7 +257,7 @@ u64, and template availability u32 (1 only when construction is available).
 
 MINING_TEMPLATE success uses the same payload shape as SUBMIT_WORK: parent 32,
 work ID 32, length u32, full canonical block. Both nested lengths are checked.
-SUBMIT_WORK success is exactly 72 bytes: block ID 32, height u64, work 32.
+SUBMIT_WORK success is exactly 80 bytes: block ID 32, height u64, work 40.
 Previously reserved method IDs acquire defined successes without changing RPC
 version, framing or maximum payload. The largest success is now a full template,
 1,051,948 payload bytes. Older codecs that reject these formerly unavailable

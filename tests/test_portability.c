@@ -60,9 +60,9 @@ int test_portability(void)
     /* Truncation to 32 bits cannot turn the bound into a valid length/count. */
     memset(tx1+8,255,4);CHECK(stn_transaction_validate_structure(tx1,192)==STN_DATA_LENGTH);
     CHECK(stn_peer_decode(header_copy,SIZE_MAX,&message)!=STN_PEER_OK);
-    target[31]=1;CHECK(stn_target_work(target,&work)==STN_DATA_OK && work.bytes[0]==128);
+    target[31]=1;CHECK(stn_target_work(target,&work)==STN_DATA_OK && work.bytes[8]==128);
     target[31]=2;CHECK(stn_target_work(target,&work)==STN_DATA_OK);
-    for(i=0;i<32;++i){CHECK(work.bytes[i]==0x55);}
+    for(i=0;i<32;++i){CHECK(work.bytes[i+8]==0x55);}
     printf("Portability/invariance: %u checks, %u failures.\n",checks,failures);
     return failures==0 ? 0 : 1;
 }

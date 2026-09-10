@@ -1,5 +1,10 @@
 # Chain Persistence and Atomic Application
 
+
+Current work representation is 320 bits / 40 canonical big-endian bytes (Phase 11
+Chunk 3). This supersedes historical 256-bit work limits below. STNC/STNP version
+2 carries widened work fields; block, target, hash and mining-job formats remain.
+
 Status: implemented ISO C17 storage coordination and a Windows x64 local NTFS
 adapter. The runnable node uses this as its current canonical block store. The
 format is still whole-snapshot persistence, not the final scalable/indexed store.

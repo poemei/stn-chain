@@ -8,7 +8,7 @@ stn_peer_status stn_peer_header(const uint8_t *p,size_t n,uint16_t *t,size_t *le
 {
     uint16_t type;size_t size;
     if(p==NULL || t==NULL || length==NULL){return STN_PEER_ARGUMENT;}
-    if(n!=12 || memcmp(p,"STNP",4)!=0 || stn_wire_read(p+4,2)!=1){return STN_PEER_PROTOCOL;}
+    if(n!=12 || memcmp(p,"STNP",4)!=0 || stn_wire_read(p+4,2)!=2){return STN_PEER_PROTOCOL;}
     type=(uint16_t)stn_wire_read(p+6,2);size=(size_t)stn_wire_read(p+8,4);
     if(!type_valid(type) || size>STN_PEER_MAX_PAYLOAD){return STN_PEER_PROTOCOL;}
     *t=type;*length=size;return STN_PEER_OK;
@@ -29,7 +29,7 @@ stn_peer_status stn_peer_encode(uint16_t t,const uint8_t *p,size_t n,uint8_t *ou
     if(!type_valid(t) || n>STN_PEER_MAX_PAYLOAD){return STN_PEER_PROTOCOL;}
     if(cap<12 || n>cap-12){return STN_PEER_CAPACITY;}
     if(n!=0){memmove(out+12,p,n);}memcpy(out,"STNP",4);
-    stn_wire_write(out+4,2,1);stn_wire_write(out+6,2,t);stn_wire_write(out+8,4,n);*written=n+12;return STN_PEER_OK;
+    stn_wire_write(out+4,2,2);stn_wire_write(out+6,2,t);stn_wire_write(out+8,4,n);*written=n+12;return STN_PEER_OK;
 }
 static stn_peer_status local_validate(const stn_chain_context *c,const stn_block_span *b,size_t n,stn_chain_state *out)
 {
@@ -63,9 +63,9 @@ stn_peer_status stn_peer_serve(const stn_chain_context *c,const stn_block_span *
         if(memcmp(m.payload,greeting,68)!=0){session->handshake=-1;return STN_PEER_NETWORK;}
         memcpy(response+12,greeting,68);length=68;
     }else if(m.type==STN_PEER_STATE && m.length==0){
-        if(cap<88){return STN_PEER_CAPACITY;}
+        if(cap<96){return STN_PEER_CAPACITY;}
         stn_wire_write(response+12,8,state.height);memcpy(response+20,state.tip_id,32);
-        memcpy(response+52,state.cumulative_work.bytes,32);stn_wire_write(response+84,4,count);length=76;
+        memcpy(response+52,state.cumulative_work.bytes,STN_WORK_SIZE);stn_wire_write(response+92,4,count);length=84;
     }else if(m.type==STN_PEER_GET_HEADERS && m.length==8){
         start=(size_t)stn_wire_read(m.payload,4);num=(size_t)stn_wire_read(m.payload+4,4);
         if(start>=count || num==0 || num>64 || num>count-start){goto bad;}
@@ -117,8 +117,8 @@ stn_peer_report stn_peer_sync(const stn_chain_context *c,const stn_storage_provi
     r.status=exchange(t,w,STN_PEER_HELLO,greeting,68,STN_PEER_HELLO,&m);if(r.status!=STN_PEER_OK){goto done;}
     if(m.length!=68 || memcmp(m.payload,greeting,68)!=0){r.status=STN_PEER_NETWORK;goto done;}
     r.status=exchange(t,w,STN_PEER_STATE,NULL,0,STN_PEER_STATE,&m);if(r.status!=STN_PEER_OK){goto done;}
-    if(m.length!=76){r.status=STN_PEER_PROTOCOL;goto done;}
-    count=(size_t)stn_wire_read(m.payload+72,4);
+    if(m.length!=84){r.status=STN_PEER_PROTOCOL;goto done;}
+    count=(size_t)stn_wire_read(m.payload+80,4);
     if(count==0 || stn_wire_read(m.payload,8)!=count-1){r.status=STN_PEER_PROTOCOL;goto done;}
     /* Bound allocation by caller-owned bytes, never merely a peer count. */
     if(count>w->candidate_capacity/(STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY) || count>SIZE_MAX/sizeof(*blocks)){r.status=STN_PEER_CAPACITY;goto done;}
