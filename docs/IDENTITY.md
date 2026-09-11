@@ -68,3 +68,16 @@ revocation places the grant identifier in the reconstructed accepted-state
 revocation set; duplicate revocations have no additional effect. Historical
 grant bytes remain unchanged. **Grant Signature Validity ≠ Current Grant
 Authority.** **Revocation State Follows Accepted Chain State.**
+
+## Identity rotation
+
+Phase 14 Block 5 defines a 129-byte rotation record containing version, old
+identity, replacement identity, and a 64-byte signature. The dedicated signing
+domain is `STN-CHAIN:IDENTITY:ROTATE:1`. The currently active identity must sign
+its replacement; a replacement key cannot authorize its own takeover. Rotation
+state is a monotonic accepted-history lineage with one successor per active
+identity, deterministic sequential resolution, and cycle/conflict rejection.
+Genesis roots cannot be rotated by this primitive. Existing grants remain bound
+to their original subject and revoked grants remain revoked. **Rotation Does
+Not Rewrite History.** **Historical Identity ≠ Current Active Identity.**
+**Identity Rotation ≠ Authority Inheritance.**

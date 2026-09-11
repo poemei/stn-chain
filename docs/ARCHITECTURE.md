@@ -483,6 +483,15 @@ non-root is an INVALID_GRANT and cannot feed Block 2; only VALID_GRANT evidence
 may proceed to authority evaluation. No delegation or key lifecycle behavior
 is introduced.
 
+## Phase 14 Block 5 — identity rotation
+
+The portable rotation primitive advances one active identity to one canonical
+replacement only when the current identity signs the exact old/new pair. It
+stores accepted lineage edges, rejects conflicting successors and cycles, and
+resolves the current identity deterministically. Genesis-root succession is
+rejected and remains a separate protocol decision. Rotation does not migrate
+authority grants or alter historical signature verification.
+
 ## Phase 14 Block 4 — authority-grant revocation
 
 Complete canonical grants receive a 32-byte SHA-256 identifier. A 129-byte

@@ -4,6 +4,17 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 14 Block 5 — deterministic identity/key rotation foundation — 2026-09-11
+
+- Added a fixed 129-byte identity rotation record and the dedicated
+  `STN-CHAIN:IDENTITY:ROTATE:1` signing domain.
+- Current identities authorize their own replacements; replacement-only and
+  unrelated signatures cannot take over. Accepted rotation state is monotonic,
+  sequential, cycle-free, conflict-detecting, and reconstructable.
+- Genesis-root succession, grant inheritance, replay protection, wallets, and
+  key storage remain outside this block. Phase 14 Block 6 was not started. No
+  commit or push.
+
 ### Phase 14 Block 4 — deterministic authority-grant revocation — 2026-09-10
 
 - Added SHA-256 identifiers for complete canonical Block 3 grants and a fixed

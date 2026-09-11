@@ -348,6 +348,14 @@ root authorization, duplicate application, revoked-grant rejection, and
 reconstruction by replaying accepted evidence. Persistence and reorganization
 remain history-derived; no local revocation database is introduced.
 
+## Phase 14 Block 5 — identity rotation
+
+The Release/x64 test executable qualifies the 129-byte rotation codec and
+dedicated signing domain, active-identity authorization, sequential lineage,
+duplicate/conflict handling, cycle rejection, root-rotation rejection, and
+current-identity reconstruction. Historical signature and grant behavior remain
+separate from current identity state.
+
 ## Phase 13 Block 6 — deterministic shutdown
 
 The Release/x64 build includes listener-close-before-worker-join shutdown

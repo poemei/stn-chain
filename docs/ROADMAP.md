@@ -446,3 +446,13 @@ by the original genesis-root issuer of the referenced grant. Valid revocations
 produce monotonic revocation state; duplicate application is idempotent, and
 active authority evaluation rejects revoked grants. State is reconstructed from
 accepted history rather than a local blacklist. Block 5 was not started.
+
+### Block 5 — deterministic identity/key rotation foundation COMPLETE (2026-09-11)
+
+The portable identity lifecycle now supports a fixed 129-byte signed rotation
+from the currently active identity to one replacement. Accepted lineage is
+monotonic and resolves sequential rotations deterministically; duplicate edges
+are idempotent while conflicting successors and cycles fail closed. Genesis-root
+succession is rejected, authority grants do not migrate implicitly, and
+historical signatures remain tied to historical identities. Block 6 was not
+started.

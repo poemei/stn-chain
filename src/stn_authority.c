@@ -122,6 +122,44 @@ stn_authority_grant_result stn_authority_grant_active(const uint8_t *grant,size_
 {
     uint8_t id[32];stn_authority_grant_result r;if(state==NULL || evidence==NULL){return STN_AUTHORITY_MALFORMED_GRANT;}r=stn_authority_grant_validate(grant,length,roots,count,evidence);if(r!=STN_AUTHORITY_VALID_GRANT){return r;}if(stn_authority_grant_id(grant,length,provider,id)!=STN_DATA_OK){return STN_AUTHORITY_INVALID_GRANT;}return stn_authority_state_is_revoked(state,id)?STN_AUTHORITY_INVALID_GRANT:STN_AUTHORITY_VALID_GRANT;
 }
+static int rotation_root(const uint8_t *roots,size_t count,const uint8_t id[32]){return root_contains(roots,count,id);}
+stn_identity_rotation_result stn_identity_rotation_statement(const uint8_t old_id[32],const uint8_t new_id[32],uint8_t *statement,size_t capacity,size_t *written)
+{
+    uint8_t a[32],b[32];size_t n=STN_AUTHORITY_ROTATE_DOMAIN_SIZE+1u+64u;
+    if(written!=NULL){*written=0;}
+    if(statement==NULL || written==NULL || capacity<n || stn_identity_derive(old_id,a)!=STN_IDENTITY_VALID || stn_identity_derive(new_id,b)!=STN_IDENTITY_VALID || memcmp(a,b,32)==0){return STN_AUTHORITY_MALFORMED_ROTATION;}
+    memcpy(statement,STN_AUTHORITY_ROTATE_DOMAIN,STN_AUTHORITY_ROTATE_DOMAIN_SIZE-1u);statement[STN_AUTHORITY_ROTATE_DOMAIN_SIZE-1u]=0;statement[STN_AUTHORITY_ROTATE_DOMAIN_SIZE]=STN_AUTHORITY_VERSION;memcpy(statement+STN_AUTHORITY_ROTATE_DOMAIN_SIZE+1u,a,32);memcpy(statement+STN_AUTHORITY_ROTATE_DOMAIN_SIZE+33u,b,32);*written=n;return STN_AUTHORITY_VALID_ROTATION;
+}
+stn_identity_rotation_result stn_identity_rotation_encode(const uint8_t old_id[32],const uint8_t new_id[32],const uint8_t signature[64],uint8_t *rotation,size_t capacity,size_t *written)
+{
+    uint8_t statement[STN_AUTHORITY_ROTATE_DOMAIN_SIZE+65u];size_t n=0;uint8_t a[32],b[32];
+    if(written!=NULL){*written=0;}
+    if(rotation==NULL || signature==NULL || written==NULL || capacity<STN_AUTHORITY_ROTATION_SIZE || stn_identity_rotation_statement(old_id,new_id,statement,sizeof(statement),&n)!=STN_AUTHORITY_VALID_ROTATION){return STN_AUTHORITY_MALFORMED_ROTATION;}
+    stn_identity_derive(old_id,a);stn_identity_derive(new_id,b);rotation[0]=STN_AUTHORITY_VERSION;memcpy(rotation+1,a,32);memcpy(rotation+33,b,32);memcpy(rotation+65,signature,64);*written=STN_AUTHORITY_ROTATION_SIZE;return STN_AUTHORITY_VALID_ROTATION;
+}
+stn_identity_rotation_result stn_identity_rotation_validate(const uint8_t *rotation,size_t length,const stn_identity_rotation_state *state,const uint8_t *roots,size_t count)
+{
+    uint8_t old_id[32],new_id[32],statement[STN_AUTHORITY_ROTATE_DOMAIN_SIZE+65u];size_t n=0;stn_identity_result v;
+    if(rotation==NULL || state==NULL || length!=STN_AUTHORITY_ROTATION_SIZE || rotation[0]!=STN_AUTHORITY_VERSION || state->rotation_count>STN_AUTHORITY_MAX_ROTATIONS || stn_authority_root_set_validate(roots,count)!=STN_AUTHORITY_AUTHORIZED){return STN_AUTHORITY_MALFORMED_ROTATION;}
+    if(stn_identity_derive(rotation+1,old_id)!=STN_IDENTITY_VALID || stn_identity_derive(rotation+33,new_id)!=STN_IDENTITY_VALID){return STN_AUTHORITY_MALFORMED_ROTATION;}
+    if(memcmp(old_id,new_id,32)==0 || rotation_root(roots,count,old_id) || rotation_root(roots,count,new_id)){return STN_AUTHORITY_INVALID_ROTATION;}
+    {size_t i;for(i=0;i<state->rotation_count;++i){if(memcmp(state->old_identities[i],old_id,32)==0){return memcmp(state->new_identities[i],new_id,32)==0?STN_AUTHORITY_VALID_ROTATION:STN_AUTHORITY_INVALID_ROTATION;}if(memcmp(state->old_identities[i],new_id,32)==0){return STN_AUTHORITY_INVALID_ROTATION;}}}
+    if(memcmp(old_id,state->current_identity,32)!=0){return STN_AUTHORITY_INVALID_ROTATION;}
+    if(stn_identity_rotation_statement(old_id,new_id,statement,sizeof(statement),&n)!=STN_AUTHORITY_VALID_ROTATION){return STN_AUTHORITY_MALFORMED_ROTATION;}
+    v=stn_identity_verify(old_id,statement,n,rotation+65,64);return v==STN_IDENTITY_VALID?STN_AUTHORITY_VALID_ROTATION:v==STN_IDENTITY_MALFORMED?STN_AUTHORITY_MALFORMED_ROTATION:STN_AUTHORITY_INVALID_ROTATION;
+}
+void stn_identity_rotation_initialize(stn_identity_rotation_state *state,const uint8_t initial[32])
+{
+    if(state!=NULL){memset(state,0,sizeof(*state));if(initial!=NULL && stn_identity_derive(initial,state->initial_identity)==STN_IDENTITY_VALID){memcpy(state->current_identity,state->initial_identity,32);}}
+}
+stn_identity_rotation_result stn_identity_rotation_apply(stn_identity_rotation_state *state,const uint8_t *rotation,size_t length,const uint8_t *roots,size_t count)
+{
+    uint8_t old_id[32],new_id[32];stn_identity_rotation_result r;if(state==NULL){return STN_AUTHORITY_MALFORMED_ROTATION;}r=stn_identity_rotation_validate(rotation,length,state,roots,count);if(r!=STN_AUTHORITY_VALID_ROTATION){return r;}memcpy(old_id,rotation+1,32);memcpy(new_id,rotation+33,32);if(memcmp(state->current_identity,new_id,32)==0){return STN_AUTHORITY_VALID_ROTATION;}if(state->rotation_count==STN_AUTHORITY_MAX_ROTATIONS){return STN_AUTHORITY_INVALID_ROTATION;}memcpy(state->old_identities[state->rotation_count],old_id,32);memcpy(state->new_identities[state->rotation_count],new_id,32);memcpy(state->current_identity,new_id,32);++state->rotation_count;return STN_AUTHORITY_VALID_ROTATION;
+}
+stn_identity_rotation_result stn_identity_rotation_current(const stn_identity_rotation_state *state,uint8_t current[32])
+{
+    if(state==NULL || current==NULL || state->rotation_count>STN_AUTHORITY_MAX_ROTATIONS || stn_identity_derive(state->current_identity,current)!=STN_IDENTITY_VALID){return STN_AUTHORITY_MALFORMED_ROTATION;}return STN_AUTHORITY_VALID_ROTATION;
+}
 stn_authority_result stn_authority_evidence_encode(const uint8_t subject[32],const uint8_t action[32],const uint8_t context[32],uint8_t *evidence,size_t capacity,size_t *written)
 {
     uint8_t identity[32];
