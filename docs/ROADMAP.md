@@ -456,3 +456,12 @@ are idempotent while conflicting successors and cycles fail closed. Genesis-root
 succession is rejected, authority grants do not migrate implicitly, and
 historical signatures remain tied to historical identities. Block 6 was not
 started.
+
+### Block 6 — deterministic signed-action replay protection foundation COMPLETE (2026-09-11)
+
+Replay protection reuses the existing signer-plus-record-nonce rule. The fixed
+64-byte replay identity is deterministic and portable; state consumption is
+explicitly caller-controlled after accepted-state publication. Fresh, replay,
+and malformed results are distinct, and state reconstruction follows accepted
+history rather than pending contents or a local cache. Grant, revocation, and
+rotation semantics remain intact. Block 7 was not started.

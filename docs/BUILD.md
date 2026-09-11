@@ -356,6 +356,14 @@ duplicate/conflict handling, cycle rejection, root-rotation rejection, and
 current-identity reconstruction. Historical signature and grant behavior remain
 separate from current identity state.
 
+## Phase 14 Block 6 — signed-action replay protection
+
+The Release/x64 test executable qualifies canonical signer/nonce replay IDs,
+fresh versus replay results, accepted-state-only consumption, reconstruction,
+malformed inputs, and caller-owned state capacity handling. Existing grant,
+revocation, and rotation lifecycle tests remain part of the same regression
+gate; production transaction/history integration remains deferred.
+
 ## Phase 13 Block 6 — deterministic shutdown
 
 The Release/x64 build includes listener-close-before-worker-join shutdown

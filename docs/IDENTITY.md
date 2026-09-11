@@ -81,3 +81,15 @@ Genesis roots cannot be rotated by this primitive. Existing grants remain bound
 to their original subject and revoked grants remain revoked. **Rotation Does
 Not Rewrite History.** **Historical Identity ≠ Current Active Identity.**
 **Identity Rotation ≠ Authority Inheritance.**
+
+## Signed-action replay protection
+
+Phase 14 Block 6 uses the existing record rule: the canonical replay
+discriminator is the signer identity plus the required nonzero 32-byte record
+nonce. The replay identity is the fixed 64-byte concatenation of those canonical
+values. State is caller-owned and is consumed only after accepted-state
+publication; submission, pending admission, signature verification, authority
+evaluation, and peer receipt do not consume it. Rebuilding from the accepted
+history produces the same fresh/replay result, and replacing the accepted
+history rebuilds the replay state accordingly. **Replay of Accepted Evidence ≠
+New Authorized Action.** **Submitted ≠ Pending ≠ Accepted.**

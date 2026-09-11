@@ -501,3 +501,13 @@ produce a valid revocation for that grant. Accepted-state reconstruction keeps
 revocation monotonic for the active history, while reorganization rebuilds the
 set from the replacement history. No local blacklist, immediate pending effect,
 or persisted trust cache is authoritative.
+
+## Phase 14 Block 6 — signed-action replay protection
+
+Replay protection reuses the existing record nonce rule rather than introducing
+a counter, timestamp, UUID, or wallet sequence. A replay identity is exactly
+the canonical signer public key followed by its nonzero 32-byte record nonce.
+The portable state is caller-owned accepted-history state; consuming an unseen
+identity marks it FRESH, while a consumed identity returns REPLAY. Pending and
+submitted evidence do not mutate this state. Reorganization and restart rebuild
+the state by replaying the applicable accepted history.

@@ -4,6 +4,16 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 14 Block 6 — deterministic signed-action replay protection — 2026-09-11
+
+- Added the portable replay primitive using the existing canonical signer plus
+  nonzero 32-byte record nonce discriminator. Replay state is caller-owned and
+  consumed only after accepted-state publication.
+- Added deterministic FRESH, REPLAY, and MALFORMED results with reconstruction
+  from accepted history. Pending, submission, transport, signature, and
+  authority checks do not consume replay state. Phase 14 Block 7 was not
+  started. No commit or push.
+
 ### Phase 14 Block 5 — deterministic identity/key rotation foundation — 2026-09-11
 
 - Added a fixed 129-byte identity rotation record and the dedicated
