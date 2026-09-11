@@ -37,3 +37,19 @@ or was produced by mining. **Signature ≠ Authority.** Authority is explicit,
 scoped, deterministic, and fail-closed. This block defines no organizational
 roles, policy taxonomy, delegation, rotation, revocation, wallet, or contract
 lifecycle.
+
+## Authority-grant provenance
+
+Phase 14 Block 3 defines the genesis-declared authority root set. Roots are
+canonical 32-byte public keys in ascending order, with no duplicates and a
+maximum of 16 entries. Root status grants only `ISSUE_AUTHORITY_GRANT` and is
+not inferred from organizational ownership, mining, peers, transport, or local
+configuration.
+
+The canonical grant envelope is 194 bytes: version, issuer identity, the
+canonical 97-byte Block 2 authority evidence, and one 64-byte signature. Its
+signing statement is the domain `STN-CHAIN:AUTHORITY:GRANT:1`, a zero byte, the
+grant version, issuer, and evidence. A grant is valid only when its signature
+verifies and its issuer is present in the applicable genesis root set. A valid
+issuer signature without root authority is an invalid grant. No recursive
+delegation, rotation, revocation, expiry, or local root override is defined.

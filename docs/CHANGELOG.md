@@ -4,6 +4,18 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 14 Block 3 — authority evidence provenance and grant validation — 2026-09-10
+
+- Added genesis-declared authority roots as a bounded, sorted set of canonical
+  public keys. Root status is scoped only to `ISSUE_AUTHORITY_GRANT`.
+- Added the canonical 194-byte grant envelope and the dedicated
+  `STN-CHAIN:AUTHORITY:GRANT:1` signing domain. Grant validation separates
+  canonical parsing, issuer signature verification, and root recognition.
+- Only VALID_GRANT evidence reaches Block 2 authority evaluation. A valid
+  signature from a non-root remains INVALID_GRANT; no delegation, rotation,
+  revocation, local override, or unrelated wire/storage change was added.
+- Phase 14 Block 4 was not started. No commit or push.
+
 ### Phase 14 Block 2 — deterministic authority evaluation foundation — 2026-09-10
 
 - Added a portable, bounded authority evaluator using the Block 1 canonical

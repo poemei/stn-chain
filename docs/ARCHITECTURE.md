@@ -471,3 +471,14 @@ unauthorized and malformed or unsupported evidence fails closed. The primitive
 does not infer authority from signatures, transport, storage, mining, peers, or
 STN-LABZ participation, and does not implement organizational policy or
 contracts.
+
+## Phase 14 Block 3 — authority-grant provenance
+
+Genesis declares a bounded, sorted authority-root set of canonical public keys.
+Only those roots may issue grants, and only for `ISSUE_AUTHORITY_GRANT`. A
+canonical 194-byte grant signs exactly one Block 2 evidence record with the
+dedicated `STN-CHAIN:AUTHORITY:GRANT:1` domain. Parsing, signature verification,
+and root recognition remain separate stages. A valid issuer signature from a
+non-root is an INVALID_GRANT and cannot feed Block 2; only VALID_GRANT evidence
+may proceed to authority evaluation. No delegation or key lifecycle behavior
+is introduced.

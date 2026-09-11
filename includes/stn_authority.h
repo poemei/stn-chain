@@ -9,12 +9,22 @@
 #define STN_AUTHORITY_CONTEXT_SIZE 32u
 #define STN_AUTHORITY_EVIDENCE_SIZE 97u
 #define STN_AUTHORITY_VERSION 1u
+#define STN_AUTHORITY_MAX_ROOTS 16u
+#define STN_AUTHORITY_GRANT_SIZE 194u
+#define STN_AUTHORITY_GRANT_DOMAIN "STN-CHAIN:AUTHORITY:GRANT:1"
+#define STN_AUTHORITY_GRANT_DOMAIN_SIZE 28u
 
 typedef enum stn_authority_result {
     STN_AUTHORITY_AUTHORIZED=0,
     STN_AUTHORITY_UNAUTHORIZED,
     STN_AUTHORITY_MALFORMED
 } stn_authority_result;
+
+typedef enum stn_authority_grant_result {
+    STN_AUTHORITY_VALID_GRANT=0,
+    STN_AUTHORITY_INVALID_GRANT,
+    STN_AUTHORITY_MALFORMED_GRANT
+} stn_authority_grant_result;
 
 /* Action and context are opaque, fixed-width, versioned tokens. Their
  * meanings are assigned by later protocol phases; this primitive compares
@@ -23,6 +33,31 @@ stn_authority_result stn_authority_action_validate(
     const uint8_t action[STN_AUTHORITY_ACTION_SIZE]);
 stn_authority_result stn_authority_context_validate(
     const uint8_t context[STN_AUTHORITY_CONTEXT_SIZE]);
+
+stn_authority_result stn_authority_evidence_validate(
+    const uint8_t *evidence, size_t evidence_length);
+
+/* Roots are the canonical genesis-declared public-key set, sorted ascending
+ * with no duplicates. A zero-count set is valid and grants no issuer power. */
+stn_authority_result stn_authority_root_set_validate(
+    const uint8_t *roots, size_t root_count);
+
+stn_authority_grant_result stn_authority_grant_statement(
+    const uint8_t issuer[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    const uint8_t evidence[STN_AUTHORITY_EVIDENCE_SIZE],
+    uint8_t *statement, size_t capacity, size_t *written);
+
+stn_authority_grant_result stn_authority_grant_encode(
+    const uint8_t issuer[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    const uint8_t evidence[STN_AUTHORITY_EVIDENCE_SIZE],
+    const uint8_t signature[STN_IDENTITY_SIGNATURE_SIZE],
+    uint8_t *grant, size_t capacity, size_t *written);
+
+/* Only a root listed in the applicable genesis root set may issue a grant. */
+stn_authority_grant_result stn_authority_grant_validate(
+    const uint8_t *grant, size_t grant_length,
+    const uint8_t *genesis_roots, size_t root_count,
+    uint8_t evidence[STN_AUTHORITY_EVIDENCE_SIZE]);
 
 /* Canonical evidence: version || subject identity || action || context. */
 stn_authority_result stn_authority_evidence_encode(

@@ -332,6 +332,14 @@ missing authority, malformed/truncated/oversized/unsupported evidence, and the
 separation between valid signatures and authority. No additional platform
 provider or authority service is required.
 
+## Phase 14 Block 3 — authority-grant provenance
+
+The Release/x64 test executable qualifies canonical 194-byte grants, the
+genesis root set, the dedicated signing domain, valid root-issued grants,
+non-root issuers, signature/content mutations, malformed lengths, and Block 2
+composition. Test roots are explicit fixtures; production does not receive a
+default or local-configured root.
+
 ## Phase 13 Block 6 — deterministic shutdown
 
 The Release/x64 build includes listener-close-before-worker-join shutdown

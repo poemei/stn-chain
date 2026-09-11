@@ -4,6 +4,7 @@
 #include "stn_block.h"
 #include "stn_validation.h"
 #include "stn_pow.h"
+#include "stn_authority.h"
 
 #define STN_CHAIN_MAX_BATCH 64u
 
@@ -11,6 +12,9 @@ typedef struct stn_chain_context {
     uint8_t network_id[32];
     const uint8_t *genesis_bytes; /* Exact externally selected development anchor. */
     size_t genesis_length;
+    /* Canonical genesis-declared authority roots, sorted public keys. */
+    const uint8_t *genesis_authority_roots;
+    size_t genesis_authority_root_count;
     stn_hash_provider hash_provider;
     /* NULL selects legacy v1 development-only profile (no PoW/work).
      * Non-NULL strictly requires v3 blocks, including genesis. No downgrade. */

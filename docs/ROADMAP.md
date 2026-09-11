@@ -427,3 +427,13 @@ AUTHORIZED, UNAUTHORIZED, or MALFORMED; absent authority is unauthorized and
 malformed or unsupported evidence fails closed. Signature validity does not
 confer authority. No organizational policy, contract lifecycle, wire change,
 storage authority database, or Block 3 work was introduced.
+
+### Block 3 — authority evidence provenance and grant validation COMPLETE (2026-09-10)
+
+The applicable genesis definition now supplies a bounded, sorted public-key
+root set through the chain context. Only listed roots may issue the dedicated
+`ISSUE_AUTHORITY_GRANT` capability. Canonical 194-byte grants sign exactly one
+Block 2 evidence record under `STN-CHAIN:AUTHORITY:GRANT:1`; signature validity
+and issuer root authority are evaluated separately. Only VALID_GRANT evidence
+can feed Block 2. Recursive delegation and key lifecycle remain undefined.
+Block 4 was not started.

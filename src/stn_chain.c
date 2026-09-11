@@ -38,6 +38,7 @@ static stn_data_status context_valid(const stn_chain_context *c)
 {
     stn_block b;
     if (c==NULL || c->genesis_bytes==NULL) { return STN_DATA_ARGUMENT; }
+    if(stn_authority_root_set_validate(c->genesis_authority_roots,c->genesis_authority_root_count)!=STN_AUTHORITY_AUTHORIZED){return STN_DATA_CONTENT;}
     if (stn_block_decode(c->genesis_bytes,c->genesis_length,&b)!=STN_DATA_OK ||
         b.header.height!=0 || memcmp(b.header.network_id,c->network_id,32)!=0) { return STN_DATA_CONTENT; }
     if(c->pow_policy!=NULL) {
