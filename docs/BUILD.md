@@ -324,6 +324,14 @@ mutation/wrong-key rejection, malformed lengths, noncanonical encodings, and
 fail-closed behavior. The provider is vendored under `src/crypto/` and uses no
 network or runtime service dependency.
 
+## Phase 14 Block 2 — deterministic authority foundation
+
+The Release/x64 test executable includes the authority suite. It qualifies
+canonical identity/action/context/evidence handling, exact scope matching,
+missing authority, malformed/truncated/oversized/unsupported evidence, and the
+separation between valid signatures and authority. No additional platform
+provider or authority service is required.
+
 ## Phase 13 Block 6 — deterministic shutdown
 
 The Release/x64 build includes listener-close-before-worker-join shutdown

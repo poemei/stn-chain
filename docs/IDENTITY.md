@@ -25,3 +25,15 @@ The current provider is the isolated public-domain Ed25519-donna implementation
 under `src/crypto/ed25519_donna/`. It is compiled behind `stn_identity` and
 does not expose provider-native formats. Private keys are not stored or logged.
 Other platform providers must reproduce the same canonical acceptance profile.
+
+## Authority boundary
+
+Phase 14 Block 2 supplies a separate deterministic authority primitive. Its
+subject is this same canonical public-key identity. Authority evidence grants a
+versioned, fixed-width action token in a versioned context token; the evaluator
+compares subject, action, and context exactly. Evidence is not accepted because
+it arrived through a trusted transport, was persisted, was signed by somebody,
+or was produced by mining. **Signature ≠ Authority.** Authority is explicit,
+scoped, deterministic, and fail-closed. This block defines no organizational
+roles, policy taxonomy, delegation, rotation, revocation, wallet, or contract
+lifecycle.

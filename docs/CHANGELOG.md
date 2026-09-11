@@ -4,6 +4,19 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 14 Block 2 — deterministic authority evaluation foundation — 2026-09-10
+
+- Added a portable, bounded authority evaluator using the Block 1 canonical
+  public-key identity, fixed versioned action/context tokens, and canonical
+  subject/action/context evidence.
+- Added explicit AUTHORIZED, UNAUTHORIZED, and MALFORMED results. Missing
+  evidence is unauthorized; malformed, unsupported, truncated, oversized, and
+  out-of-scope evidence fails closed. Signature validity remains separate from
+  authority, with no transport, mining, peer, storage, or STN-LABZ trust.
+- Added authority qualification and preserved the existing consensus, wire,
+  persistence, RPC, P2P, and mining boundaries. Phase 14 Block 3 was not
+  started. No commit or push.
+
 ### Phase 14 Block 1 — production identity and signature foundation — 2026-09-10
 
 - Authorized O-003 and added canonical 32-byte public-key identity, fixed

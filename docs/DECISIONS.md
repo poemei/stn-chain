@@ -96,7 +96,7 @@ compatibility or activation. O-004 and O-018 must define that relationship.
 | --- | --- | --- |
 | O-001 | [C17 with native Visual Studio projects and a separate Unix build path](TOOLCHAIN_PROPOSAL.md) | Windows C17 scaffold implemented; Unix builds and minimum supported tool versions remain open |
 | O-002 | [Fixed-order record envelope](ENCODING_PROPOSAL.md) and [transaction/block containers](TRANSACTION_BLOCK_FORMAT.md) | Development codecs implemented/tested; final protocol budgets and activation remain open |
-| O-003 | SHA-256 IDs and PureEd25519, with a replaceable crypto provider | Authorized for Phase 14 Block 1; canonical 32-byte keys, 64-byte R||S signatures, strict RFC 8032 acceptance, and the isolated public-domain provider are qualified |
+| O-003 | SHA-256 IDs and PureEd25519, with a replaceable crypto provider | Authorized for Phase 14 Blocks 1–2; canonical 32-byte keys, 64-byte R||S signatures, strict RFC 8032 acceptance, isolated public-domain provider, and separate explicit authority evaluation are qualified |
 | O-006/O-007 | [Signed intelligence exercise](SIGNED_RECORD_PROPOSAL.md) | Development payload codec implemented/tested; production provenance, corrections, actual API, and source-attestation contract still open |
 
 ## Next design increment

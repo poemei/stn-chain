@@ -460,3 +460,14 @@ statement construction, bounded 64-byte signatures, and explicit verification
 results. The Ed25519-donna provider is isolated behind the identity API; native
 provider formats do not enter protocol data. Signature validity is evidence of
 key control only and does not answer authority.
+
+## Phase 14 Block 2 — deterministic authority foundation
+
+Authority consumes the Block 1 public-key identity plus fixed 32-byte versioned
+action and context tokens. Canonical evidence is exactly a version byte,
+subject identity, action token, and context token. Evaluation returns
+AUTHORIZED, UNAUTHORIZED, or MALFORMED by exact comparison; absent evidence is
+unauthorized and malformed or unsupported evidence fails closed. The primitive
+does not infer authority from signatures, transport, storage, mining, peers, or
+STN-LABZ participation, and does not implement organizational policy or
+contracts.

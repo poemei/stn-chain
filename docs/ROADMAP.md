@@ -417,3 +417,13 @@ signing statement, strict 64-byte PureEd25519 signatures, deterministic
 verification results, and fail-closed malformed/invalid handling. Signature
 validity remains separate from authority. The isolated public-domain provider
 is qualified only on Windows Release/x64; Block 2 was not started.
+
+### Block 2 — deterministic authority evaluation foundation COMPLETE (2026-09-10)
+
+Authority evaluation now consumes the Block 1 canonical identity and exact
+versioned action/context tokens. Canonical evidence is bounded and scoped to
+subject, action, and context. Evaluation is deterministic and returns
+AUTHORIZED, UNAUTHORIZED, or MALFORMED; absent authority is unauthorized and
+malformed or unsupported evidence fails closed. Signature validity does not
+confer authority. No organizational policy, contract lifecycle, wire change,
+storage authority database, or Block 3 work was introduced.
