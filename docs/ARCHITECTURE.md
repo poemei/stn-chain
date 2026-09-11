@@ -228,10 +228,12 @@ failure). Record-validation details remain available in the existing report;
 later replay/store failures are conveyed by the returned admission result.
 Unsupported transaction, record, or intelligence versions fail closed.
 
-Signature and authority enforcement uses supplied validation hooks; no production
-Ed25519 or authority provider is implemented by this increment. Missing hooks
-cannot admit data. Positive admission tests use explicitly scripted hooks and
-production SHA-256, proving orchestration rather than signature qualification.
+Signature and authority enforcement uses supplied validation hooks; this pending
+admission increment did not wire a production identity or authority provider.
+Missing hooks cannot admit data. Positive admission tests use explicitly scripted
+hooks and production SHA-256, proving orchestration rather than signature or
+authority qualification. Phase 14 Block 1 now supplies the isolated identity
+and signature foundation; admission wiring and authority remain later work.
 Existing integration work is preserved; this increment adds no RPC, mining,
 assembly, gossip, or pending-persistence integration.
 
@@ -450,3 +452,11 @@ dispatch, status, request association, and ownership policy sit above
 platform-specific sockets, workers, deadlines, and shutdown. Final integration
 qualification found no Windows coupling in portable `includes/` or `src/`, and
 Phase 14 identity/authority work remains outside this phase.
+
+## Phase 14 Block 1 — identity/signature foundation
+
+Portable identity semantics use canonical 32-byte public keys, fixed signing
+statement construction, bounded 64-byte signatures, and explicit verification
+results. The Ed25519-donna provider is isolated behind the identity API; native
+provider formats do not enter protocol data. Signature validity is evidence of
+key control only and does not answer authority.

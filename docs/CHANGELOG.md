@@ -4,6 +4,17 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 14 Block 1 — production identity and signature foundation — 2026-09-10
+
+- Authorized O-003 and added canonical 32-byte public-key identity, fixed
+  domain-separated signing statements, strict 64-byte PureEd25519 verification,
+  and explicit valid/invalid/malformed results.
+- Added a narrowly scoped public-domain Ed25519-donna provider isolated behind
+  the identity API. Malformed keys/signatures, noncanonical encodings, and
+  invalid signatures fail closed; no private keys are persisted or logged.
+- Identity qualification: 14 checks, zero failures. Full Chain C regressions
+  remain passing; Phase 14 Block 2 was not started. No commit or push.
+
 ### Phase 13 Block 8 — final RPC integration qualification and closeout — 2026-09-10
 
 - Final integration qualification confirms Blocks 1–7 compose without an

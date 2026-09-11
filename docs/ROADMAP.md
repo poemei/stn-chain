@@ -406,3 +406,14 @@ Phase 13 is complete for the qualified Windows Release/x64 environment. The
 next authorized phase is **Phase 14 — Production Identity / Signatures /
 Authority**. No Phase 14 implementation was started, and no other platform or
 production-security qualification is claimed.
+
+## Phase 14 — Production Identity / Signatures / Authority — ACTIVE
+
+### Block 1 — Production identity and signature foundation COMPLETE (2026-09-10)
+
+O-003 is authorized for Phase 14 Block 1. The production foundation uses the
+canonical 32-byte Ed25519 public key as identity, a fixed domain-prefixed
+signing statement, strict 64-byte PureEd25519 signatures, deterministic
+verification results, and fail-closed malformed/invalid handling. Signature
+validity remains separate from authority. The isolated public-domain provider
+is qualified only on Windows Release/x64; Block 2 was not started.

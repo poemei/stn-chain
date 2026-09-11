@@ -316,6 +316,14 @@ pending-RPC runs with the full Chain C executable and existing Phase 9–12 and
 Stratum evidence. Windows Release/x64 remains the only qualified execution
 environment; Phase 14 was not started.
 
+## Phase 14 Block 1 — identity/signature foundation
+
+Build Release/x64 and run `stn-chain-tests.exe`. The identity suite covers the
+RFC 8032 vector, canonical identity derivation, statement construction,
+mutation/wrong-key rejection, malformed lengths, noncanonical encodings, and
+fail-closed behavior. The provider is vendored under `src/crypto/` and uses no
+network or runtime service dependency.
+
 ## Phase 13 Block 6 — deterministic shutdown
 
 The Release/x64 build includes listener-close-before-worker-join shutdown

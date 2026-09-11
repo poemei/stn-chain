@@ -156,6 +156,7 @@ int test_portability(void);
 int test_rpc(void);
 int test_mining(void);
 int test_pending(void);
+int test_identity(void);
 
 int main(void)
 {
@@ -171,6 +172,7 @@ int main(void)
     int rpc_failed;
     int mining_failed;
     int pending_failed;
+    int identity_failed;
     known_bytes(); malformed(); boundaries(); encode_failure();
     printf("Record codec: %u checks, %u failures.\n", checks, failures);
     intelligence_failed = test_intelligence();
@@ -185,5 +187,6 @@ int main(void)
     rpc_failed = test_rpc();
     mining_failed = test_mining();
     pending_failed = test_pending();
-    return failures == 0 && !intelligence_failed && !validation_failed && !chain_data_failed && !chain_failed && !pow_failed && !fork_failed && !storage_failed && !peer_failed && !portability_failed && !rpc_failed && !mining_failed && !pending_failed ? EXIT_SUCCESS : EXIT_FAILURE;
+    identity_failed = test_identity();
+    return failures == 0 && !intelligence_failed && !validation_failed && !chain_data_failed && !chain_failed && !pow_failed && !fork_failed && !storage_failed && !peer_failed && !portability_failed && !rpc_failed && !mining_failed && !pending_failed && !identity_failed ? EXIT_SUCCESS : EXIT_FAILURE;
 }

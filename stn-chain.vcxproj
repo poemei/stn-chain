@@ -67,6 +67,8 @@
     <ClInclude Include="src\stn_wire_internal.h" />
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\stn_record.c" />
+    <ClCompile Include="src\stn_identity.c" />
+    <ClCompile Include="src\crypto\ed25519_donna\ed25519_provider.c" />
     <ClCompile Include="src\stn_intelligence.c" />
     <ClCompile Include="src\stn_validation.c" />
     <ClCompile Include="src\stn_block.c" />
@@ -82,6 +84,7 @@
     <ClInclude Include="includes\stn_validation.h" />
     <ClInclude Include="includes\stn_intelligence.h" />
     <ClInclude Include="includes\stn_record.h" />
+    <ClInclude Include="includes\stn_identity.h" />
     <None Include="platforms\README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

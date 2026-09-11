@@ -61,12 +61,15 @@
     <ClInclude Include="includes\stn_platform.h" />
     <ClInclude Include="src\stn_wire_internal.h" />
     <ClCompile Include="tests\test_record.c" />
+    <ClCompile Include="tests\test_identity.c" />
     <ClCompile Include="tests\test_intelligence.c" />
     <ClCompile Include="tests\test_validation.c" />
     <ClCompile Include="tests\test_chain_data.c" />
     <ClCompile Include="tests\test_chain.c" />
     <ClCompile Include="tests\test_pow.c" /><ClCompile Include="tests\test_fork.c" />
     <ClCompile Include="src\stn_record.c" />
+    <ClCompile Include="src\stn_identity.c" />
+    <ClCompile Include="src\crypto\ed25519_donna\ed25519_provider.c" />
     <ClCompile Include="src\stn_intelligence.c" />
     <ClCompile Include="src\stn_validation.c" />
     <ClCompile Include="src\stn_block.c" />
@@ -82,6 +85,7 @@
     <ClInclude Include="includes\stn_validation.h" />
     <ClInclude Include="includes\stn_intelligence.h" />
     <ClInclude Include="includes\stn_record.h" />
+    <ClInclude Include="includes\stn_identity.h" />
     <None Include="platforms\README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
