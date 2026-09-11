@@ -1,6 +1,6 @@
 # Copyright (c) 2026 STN-Labz. See docs/LICENSE.md.
 # Real executable / TCP / CNG / NTFS integration. No mining search loop.
-param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly, [switch]$LibraryOnly, [switch]$OutboundOnly, [switch]$DiscoveryOnly)
+param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly, [switch]$LibraryOnly, [switch]$OutboundOnly, [switch]$DiscoveryOnly, [switch]$FramingOnly)
 $ErrorActionPreference = 'Stop'
 $script:checks = 0
 function Check($condition, $message) {
@@ -26,16 +26,17 @@ function ReadExact($stream, [int]$n) {
     }
     return ,$b
 }
-function Request($stream, [int]$method, [byte[]]$payload, [int]$version = 2) {
+function Request($stream, [int]$method, [byte[]]$payload, [int]$version = 2, [UInt64]$id = 123, [switch]$VerifyId) {
     $frame = [byte[]]([Text.Encoding]::ASCII.GetBytes('STNC') + (NumberBytes $version 2) +
         (NumberBytes 1 2) + (NumberBytes $method 2) + (NumberBytes 0 2) +
-        (NumberBytes 123 8) + (NumberBytes $payload.Length 4) + $payload)
+        (NumberBytes $id 8) + (NumberBytes $payload.Length 4) + $payload)
     # Fragment the header deliberately; exact-read transport must reassemble it.
     $stream.Write($frame, 0, 7); $stream.Write($frame, 7, $frame.Length - 7)
     $header = ReadExact $stream 24
     Check ([Text.Encoding]::ASCII.GetString($header, 0, 4) -eq 'STNC') 'response magic'
     $n = ReadNumber $header[20..23]
     Check ($n -le 1051948) 'response bounded'
+    if ($VerifyId) { Check ((ReadNumber $header[12..19]) -eq $id) 'response request association' }
     return @{ Code = (ReadNumber $header[10..11]); Payload = (ReadExact $stream ([int]$n)) }
 }
 function StartNode([string]$data, [bool]$once = $true, [string]$genesis = '', [int]$rpcPort = 0, [string]$peer = '') {
@@ -98,6 +99,30 @@ try {
     $anchor = Request $node.Stream 2 (NumberBytes 0 8)
     Check ($anchor.Code -eq 0 -and $anchor.Payload.Length -eq 364) 'explicit normal-mode genesis'
     [IO.File]::WriteAllBytes($genesisPath, $anchor.Payload)
+    if ($FramingOnly) {
+        $node.Client.Close(); Check ($node.Process.WaitForExit(5000)) 'bootstrap stopped'
+        $node=StartNode $data $false $genesisPath
+        $partial=[byte[]]([Text.Encoding]::ASCII.GetBytes('STNC')+(NumberBytes 2 2)+
+            (NumberBytes 1 2)+(NumberBytes 1 2)+(NumberBytes 0 2)+
+            (NumberBytes 123 8)+(NumberBytes 8 4)+(NumberBytes 70 8))
+        $client=[Net.Sockets.TcpClient]::new('127.0.0.1',$node.Port)
+        $client.ReceiveTimeout=10000;$script:clients+=$client
+        $client.GetStream().Write($partial,0,25)
+        $r=Request $node.Stream 1 @() 2 7001 -VerifyId;Check ($r.Code -eq 0) 'healthy session remains usable during incomplete frame'
+        $closed=[Net.Sockets.TcpClient]::new('127.0.0.1',$node.Port)
+        $script:clients+=$closed;$closed.GetStream().Write($partial,0,5);$closed.Dispose()
+        $r=Request $node.Stream 1 @() 2 7002 -VerifyId;Check ($r.Code -eq 0) 'healthy session survives incomplete-header disconnect'
+        $r=Request $node.Stream 0xffff @() 2 7004 -VerifyId;Check ($r.Code -eq 3) 'unsupported opcode is deterministic'
+        $r=Request $node.Stream 1 ([byte[]]@(1)) 2 7005;Check ($r.Code -eq 1) 'malformed complete request is deterministic'
+        $r=Request $node.Stream 1 @() 2 7006 -VerifyId;Check ($r.Code -eq 0) 'valid request follows protocol errors'
+        Start-Sleep -Seconds 61
+        $timedOut=$false
+        try {[void](ReadExact $client.GetStream() 1)} catch {$timedOut=$true}
+        Check $timedOut 'incomplete frame session closes at bounded deadline'
+        $r=Request $node.Stream 1 @() 2 7003 -VerifyId;Check ($r.Code -eq 0) 'healthy session survives incomplete frame deadline'
+        Write-Output "RPC framing executable: $script:checks checks, 0 failures."
+        return
+    }
     if ($DiscoveryOnly) {
         $node.Client.Close();Check ($node.Process.WaitForExit(5000)) 'bootstrap stopped'
         $peerA=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
@@ -281,21 +306,21 @@ try {
         $r = Request $client.GetStream() 1 @(); Check ($r.Code -eq 0) 'connection churn'
         $client.Dispose()
     }
-    # A frame header and one payload byte have arrived. Crossing the transport's
-    # idle poll must retain that frame, while a second healthy session stays alive.
+    # A frame header and one payload byte have arrived. The bounded frame
+    # deadline must terminate the incomplete session, while a second healthy
+    # session stays alive and remains usable.
     $idle = [Net.Sockets.TcpClient]::new('127.0.0.1', $node.Port)
     $script:clients += $idle; $idle.ReceiveTimeout = 10000
     $partial = [byte[]]([Text.Encoding]::ASCII.GetBytes('STNC') + (NumberBytes 2 2) +
         (NumberBytes 1 2) + (NumberBytes 2 2) + (NumberBytes 0 2) +
         (NumberBytes 123 8) + (NumberBytes 8 4) + (NumberBytes 70 8))
-    $node.Stream.Write($partial, 0, 25)
+    $idle.GetStream().Write($partial, 0, 25)
+    $r = Request $node.Stream 1 @(); Check ($r.Code -eq 0) 'healthy session remains usable during incomplete frame'
     Start-Sleep -Seconds 61
-    $r = Request $idle.GetStream() 1 @(); Check ($r.Code -eq 0) 'idle session survives 60 seconds'
-    $node.Stream.Write($partial, 25, 7)
-    $h = ReadExact $node.Stream 24
-    Check ((ReadNumber $h[10..11]) -eq 0 -and (ReadNumber $h[20..23]) -eq 364) 'partial frame retained across idle timeout'
-    $block = ReadExact $node.Stream 364
-    Check ((ReadNumber $block[72..79]) -eq 70) 'partial request correct block'
+    $timedOut = $false
+    try { [void](ReadExact $idle.GetStream() 1) } catch { $timedOut = $true }
+    Check $timedOut 'incomplete frame session closes at bounded deadline'
+    $r = Request $node.Stream 1 @(); Check ($r.Code -eq 0) 'healthy session survives incomplete frame deadline'
     $idle.Dispose()
     $node.Client.Dispose(); $node.Process.Kill(); $node.Process.WaitForExit()
     $node = StartNode $data

@@ -2,6 +2,14 @@
 #include "stn_rpc.h"
 #include "stn_wire_internal.h"
 #include <string.h>
+stn_rpc_code stn_rpc_payload_length(const uint8_t *p,size_t n,size_t *payload_length)
+{
+    size_t declared;
+    if(p==NULL || payload_length==NULL || n!=STN_RPC_HEADER_SIZE){return STN_RPC_INVALID;}
+    declared=(size_t)stn_wire_read(p+20,4);
+    if(declared>STN_RPC_MAX_PAYLOAD){return STN_RPC_CAPACITY;}
+    *payload_length=declared;return STN_RPC_OK;
+}
 static uint32_t capability(uint16_t method)
 {
     switch(method){

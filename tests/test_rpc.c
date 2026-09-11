@@ -30,6 +30,10 @@ static void codecs(void)
     static const uint8_t independent[24]={'S','T','N','C',0,2,0,1,0,1,0,0,1,2,3,4,5,6,7,8,0,0,0,0};
     stn_rpc_message q,before,r;size_t n,w,i;spy s={0};stn_rpc_service service={&s,handler};uint8_t copy[64];
     CHECK(stn_rpc_decode(independent,24,&q)==STN_RPC_OK && q.kind==1 && q.method==1 && q.request_id==UINT64_C(0x0102030405060708));
+    CHECK(stn_rpc_payload_length(independent,24,&n)==STN_RPC_OK && n==0);
+    CHECK(stn_rpc_payload_length(independent,23,&n)==STN_RPC_INVALID);
+    memcpy(copy,independent,24);memset(copy+20,0xff,4);
+    CHECK(stn_rpc_payload_length(copy,24,&n)==STN_RPC_CAPACITY);
     CHECK(stn_rpc_encode(&q,copy,sizeof(copy),&n)==STN_RPC_OK && n==24 && memcmp(copy,independent,24)==0);before=q;
     for(i=0;i<24;++i){
         CHECK(stn_rpc_decode(independent,i,&q)!=STN_RPC_OK && memcmp(&q,&before,sizeof(q))==0);

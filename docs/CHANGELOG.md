@@ -4,6 +4,56 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 13 Block 4 — deterministic protocol error behavior — 2026-09-10
+
+- Qualified existing STNC status handling for unsupported methods and malformed
+  complete requests, including request-ID association and valid-request
+  continuation after protocol errors.
+- Transport failures remain session failures and are not converted into
+  protocol status values. No wire fields, status codes, consensus behavior, or
+  authority behavior changed.
+- Focused framing qualification now covers 33 checks with zero failures.
+  Block 5 and Phase 14 were not started; no commit or push was performed.
+
+### Phase 13 Block 3 — complete-frame session continuity — 2026-09-10
+
+- Qualified sequential complete-frame handling and response association within
+  one RPC session. Each request completes its bounded response before the next
+  header is read; request/response state remains session-local.
+- Added 33 focused framing checks covering distinct request IDs, repeated
+  requests, deterministic unsupported and malformed request errors,
+  incomplete-header disconnect, Block 2 deadline behavior, and an independent
+  healthy client. All passed.
+- No STNC wire, parser, dispatch, consensus, authority, or protocol-layout
+  changes. Block 4 and Phase 14 were not started; no commit or push was done.
+
+### Phase 13 Block 2 — bounded incomplete-frame sessions — 2026-09-10
+
+- Added per-frame 60-second deadlines to Windows RPC header, payload and response
+  transfers. Partial, stalled, disconnected or failed frames now terminate and
+  clean up only their owning session while independent clients remain usable.
+- Short-read reassembly, Block 1 payload preflight, protocol layout, consensus,
+  storage, pending state and authority behavior are unchanged.
+- Added the focused `-FramingOnly` runtime qualification: 22 checks, zero
+  failures. Windows Release/x64 completed with zero warnings, errors and
+  failures. Block 3 and Phase 14 were not started; no commit or push was
+  performed.
+
+### Phase 13 Block 1 — RPC framing preflight baseline — 2026-09-10
+
+- Added portable `stn_rpc_payload_length` preflight for the fixed 24-byte STNC
+  header. It bounds the declared payload before stream reads while preserving
+  existing magic, version, method, shape, error and response semantics.
+- Applied the preflight to both runnable Windows RPC session loops. Oversized
+  declarations fail before payload reads; malformed, slow, partial, concurrent,
+  repeated and disconnected session behavior remains bounded and isolated.
+- Added three focused RPC checks. Full C qualification is 1,134,866 checks with
+  zero failures; 34 probes, Phase 9 (1,544), Phase 10 (562), Phase 11 (834), and
+  Stratum parser/session checks (29) pass. Windows Release/x64 has zero warnings,
+  errors and failures.
+- Phase 13 is ACTIVE. No identity, authentication, authority, storage, consensus,
+  Block 2 or Phase 14 work was started. No commit or push.
+
 ### Phase 12 Block 2 — automatic outbound connections — 2026-09-10
 
 - Added a portable candidate-consuming outbound lane with deterministic rotation,

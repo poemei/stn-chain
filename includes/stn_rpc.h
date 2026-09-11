@@ -38,6 +38,11 @@ typedef struct stn_rpc_message {
     const uint8_t *payload;
     size_t length;
 } stn_rpc_message;
+/* Fixed-header preflight for stream readers. It does not interpret magic,
+ * version, kind or method, so dispatch retains their existing error semantics.
+ * It only permits an exact 24-byte header and a declared payload within the
+ * global bound before the caller reads that payload from an untrusted stream. */
+stn_rpc_code stn_rpc_payload_length(const uint8_t *bytes,size_t length,size_t *payload_length);
 /* STNC,u16 version=1,u16 kind,u16 method,u16 code,u64 ID,u32 length.
  * Big-endian; exact length; no implicit fields. Request code must be zero.
  * Decode checks method payload shape for known requests; unknown methods are

@@ -58,6 +58,15 @@ static stn_peer_status transfer(const stn_peer_transport *t,uint8_t *p,size_t n,
         if(s!=STN_PEER_OK){return s;}p+=chunk;n-=chunk;
     }return STN_PEER_OK;
 }
+static stn_peer_status rpc_transfer(stn_windows_peer *peer,const stn_peer_transport *transport,
+    uint8_t *bytes,size_t length,int sending,int idle_allowed)
+{
+    stn_peer_status status;
+    peer->operation_deadline_ms=GetTickCount64()+APP_RPC_IO_TIMEOUT_MS;
+    status=transfer(transport,bytes,length,sending,idle_allowed);
+    peer->operation_deadline_ms=0;
+    return status;
+}
 typedef struct rpc_client {
     HANDLE thread;
     stn_windows_peer peer;
@@ -73,18 +82,17 @@ static DWORD WINAPI rpc_client_thread(void *user)
     uint8_t *request=(uint8_t*)malloc(STN_RPC_MAX_FRAME),*response=(uint8_t*)malloc(STN_RPC_MAX_FRAME);
     if(request!=NULL && response!=NULL){
         while(InterlockedCompareExchange(&stopping,0,0)==0){
-            size_t n,w;stn_peer_status io=transfer(&client->transport,request,24,0,1);stn_rpc_code dispatch;
+            size_t n,w;stn_peer_status io=rpc_transfer(&client->peer,&client->transport,request,24,0,1);stn_rpc_code dispatch;
             if(io==STN_PEER_TIMEOUT){continue;}
             if(io!=STN_PEER_OK){break;}
-            n=(size_t)stn_wire_read(request+20,4);
-            if(memcmp(request,"STNC",4)!=0 || n>STN_RPC_MAX_PAYLOAD){break;}
-            io=transfer(&client->transport,request+24,n,0,0);
+            if(memcmp(request,"STNC",4)!=0 || stn_rpc_payload_length(request,24,&n)!=STN_RPC_OK){break;}
+            io=rpc_transfer(&client->peer,&client->transport,request+24,n,0,0);
             if(io!=STN_PEER_OK){break;}
             EnterCriticalSection(client->dispatch_lock);
             dispatch=stn_rpc_dispatch(request,24+n,STN_RPC_READ|STN_RPC_SUBMISSION,
                 client->service,response,STN_RPC_MAX_FRAME,&w);
             LeaveCriticalSection(client->dispatch_lock);
-            if(dispatch!=STN_RPC_OK || transfer(&client->transport,response,w,1,0)!=STN_PEER_OK){break;}
+            if(dispatch!=STN_RPC_OK || rpc_transfer(&client->peer,&client->transport,response,w,1,0)!=STN_PEER_OK){break;}
         }
     }
     free(request);free(response);
@@ -124,13 +132,12 @@ static int serve_once(stn_windows_peer *listener,const stn_rpc_service *service)
     request=(uint8_t*)malloc(STN_RPC_MAX_FRAME);response=(uint8_t*)malloc(STN_RPC_MAX_FRAME);
     if(request!=NULL && response!=NULL){
         for(;;){
-            size_t n,w;stn_peer_status io=transfer(&transport,request,24,0,1);
+            size_t n,w;stn_peer_status io=rpc_transfer(&peer,&transport,request,24,0,1);
             if(io==STN_PEER_TIMEOUT){continue;}if(io!=STN_PEER_OK){ok=1;break;}
-            n=(size_t)stn_wire_read(request+20,4);
-            if(memcmp(request,"STNC",4)!=0 || n>STN_RPC_MAX_PAYLOAD){break;}
-            if(transfer(&transport,request+24,n,0,0)!=STN_PEER_OK){break;}
+            if(memcmp(request,"STNC",4)!=0 || stn_rpc_payload_length(request,24,&n)!=STN_RPC_OK){break;}
+            if(rpc_transfer(&peer,&transport,request+24,n,0,0)!=STN_PEER_OK){break;}
             if(stn_rpc_dispatch(request,24+n,STN_RPC_READ|STN_RPC_SUBMISSION,service,response,STN_RPC_MAX_FRAME,&w)!=STN_RPC_OK ||
-               transfer(&transport,response,w,1,0)!=STN_PEER_OK){break;}
+               rpc_transfer(&peer,&transport,response,w,1,0)!=STN_PEER_OK){break;}
         }
     }
     free(request);free(response);stn_windows_peer_close(&peer);return ok;

@@ -16,7 +16,8 @@ stn_peer_status stn_windows_peer_accept(stn_windows_peer *listener,unsigned time
  * close/reuse; the object/socket lifetime must remain stable during interrupt. */
 void stn_windows_peer_interrupt(stn_windows_peer *peer);
 void stn_windows_peer_close(stn_windows_peer *peer);
-/* Optional outbound operation deadline; zero preserves existing idle semantics. */
+/* Optional operation deadline for bounded RPC/outbound transfers; zero
+ * preserves existing idle semantics. */
 stn_peer_status stn_windows_peer_open_candidate(void *,const stn_peer_endpoint *,stn_peer_transport *);
 void stn_windows_peer_close_candidate(void *);
 #endif

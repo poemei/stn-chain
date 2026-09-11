@@ -257,3 +257,38 @@ cannot alter accepted or persisted state. Blocks 1–4 contribute 1,586 focused 
 checks, 70 focused executable checks and 27 pending-RPC checks. The complete Chain C total is 1,134,863;
 Windows Release/x64 is the only qualified runtime. Phase 12 is complete and Phase
 13 has not started.
+
+## Phase 13 Block 1 — RPC framing preflight
+
+Build the Release/x64 solution and run `stn-chain-tests.exe`. The RPC suite now
+includes three preflight checks for exact header length, valid declared payload,
+and maximum-plus-one rejection. The running Windows node applies the same helper
+before reading persistent or `--once` RPC payloads. Existing Phase 9/10/11
+process suites remain the affected regression set; no other-platform qualification
+is claimed.
+
+## Phase 13 Block 2 — bounded incomplete-frame sessions
+
+Build the Release/x64 solution and run the existing test executable, then run
+`powershell -ExecutionPolicy Bypass -File tools/test-node.ps1 -FramingOnly`.
+The focused runtime check leaves one client with a partial frame for the
+bounded 60-second operation deadline, verifies that session closes, and checks
+that an independent RPC client remains usable. The Windows transport deadline
+is platform plumbing; framing and dispatch remain portable.
+
+## Phase 13 Block 3 — complete-frame session continuity
+
+Run `powershell -ExecutionPolicy Bypass -File tools/test-node.ps1 -FramingOnly`
+after the Release/x64 build. The focused run performs 33 checks for consecutive
+complete requests, distinct response identifiers, deterministic unsupported and
+malformed request errors, incomplete-header disconnect, Block 2 deadline
+termination, and independent-client continuity. The existing
+pending-RPC and full C suites remain the affected regressions.
+
+## Phase 13 Block 4 — deterministic protocol errors
+
+The same `-FramingOnly` run verifies deterministic unsupported-method and
+malformed-complete-request responses, request-ID association where the request
+decodes, a valid request after protocol errors, and continued independent
+client operation. Transport disconnects remain session failures rather than
+STNC status responses.

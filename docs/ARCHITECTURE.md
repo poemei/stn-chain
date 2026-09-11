@@ -383,3 +383,38 @@ candidate/discovery contract and enforce the fixed pacing boundary. Linux, ARM a
 macOS implementations remain future adapter/qualification work; this block adds
 no unrelated backends. Blocks 1–4 complete the bounded Phase 12 orchestration
 qualification; Phase 13 has not started.
+
+## Phase 13 Block 1 — RPC framing preflight
+
+The RPC stream boundary now uses portable `stn_rpc_payload_length` to validate
+the fixed 24-byte header and declared payload bound before reading body bytes.
+It deliberately leaves magic, version, method, shape and capability interpretation
+to the existing codec and dispatcher. The Windows application supplies only
+transport/session loops; no Windows type enters the portable helper. This is a
+bounded resource-hardening baseline, not authentication, authorization or a
+consensus change.
+
+## Phase 13 Block 2 — bounded RPC receive sessions
+
+Windows RPC transport transfers now set and clear the existing per-operation
+deadline around each fixed header, bounded payload and response. The transport
+continues to accept short reads, while a stalled or failed partial frame closes
+only that session and frees its private buffers. This policy remains in the
+platform adapter; portable parser and dispatch code has no Windows timer or
+socket dependency.
+
+## Phase 13 Block 3 — complete-frame session continuity
+
+The Windows RPC loops keep request receive, dispatch, and response completion
+as one sequential per-session cycle. The next request is not read until the
+prior bounded response transfer finishes. Request and response storage remains
+private to each client, with no global parser or result state; the portable
+dispatcher and wire definitions are unchanged.
+
+## Phase 13 Block 4 — deterministic protocol errors
+
+Protocol-visible rejection remains in the portable RPC codec and dispatcher:
+unsupported methods and complete requests with invalid known shapes produce
+bounded canonical STNC responses, while transport failures stay in the Windows
+adapter and never become protocol status values. Request identifiers remain
+session-local correlation data; no authority or consensus path consumes them.

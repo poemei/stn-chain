@@ -284,6 +284,28 @@ serialized at the service boundary so concurrent clients cannot race shared
 consensus/persistence scratch state. Connection concurrency therefore does not
 change consensus ordering or RPC wire semantics.
 
+## Phase 13 Block 1 — framing preflight baseline
+
+The portable `stn_rpc_payload_length` helper is the stream-reader preflight for
+STNC. It accepts only an exact 24-byte header and returns its declared payload
+length when that value is at most `STN_RPC_MAX_PAYLOAD`. It does not interpret
+magic, version, kind, opcode, request shape or capabilities; those existing
+dispatch rules retain their protocol-visible error behavior. A caller runs the
+preflight before attempting to read the declared payload.
+
+The Windows persistent-client and `--once` loops use this helper after receiving
+the fixed header. Bad magic remains the existing immediate close behavior;
+unsupported versions and methods still reach dispatch when their bounded payload
+can be read and receive the existing deterministic error response. An oversized
+declaration is rejected before any payload read. No allocation is based on an
+untrusted value beyond the existing fixed frame bound, and no client/session or
+consensus state is changed by preflight failure.
+
+Three focused checks cover valid, truncated and maximum-plus-one declarations.
+The helper and all parsing remain in portable `src/`/`includes/`; Windows socket
+transfer remains in the platform adapter. Authentication, identity, authority,
+TLS and API-account behavior remain Phase 14 or later concerns.
+
 Core tests preserve all earlier 237 RPC checks and add mining tests. The real
 executable smoke test covers fragmented headers, template retrieval, insufficient
 PoW, successful submission, stale work, forbidden administration, bad version,
@@ -303,3 +325,35 @@ Core/Stratum-role clients; actual STN Core and stn-stratumd binaries were not te
 New-connection socket/allocation/thread failures are isolated from existing
 sessions; OS resource exhaustion was not deliberately induced. Node dispatch
 remains serialized. Core borrowed scratch never reallocates without ownership.
+
+## Phase 13 Block 2 — bounded incomplete-frame sessions
+
+The Windows stream adapter applies the existing 60-second operation deadline to
+each RPC header, payload and response transfer. Short reads are still
+reassembled deterministically, but a partial frame that stalls, disconnects,
+resets or otherwise fails is terminated and its session resources are released.
+The deadline is per session and per frame; it is not shared parser state or a
+global connection limit. A separate healthy client can continue to complete
+requests while another client is stalled. Portable framing, dispatch,
+consensus and authority behavior are unchanged.
+
+## Phase 13 Block 3 — complete-frame session continuity
+
+An established session consumes one complete request before dispatching and
+finishing its matching response; only then does it read the next header. Each
+iteration uses the session's bounded private request and response buffers, so
+payload bytes and status from an earlier request cannot become the next
+request. Focused runtime checks use distinct request identifiers on consecutive
+requests and verify the returned association while an incomplete or failed
+client remains isolated. Existing malformed-complete-request error and close
+semantics are unchanged.
+
+## Phase 13 Block 4 — deterministic protocol error behavior
+
+Complete, bounded requests that name an unsupported method or violate a known
+request shape receive the existing STNC error response deterministically. A
+supported request may follow those responses in the same session where the
+existing protocol permits continuation; response identifiers remain tied to
+the decoded request. Malformed framing and transport failure remain separate:
+they do not become application status values and still terminate only the
+affected session when required. No status codes or wire fields were added.

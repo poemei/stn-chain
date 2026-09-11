@@ -290,3 +290,72 @@ banning, or other platform backend was introduced.
 
 Phase 12 is COMPLETE for bounded Windows Release/x64 qualification. Phase 13 was
 not started. No commit or push was performed.
+
+## Phase 13 — RPC Production Hardening — ACTIVE
+
+### Block 1 — RPC framing preflight baseline COMPLETE (2026-09-10)
+
+The smallest unresolved hardening requirement was making the runnable RPC stream
+reader use one portable fixed-header payload-bound check before reading untrusted
+payload bytes. `stn_rpc_payload_length` requires the exact 24-byte header and
+rejects declared payloads above `STN_RPC_MAX_PAYLOAD`; existing magic, version,
+opcode, shape, capability and response semantics remain in `stn_rpc_dispatch`.
+The Windows application now uses this preflight in both persistent-client and
+single-session loops. No protocol layout or consensus behavior changed.
+
+Three new RPC checks cover valid, truncated and over-bound declarations. The
+complete C suite totals 1,134,866 checks with zero failures; Phase 9 (1,544),
+Phase 10 (562), Phase 11 adjusted-target (834), Stratum (29) and build probes
+(34) remain passing. The legacy general node script's fixed-target mining loop
+still stops at the authorized Phase 11 height-60 target transition; it is not
+used as a qualification claim. Windows Release/x64 is clean.
+
+Phase 13 remains active. Block 2 and Phase 14 were not started. This increment
+was not committed or pushed.
+
+### Block 2 — bounded incomplete-frame session handling COMPLETE (2026-09-10)
+
+The next prerequisite-consistent boundary was the receive path after Block 1
+payload preflight: a partial header or payload could otherwise remain in a
+Windows RPC session indefinitely because short-read polling had no per-frame
+deadline. RPC header, payload and response transfers now carry the existing
+60-second bounded operation deadline. A timeout, disconnect, reset or receive
+failure terminates that session, releases its private buffers and closes its
+socket; completed frames and repeated requests retain their existing behavior.
+No global parser state or connection ceiling was added.
+
+The framing-only executable qualification covers a split healthy request during
+an independent incomplete frame, incomplete-header disconnect, and deadline
+termination: 19 checks, zero
+failures. The portable RPC parser and Block 1 preflight remain unchanged; the
+deadline is Windows transport plumbing only. Windows Release/x64 remains
+clean. Block 3 and Phase 14 were not started. This increment was not committed
+or pushed.
+
+### Block 3 — complete-frame session continuity and response association COMPLETE (2026-09-10)
+
+The next smallest unresolved boundary was qualification of repeated complete
+frames within an established RPC session. The existing bounded receive loops
+consume exactly one header and payload, dispatch it, complete its response
+transfer, and only then begin the next request; request and response buffers
+remain private to each client. Focused runtime coverage verifies back-to-back
+requests with distinct request identifiers, response association, an
+incomplete-header disconnect, the Block 2 deadline, and continued operation of
+an independent client: 22 checks, zero failures.
+
+No wire, parser, dispatch, consensus or authority behavior changed. Block 1
+preflight and Block 2 deadlines remain intact. Windows Release/x64 remains
+clean. Block 4 and Phase 14 were not started. This increment was not committed
+or pushed.
+
+### Block 4 — deterministic protocol error behavior COMPLETE (2026-09-10)
+
+The next smallest unresolved boundary was protocol-visible error/status
+qualification for complete but unsupported or malformed requests. Existing
+portable dispatch behavior now has focused runtime coverage for deterministic
+unsupported-method and malformed-shape responses, request-ID association where
+the request decodes, valid-request continuation, and isolation from transport
+failure. The combined framing qualification is 33 checks with zero failures.
+No status codes, wire fields, consensus, authority, or transport semantics
+changed. Block 5 and Phase 14 were not started. This increment was not
+committed or pushed.
