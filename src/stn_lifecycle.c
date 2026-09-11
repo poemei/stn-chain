@@ -52,6 +52,16 @@ static int find_grant(const stn_lifecycle_state *s,const uint8_t id[32],const st
 static int initial_contains(const stn_lifecycle_state *s,const uint8_t id[32])
 { size_t i;for(i=0;i<s->initial_identity_count;++i)if(memcmp(s->initial_identities[i],id,32)==0)return 1;return 0; }
 
+static stn_lifecycle_result consume_publication(stn_lifecycle_state *s,const stn_record *record,const stn_hash_provider *p)
+{
+    uint8_t id[64];
+    if (stn_replay_id_from_signer_nonce(record->signer_public_key,record->nonce,id)!=STN_REPLAY_FRESH) return STN_LIFECYCLE_MALFORMED;
+    if (stn_replay_state_check(&s->replay,id)==STN_REPLAY_REPLAY) return STN_LIFECYCLE_REPLAY;
+    if (stn_replay_state_consume(&s->replay,id)!=STN_REPLAY_FRESH) return STN_LIFECYCLE_CAPACITY;
+    (void)p;
+    return STN_LIFECYCLE_OK;
+}
+
 stn_lifecycle_result stn_lifecycle_apply_transaction(stn_lifecycle_state *s,const stn_transaction *tx,const uint8_t *roots,size_t root_count,const stn_hash_provider *p)
 {
     const uint8_t *b;size_t n;uint8_t statement[256],evidence[STN_AUTHORITY_EVIDENCE_SIZE],id[32];size_t written=0;stn_lifecycle_result r;
@@ -82,7 +92,8 @@ stn_lifecycle_result stn_lifecycle_apply_transaction(stn_lifecycle_state *s,cons
         r=consume(s,b+1,tx->type,statement,written,p);if(r!=STN_LIFECYCLE_OK){if(seeded)memcpy(s->rotation.current_identity,saved_identity,32);return r;}
         return map_rot(stn_identity_rotation_apply(&s->rotation,b,n,roots,root_count));
     }
-    return tx->type==STN_TX_PUBLICATION?STN_LIFECYCLE_OK:STN_LIFECYCLE_MALFORMED;
+    if(tx->type==STN_TX_PUBLICATION){stn_record record;if(stn_record_decode(tx->record_bytes,tx->record_length,&record)!=STN_RECORD_OK)return STN_LIFECYCLE_MALFORMED;return consume_publication(s,&record,p);}
+    return STN_LIFECYCLE_MALFORMED;
 }
 
 stn_lifecycle_result stn_lifecycle_apply_block(stn_lifecycle_state *s,const uint8_t *bytes,size_t length,const uint8_t *roots,size_t root_count,const stn_hash_provider *p)
@@ -96,3 +107,4 @@ stn_lifecycle_result stn_lifecycle_rebuild(stn_lifecycle_state *s,const uint8_t 
     for(i=0;i<count;++i){if(stn_block_decode(blocks[i],lengths[i],&b)!=STN_DATA_OK)return STN_LIFECYCLE_MALFORMED;off=0;for(j=0;j<b.header.transaction_count;++j){size_t n=(size_t)stn_wire_read(b.body+off,4);off+=4;if(stn_transaction_decode(b.body+off,n,&tx)!=STN_DATA_OK)return STN_LIFECYCLE_MALFORMED;r=stn_lifecycle_apply_transaction(s,&tx,roots,root_count,p);if(r!=STN_LIFECYCLE_OK)return r;off+=n;}}
     return STN_LIFECYCLE_OK;
 }
+

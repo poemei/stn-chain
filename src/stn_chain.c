@@ -213,8 +213,18 @@ stn_chain_report stn_chain_validate_candidate(const stn_chain_context *context,
             (tx.type==STN_TX_PUBLICATION && stn_record_decode(tx.record_bytes,tx.record_length,&record)!=STN_RECORD_OK)) {
             r.body=STN_STAGE_REJECT; return fail(r,STN_CHAIN_BODY,STN_DATA_CONTENT);
         }
-        if(tx.type!=STN_TX_PUBLICATION){has_lifecycle=1;} else if (memcmp(record.network_id,context->network_id,32)!=0) {
-            r.body=STN_STAGE_REJECT; return fail(r,STN_CHAIN_NETWORK,STN_DATA_CONTENT);
+        if(tx.type!=STN_TX_PUBLICATION){has_lifecycle=1;} else {
+            if (memcmp(record.network_id,context->network_id,32)!=0) {
+                r.body=STN_STAGE_REJECT; return fail(r,STN_CHAIN_NETWORK,STN_DATA_CONTENT);
+            }
+            if (context->publication_validation != NULL) {
+                stn_validation_report pr=stn_validate_intelligence_record(tx.record_bytes,tx.record_length,context->publication_validation);
+                if (pr.acceptance != STN_ACCEPTANCE_UNDER_CONTEXT) {
+                    r.body=STN_STAGE_REJECT;
+                    return fail(r,STN_CHAIN_BODY,pr.acceptance==STN_ACCEPTANCE_UNRESOLVED ? STN_DATA_UNRESOLVED : STN_DATA_CONTENT);
+                }
+                has_lifecycle=1;
+            }
         }
         offset+=n;
     }
@@ -268,3 +278,4 @@ stn_chain_report stn_chain_validate_sequence(const stn_chain_context *context,
     r.acceptance=STN_ACCEPTANCE_UNDER_CONTEXT;
     return r;
 }
+

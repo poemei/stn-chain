@@ -25,6 +25,12 @@
 *.sdf
 *.opensdf
 ipch/
+*.sln
+*.vcxproj
+*.filters
+
+# Command tools
+*.cmd
 
 # Windows compiler, linker, resource, and analysis output
 *.obj

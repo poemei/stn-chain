@@ -53,4 +53,9 @@ stn_data_status stn_transaction_encode(const stn_transaction *tx,
  * digest must not overlap inputs; unchanged unless successful. */
 stn_data_status stn_transaction_id(const uint8_t *bytes, size_t length,
     const stn_hash_provider *provider, uint8_t digest[32]);
+/* Stable production record identifier: SHA-256 of exact protocol domain bytes
+ * (without the C-string terminator) and canonical unsigned record bytes. */
+stn_data_status stn_record_id(const uint8_t *record_bytes, size_t record_length,
+    const stn_hash_provider *provider, uint8_t digest[32]);
 #endif
+

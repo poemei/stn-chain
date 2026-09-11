@@ -18,6 +18,9 @@ typedef struct stn_chain_context {
     size_t genesis_authority_root_count;
     const uint8_t *genesis_initial_identities;
     size_t genesis_initial_identity_count;
+    /* Optional production publication semantics; NULL preserves the
+     * structural development-anchor profile. */
+    const stn_validation_context *publication_validation;
     stn_hash_provider hash_provider;
     /* NULL selects legacy v1 development-only profile (no PoW/work).
      * Non-NULL strictly requires v3 blocks, including genesis. No downgrade. */
@@ -96,3 +99,6 @@ stn_chain_report stn_chain_validate_sequence(const stn_chain_context *context,
     const stn_chain_state *prior, const stn_block_span *blocks, size_t count,
     stn_chain_state *out);
 #endif
+
+
+

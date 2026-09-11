@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_record.h"
+#include "stn_transaction.h"
 #include <string.h>
 
 static const uint8_t record_magic[4] = {0x53, 0x54, 0x4e, 0x52};
@@ -127,4 +128,26 @@ stn_record_status stn_record_encode(const stn_record *record, uint8_t *output,
            record->signature, STN_RECORD_SIGNATURE_SIZE);
     *written = total;
     return STN_RECORD_OK;
+}
+
+stn_data_status stn_record_id(const uint8_t *record_bytes, size_t record_length,
+    const stn_hash_provider *provider, uint8_t digest[32])
+{
+    static const uint8_t domain[] = "STN-CHAIN:RECORD:ID:1";
+    stn_record record;
+    uint8_t temporary[32];
+    stn_record_status envelope;
+    stn_data_status status;
+    size_t unsigned_length;
+    if (digest == NULL || record_bytes == NULL || provider == NULL ||
+        provider->hash == NULL) { return STN_DATA_ARGUMENT; }
+    envelope = stn_record_decode(record_bytes, record_length, &record);
+    if (envelope != STN_RECORD_OK) { return STN_DATA_CONTENT; }
+    unsigned_length = STN_RECORD_HEADER_SIZE + (size_t)record.payload_length;
+    status = provider->hash(provider->user, domain, sizeof(domain) - 1u,
+        record_bytes, unsigned_length, temporary);
+    if (status == STN_DATA_OK) { memcpy(digest, temporary, sizeof(temporary)); }
+    else if (status == STN_DATA_UNRESOLVED) { return STN_DATA_UNRESOLVED; }
+    else { return STN_DATA_PROVIDER_ERROR; }
+    return STN_DATA_OK;
 }
