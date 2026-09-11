@@ -482,3 +482,13 @@ and root recognition remain separate stages. A valid issuer signature from a
 non-root is an INVALID_GRANT and cannot feed Block 2; only VALID_GRANT evidence
 may proceed to authority evaluation. No delegation or key lifecycle behavior
 is introduced.
+
+## Phase 14 Block 4 — authority-grant revocation
+
+Complete canonical grants receive a 32-byte SHA-256 identifier. A 129-byte
+revocation record signs the issuer and grant identifier under
+`STN-CHAIN:AUTHORITY:REVOKE:1`. Only the original genesis-root issuer can
+produce a valid revocation for that grant. Accepted-state reconstruction keeps
+revocation monotonic for the active history, while reorganization rebuilds the
+set from the replacement history. No local blacklist, immediate pending effect,
+or persisted trust cache is authoritative.

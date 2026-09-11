@@ -53,3 +53,18 @@ grant version, issuer, and evidence. A grant is valid only when its signature
 verifies and its issuer is present in the applicable genesis root set. A valid
 issuer signature without root authority is an invalid grant. No recursive
 delegation, rotation, revocation, expiry, or local root override is defined.
+
+## Authority-grant revocation
+
+Phase 14 Block 4 derives each grant identifier as SHA-256 of the complete
+canonical 194-byte grant. A canonical revocation is 129 bytes: version, issuer,
+grant identifier, and a 64-byte signature. Its signing statement uses the
+dedicated `STN-CHAIN:AUTHORITY:REVOKE:1` domain, a zero byte, version, issuer,
+and grant identifier.
+
+Only the original grant issuer may revoke that grant, and that issuer must
+remain a genesis root. Revocation is monotonic and state-derived: a valid
+revocation places the grant identifier in the reconstructed accepted-state
+revocation set; duplicate revocations have no additional effect. Historical
+grant bytes remain unchanged. **Grant Signature Validity ≠ Current Grant
+Authority.** **Revocation State Follows Accepted Chain State.**

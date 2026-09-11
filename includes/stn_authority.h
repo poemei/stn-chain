@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "stn_identity.h"
+#include "stn_transaction.h"
 
 #define STN_AUTHORITY_ACTION_SIZE 32u
 #define STN_AUTHORITY_CONTEXT_SIZE 32u
@@ -13,6 +14,10 @@
 #define STN_AUTHORITY_GRANT_SIZE 194u
 #define STN_AUTHORITY_GRANT_DOMAIN "STN-CHAIN:AUTHORITY:GRANT:1"
 #define STN_AUTHORITY_GRANT_DOMAIN_SIZE 28u
+#define STN_AUTHORITY_REVOCATION_SIZE 129u
+#define STN_AUTHORITY_REVOKE_DOMAIN "STN-CHAIN:AUTHORITY:REVOKE:1"
+#define STN_AUTHORITY_REVOKE_DOMAIN_SIZE 29u
+#define STN_AUTHORITY_MAX_REVOKED 256u
 
 typedef enum stn_authority_result {
     STN_AUTHORITY_AUTHORIZED=0,
@@ -25,6 +30,17 @@ typedef enum stn_authority_grant_result {
     STN_AUTHORITY_INVALID_GRANT,
     STN_AUTHORITY_MALFORMED_GRANT
 } stn_authority_grant_result;
+
+typedef enum stn_authority_revocation_result {
+    STN_AUTHORITY_VALID_REVOCATION=0,
+    STN_AUTHORITY_INVALID_REVOCATION,
+    STN_AUTHORITY_MALFORMED_REVOCATION
+} stn_authority_revocation_result;
+
+typedef struct stn_authority_state {
+    uint8_t revoked_ids[STN_AUTHORITY_MAX_REVOKED][32];
+    size_t revoked_count;
+} stn_authority_state;
 
 /* Action and context are opaque, fixed-width, versioned tokens. Their
  * meanings are assigned by later protocol phases; this primitive compares
@@ -58,6 +74,36 @@ stn_authority_grant_result stn_authority_grant_validate(
     const uint8_t *grant, size_t grant_length,
     const uint8_t *genesis_roots, size_t root_count,
     uint8_t evidence[STN_AUTHORITY_EVIDENCE_SIZE]);
+
+stn_data_status stn_authority_grant_id(const uint8_t *grant, size_t grant_length,
+    const stn_hash_provider *provider, uint8_t grant_id[32]);
+
+stn_authority_revocation_result stn_authority_revocation_statement(
+    const uint8_t issuer[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    const uint8_t grant_id[32], uint8_t *statement, size_t capacity, size_t *written);
+
+stn_authority_revocation_result stn_authority_revocation_encode(
+    const uint8_t issuer[STN_IDENTITY_PUBLIC_KEY_SIZE], const uint8_t grant_id[32],
+    const uint8_t signature[STN_IDENTITY_SIGNATURE_SIZE], uint8_t *revocation,
+    size_t capacity, size_t *written);
+
+stn_authority_revocation_result stn_authority_revocation_validate(
+    const uint8_t *revocation, size_t revocation_length,
+    const uint8_t *grant, size_t grant_length,
+    const uint8_t *genesis_roots, size_t root_count,
+    const stn_hash_provider *provider, uint8_t grant_id[32]);
+
+void stn_authority_state_initialize(stn_authority_state *state);
+int stn_authority_state_is_revoked(const stn_authority_state *state,
+    const uint8_t grant_id[32]);
+stn_authority_revocation_result stn_authority_state_apply(
+    stn_authority_state *state, const uint8_t *revocation, size_t revocation_length,
+    const uint8_t *grant, size_t grant_length, const uint8_t *genesis_roots,
+    size_t root_count, const stn_hash_provider *provider);
+stn_authority_grant_result stn_authority_grant_active(
+    const uint8_t *grant, size_t grant_length, const uint8_t *genesis_roots,
+    size_t root_count, const stn_hash_provider *provider,
+    const stn_authority_state *state, uint8_t evidence[STN_AUTHORITY_EVIDENCE_SIZE]);
 
 /* Canonical evidence: version || subject identity || action || context. */
 stn_authority_result stn_authority_evidence_encode(

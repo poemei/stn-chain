@@ -1,4 +1,5 @@
 #include "stn_authority.h"
+#include "stn_sha256.h"
 #include <stdio.h>
 #include <string.h>
 #define CHECK(e) do { ++checks; if(!(e)){++failures;fprintf(stderr,"authority line %d: %s\n",__LINE__,#e);} } while(0)
@@ -8,7 +9,9 @@ static const uint8_t second_root[32]={0xfc,0x51,0xcd,0x8e,0x62,0x18,0xa1,0xa3,0x
 int test_authority(void)
 {
     static const uint8_t grant_signature[64]={0xc5,0xf9,0x93,0x39,0x86,0xf9,0x5e,0x18,0xbf,0x67,0x99,0x49,0x90,0xdc,0x42,0x5c,0x14,0x74,0xa4,0x8b,0xce,0x66,0x0b,0x3f,0x04,0x15,0x1e,0x61,0x15,0xbf,0x36,0x33,0x28,0x0b,0x63,0x63,0xf8,0x93,0x91,0xea,0xd9,0x4f,0xb6,0x7b,0xb5,0x91,0xc9,0x72,0x0b,0x3e,0xd1,0xf0,0xdf,0x62,0xe0,0xa3,0x96,0x3e,0x80,0x66,0x36,0x97,0xb1,0x04};
-    uint8_t action[32]={1,2},context[32]={1,3},evidence[STN_AUTHORITY_EVIDENCE_SIZE],bad[STN_AUTHORITY_EVIDENCE_SIZE+1],grant[STN_AUTHORITY_GRANT_SIZE],roots[64],other[32];size_t n=0;
+    static const uint8_t revoke_signature[64]={0x39,0xb9,0xe8,0x46,0x88,0x2e,0xe0,0xcf,0x5d,0x4d,0xfb,0x2a,0xa5,0x1d,0x51,0x78,0x25,0x97,0xab,0x22,0x7b,0x88,0x60,0x7c,0xce,0x3e,0x26,0xaf,0x8f,0x45,0x3c,0x80,0xe9,0xee,0x33,0x0e,0x79,0x69,0x81,0x9b,0x14,0xbe,0x41,0x93,0x50,0x50,0xa5,0xf3,0x9b,0x2d,0x1a,0xb9,0x68,0xeb,0x72,0xc8,0x14,0x40,0x36,0x7b,0x29,0x19,0xd1,0x01};
+    static const uint8_t expected_id[32]={0x75,0xdd,0x45,0x4a,0x06,0x3d,0x59,0x40,0x8c,0x02,0x7d,0xb8,0xdf,0x85,0x6a,0x7d,0xd8,0xac,0xa4,0x4d,0xc4,0xdb,0xdc,0xee,0xd4,0xae,0x52,0x99,0x1d,0xd2,0xc0,0xdb};
+    uint8_t action[32]={1,2},context[32]={1,3},evidence[STN_AUTHORITY_EVIDENCE_SIZE],bad[STN_AUTHORITY_REVOCATION_SIZE+1],grant[STN_AUTHORITY_GRANT_SIZE],revocation[STN_AUTHORITY_REVOCATION_SIZE],roots[64],other[32],id[32];size_t n=0;stn_hash_provider provider={stn_sha256,NULL};stn_authority_state state;
     CHECK(stn_authority_action_validate(action)==STN_AUTHORITY_AUTHORIZED);
     CHECK(stn_authority_context_validate(context)==STN_AUTHORITY_AUTHORIZED);
     CHECK(stn_authority_evidence_encode(key,action,context,evidence,sizeof(evidence),&n)==STN_AUTHORITY_AUTHORIZED && n==97);
@@ -18,8 +21,23 @@ int test_authority(void)
     memset(roots,0,64);CHECK(stn_authority_root_set_validate(roots,1)==STN_AUTHORITY_MALFORMED);
     CHECK(stn_authority_grant_encode(key,evidence,grant_signature,grant,sizeof(grant),&n)==STN_AUTHORITY_VALID_GRANT && n==STN_AUTHORITY_GRANT_SIZE);
     CHECK(stn_authority_grant_validate(grant,n,key,1,evidence)==STN_AUTHORITY_VALID_GRANT);
-    memcpy(other,key,32);other[0]^=1;CHECK(stn_authority_grant_validate(grant,n,other,1,evidence)==STN_AUTHORITY_INVALID_GRANT);
-    grant[130]^=1;CHECK(stn_authority_grant_validate(grant,n,key,1,evidence)==STN_AUTHORITY_INVALID_GRANT);grant[130]^=1;n=STN_AUTHORITY_EVIDENCE_SIZE;
+    CHECK(stn_authority_grant_id(grant,n,&provider,id)==STN_DATA_OK && memcmp(id,expected_id,32)==0);
+    CHECK(stn_authority_grant_id(grant,n,&provider,id)==STN_DATA_OK && memcmp(id,expected_id,32)==0);
+    CHECK(stn_authority_revocation_encode(key,id,revoke_signature,revocation,sizeof(revocation),&n)==STN_AUTHORITY_VALID_REVOCATION && n==STN_AUTHORITY_REVOCATION_SIZE);
+    CHECK(stn_authority_revocation_validate(revocation,n,grant,STN_AUTHORITY_GRANT_SIZE,key,1,&provider,id)==STN_AUTHORITY_VALID_REVOCATION);
+    stn_authority_state_initialize(&state);
+    CHECK(stn_authority_grant_active(grant,STN_AUTHORITY_GRANT_SIZE,key,1,&provider,&state,evidence)==STN_AUTHORITY_VALID_GRANT);
+    CHECK(stn_authority_state_apply(&state,revocation,n,grant,STN_AUTHORITY_GRANT_SIZE,key,1,&provider)==STN_AUTHORITY_VALID_REVOCATION);
+    CHECK(stn_authority_state_is_revoked(&state,id));
+    CHECK(stn_authority_grant_active(grant,STN_AUTHORITY_GRANT_SIZE,key,1,&provider,&state,evidence)==STN_AUTHORITY_INVALID_GRANT);
+    CHECK(stn_authority_state_apply(&state,revocation,n,grant,STN_AUTHORITY_GRANT_SIZE,key,1,&provider)==STN_AUTHORITY_VALID_REVOCATION && state.revoked_count==1);
+    CHECK(stn_authority_revocation_validate(revocation,n-1,grant,STN_AUTHORITY_GRANT_SIZE,key,1,&provider,id)==STN_AUTHORITY_MALFORMED_REVOCATION);
+    memcpy(bad,revocation,STN_AUTHORITY_REVOCATION_SIZE);bad[0]=2;CHECK(stn_authority_revocation_validate(bad,STN_AUTHORITY_REVOCATION_SIZE,grant,STN_AUTHORITY_GRANT_SIZE,key,1,&provider,id)==STN_AUTHORITY_MALFORMED_REVOCATION);
+    memcpy(bad,revocation,STN_AUTHORITY_REVOCATION_SIZE);memset(bad+1,0,32);CHECK(stn_authority_revocation_validate(bad,STN_AUTHORITY_REVOCATION_SIZE,grant,STN_AUTHORITY_GRANT_SIZE,key,1,&provider,id)==STN_AUTHORITY_MALFORMED_REVOCATION);
+    memcpy(bad,revocation,STN_AUTHORITY_REVOCATION_SIZE);memset(bad+33,0,32);CHECK(stn_authority_revocation_validate(bad,STN_AUTHORITY_REVOCATION_SIZE,grant,STN_AUTHORITY_GRANT_SIZE,key,1,&provider,id)==STN_AUTHORITY_MALFORMED_REVOCATION);
+    memcpy(bad,revocation,STN_AUTHORITY_REVOCATION_SIZE);bad[65]^=1;CHECK(stn_authority_revocation_validate(bad,STN_AUTHORITY_REVOCATION_SIZE,grant,STN_AUTHORITY_GRANT_SIZE,key,1,&provider,id)==STN_AUTHORITY_INVALID_REVOCATION);
+    memcpy(other,key,32);other[0]^=1;CHECK(stn_authority_grant_validate(grant,STN_AUTHORITY_GRANT_SIZE,other,1,evidence)==STN_AUTHORITY_INVALID_GRANT);
+    grant[130]^=1;CHECK(stn_authority_grant_validate(grant,STN_AUTHORITY_GRANT_SIZE,key,1,evidence)==STN_AUTHORITY_INVALID_GRANT);grant[130]^=1;n=STN_AUTHORITY_EVIDENCE_SIZE;
     CHECK(stn_authority_evaluate(key,action,context,evidence,n)==STN_AUTHORITY_AUTHORIZED);
     CHECK(stn_authority_evaluate(key,action,context,evidence,n)==STN_AUTHORITY_AUTHORIZED);
     CHECK(stn_authority_evaluate(key,action,context,NULL,0)==STN_AUTHORITY_UNAUTHORIZED);

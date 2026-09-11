@@ -437,3 +437,12 @@ Block 2 evidence record under `STN-CHAIN:AUTHORITY:GRANT:1`; signature validity
 and issuer root authority are evaluated separately. Only VALID_GRANT evidence
 can feed Block 2. Recursive delegation and key lifecycle remain undefined.
 Block 4 was not started.
+
+### Block 4 — deterministic authority-grant revocation foundation COMPLETE (2026-09-10)
+
+Canonical grants now have 32-byte SHA-256 identifiers. A fixed 129-byte
+revocation record uses a dedicated signing domain and is valid only when signed
+by the original genesis-root issuer of the referenced grant. Valid revocations
+produce monotonic revocation state; duplicate application is idempotent, and
+active authority evaluation rejects revoked grants. State is reconstructed from
+accepted history rather than a local blacklist. Block 5 was not started.

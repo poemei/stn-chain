@@ -340,6 +340,14 @@ non-root issuers, signature/content mutations, malformed lengths, and Block 2
 composition. Test roots are explicit fixtures; production does not receive a
 default or local-configured root.
 
+## Phase 14 Block 4 — authority-grant revocation
+
+The Release/x64 test executable qualifies canonical grant identifiers, the
+129-byte revocation codec and signing domain, issuer matching, malformed input,
+root authorization, duplicate application, revoked-grant rejection, and
+reconstruction by replaying accepted evidence. Persistence and reorganization
+remain history-derived; no local revocation database is introduced.
+
 ## Phase 13 Block 6 — deterministic shutdown
 
 The Release/x64 build includes listener-close-before-worker-join shutdown

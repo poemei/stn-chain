@@ -4,6 +4,19 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 14 Block 4 — deterministic authority-grant revocation — 2026-09-10
+
+- Added SHA-256 identifiers for complete canonical Block 3 grants and a fixed
+  129-byte revocation record with the dedicated
+  `STN-CHAIN:AUTHORITY:REVOKE:1` domain.
+- Only the original genesis-root grant issuer can revoke that grant. Valid
+  revocations create monotonic accepted-state revocation entries; duplicates
+  have no second effect, and revoked grants cannot regain authority by
+  resubmission.
+- Revocation state remains reconstructable from accepted history, with no local
+  blacklist, pending shortcut, root lifecycle, or unrelated protocol/storage
+  change. Phase 14 Block 5 was not started. No commit or push.
+
 ### Phase 14 Block 3 — authority evidence provenance and grant validation — 2026-09-10
 
 - Added genesis-declared authority roots as a bounded, sorted set of canonical
