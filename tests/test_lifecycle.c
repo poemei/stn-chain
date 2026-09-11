@@ -1,4 +1,5 @@
 #include "stn_lifecycle.h"
+#include "stn_chain.h"
 #include "stn_sha256.h"
 #include <stdio.h>
 #include <string.h>
@@ -9,7 +10,7 @@ static const uint8_t grant_sig[64]={0xc5,0xf9,0x93,0x39,0x86,0xf9,0x5e,0x18,0xbf
 static const uint8_t revoke_sig[64]={0x39,0xb9,0xe8,0x46,0x88,0x2e,0xe0,0xcf,0x5d,0x4d,0xfb,0x2a,0xa5,0x1d,0x51,0x78,0x25,0x97,0xab,0x22,0x7b,0x88,0x60,0x7c,0xce,0x3e,0x26,0xaf,0x8f,0x45,0x3c,0x80,0xe9,0xee,0x33,0x0e,0x79,0x69,0x81,0x9b,0x14,0xbe,0x41,0x93,0x50,0x50,0xa5,0xf3,0x9b,0x2d,0x1a,0xb9,0x68,0xeb,0x72,0xc8,0x14,0x40,0x36,0x7b,0x29,0x19,0xd1,0x01};
 int test_lifecycle(void)
 {
-    uint8_t action[32]={1,2},context[32]={1,3},evidence[97],grant[194],revoke[129],grant_store[194*4],replay_store[64*8],tx_bytes[256],tx_grant[256],tx_revoke[256],body1[512],body2[512],block1[1024],block2[1024];size_t n=0,ng=0,nr=0,bn1=0,bn2=0;stn_hash_provider p={stn_sha256,NULL};stn_lifecycle_state s;stn_transaction tx;stn_transaction_span span;stn_block block={0};stn_block_span history[2];uint8_t id[32];
+    uint8_t action[32]={1,2},context[32]={1,3},evidence[97],grant[194],revoke[129],grant_store[194*4],replay_store[64*8],tx_bytes[256],tx_grant[256],tx_revoke[256],body1[512],body2[512],block1[1024],block2[1024];size_t n=0,ng=0,nr=0,bn1=0,bn2=0;stn_hash_provider p={stn_sha256,NULL};stn_lifecycle_state s;stn_transaction tx;stn_transaction_span span;stn_block block={0};const uint8_t *history[2];size_t history_lengths[2];uint8_t id[32],duplicate_ids[64];
     CHECK(stn_authority_evidence_encode(root,action,context,evidence,sizeof(evidence),&n)==STN_AUTHORITY_AUTHORIZED);
     CHECK(stn_authority_grant_encode(root,evidence,grant_sig,grant,sizeof(grant),&n)==STN_AUTHORITY_VALID_GRANT);
     tx.version=1;tx.type=STN_TX_AUTHORITY_GRANT;tx.record_bytes=grant;tx.record_length=sizeof(grant);
@@ -25,13 +26,14 @@ int test_lifecycle(void)
     CHECK(stn_authority_state_is_revoked(&s.authority,id));
     CHECK(stn_transaction_encode(&tx,tx_revoke,sizeof(tx_revoke),&nr)==STN_DATA_OK); { stn_transaction decoded={0}; CHECK(stn_transaction_decode(tx_revoke,nr,&decoded)==STN_DATA_OK && decoded.type==STN_TX_AUTHORITY_REVOKE && decoded.record_length==129); }
     span.bytes=tx_grant;span.length=(uint32_t)ng;CHECK(stn_block_body_encode(&span,1,body1,sizeof(body1),&n)==STN_DATA_OK);
-    block.header.version=1;block.header.transaction_count=1;block.header.body_length=(uint32_t)n;block.body=body1;CHECK(stn_block_encode(&block,block1,sizeof(block1),&bn1)==STN_DATA_OK);
+    memcpy(duplicate_ids,root,32);memcpy(duplicate_ids+32,root,32);block.header.version=1;block.header.transaction_count=1;block.header.body_length=(uint32_t)n;block.body=body1;CHECK(stn_block_body_commitment(body1,n,1,&p,block.header.transaction_commitment)==STN_DATA_OK);CHECK(stn_block_encode(&block,block1,sizeof(block1),&bn1)==STN_DATA_OK);
+    { stn_chain_context c={0};stn_chain_state empty,accepted;stn_chain_report cr;c.genesis_bytes=block1;c.genesis_length=bn1;c.genesis_authority_roots=root;c.genesis_authority_root_count=1;c.genesis_initial_identities=root;c.genesis_initial_identity_count=1;c.hash_provider=p;CHECK(stn_chain_initialize(&c,&empty)==STN_DATA_OK);cr=stn_chain_validate_candidate(&c,&empty,block1,bn1,&accepted);CHECK(cr.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT && accepted.lifecycle!=NULL && accepted.lifecycle->grant_count==1); c.genesis_initial_identities=duplicate_ids;c.genesis_initial_identity_count=2;CHECK(stn_chain_initialize(&c,&empty)==STN_DATA_CONTENT); }
     span.bytes=tx_revoke;span.length=(uint32_t)nr;CHECK(stn_block_body_encode(&span,1,body2,sizeof(body2),&n)==STN_DATA_OK);
     block.header.body_length=(uint32_t)n;block.body=body2;CHECK(stn_block_encode(&block,block2,sizeof(block2),&bn2)==STN_DATA_OK);
-    history[0].bytes=block1;history[0].length=bn1;history[1].bytes=block2;history[1].length=bn2;
-    CHECK(stn_lifecycle_rebuild(&s,history,1,root,1,&p)==STN_LIFECYCLE_OK && s.grant_count==1 && s.authority.revoked_count==0);
-    CHECK(stn_lifecycle_rebuild(&s,history,2,root,1,&p)==STN_LIFECYCLE_OK && s.authority.revoked_count==1);
-    CHECK(stn_lifecycle_rebuild(&s,history,1,root,1,&p)==STN_LIFECYCLE_OK && s.authority.revoked_count==0);
-    CHECK(stn_lifecycle_rebuild(&s,NULL,0,root,1,&p)==STN_LIFECYCLE_OK && s.grant_count==0 && s.authority.revoked_count==0);
+    history[0]=block1;history_lengths[0]=bn1;history[1]=block2;history_lengths[1]=bn2;
+    CHECK(stn_lifecycle_rebuild(&s,history,history_lengths,1,root,1,&p)==STN_LIFECYCLE_OK && s.grant_count==1 && s.authority.revoked_count==0);
+    CHECK(stn_lifecycle_rebuild(&s,history,history_lengths,2,root,1,&p)==STN_LIFECYCLE_OK && s.authority.revoked_count==1);
+    CHECK(stn_lifecycle_rebuild(&s,history,history_lengths,1,root,1,&p)==STN_LIFECYCLE_OK && s.authority.revoked_count==0);
+    CHECK(stn_lifecycle_rebuild(&s,NULL,NULL,0,root,1,&p)==STN_LIFECYCLE_OK && s.grant_count==0 && s.authority.revoked_count==0);
     printf("Lifecycle integration: %u checks, %u failures.\n",checks,failures);return failures!=0;
 }

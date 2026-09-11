@@ -283,3 +283,18 @@ IDs are consumed only during accepted-history application. **Lifecycle State
 Derives From Accepted Chain History. Pending Lifecycle Evidence ≠ Active
 Authority. Fork Choice Determines Accepted History; Accepted History Determines
 Authority State.**
+
+## Phase 14 Block 8 — production lifecycle state integration
+
+The Genesis Initial Identity Set is a distinct consensus-visible set from the
+Genesis Authority Root Set. It contains zero through 16 canonical 32-byte
+identities, sorted strictly ascending with no duplicates. Membership permits
+identity-rotation lineage origin only; it grants no authority and does not imply
+root membership, inheritance, fallback, or overlap.
+
+Chain candidate validation clones the prior accepted lifecycle state, applies
+lifecycle transactions in canonical block order, and publishes the clone only
+when the candidate is otherwise accepted. Rejected candidates leave accepted
+lifecycle state unchanged. Persistence, restart, fork choice, reorganization,
+and peer validation use the accepted Chain state and reconstruct lifecycle state
+from accepted history. Pending or transport evidence is never authoritative.

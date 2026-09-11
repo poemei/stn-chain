@@ -5,6 +5,7 @@
 #include "stn_validation.h"
 #include "stn_pow.h"
 #include "stn_authority.h"
+#include "stn_lifecycle.h"
 
 #define STN_CHAIN_MAX_BATCH 64u
 
@@ -15,6 +16,8 @@ typedef struct stn_chain_context {
     /* Canonical genesis-declared authority roots, sorted public keys. */
     const uint8_t *genesis_authority_roots;
     size_t genesis_authority_root_count;
+    const uint8_t *genesis_initial_identities;
+    size_t genesis_initial_identity_count;
     stn_hash_provider hash_provider;
     /* NULL selects legacy v1 development-only profile (no PoW/work).
      * Non-NULL strictly requires v3 blocks, including genesis. No downgrade. */
@@ -34,6 +37,7 @@ typedef struct stn_chain_state {
      * Current window's calculation fields (version/height/time/target). */
     stn_block_header target_history[60];
     size_t target_history_count;
+    stn_lifecycle_state *lifecycle;
 } stn_chain_state;
 
 typedef enum stn_chain_reason {

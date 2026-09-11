@@ -474,3 +474,14 @@ portable accepted-history state reconstructor. Pending evidence remains
 non-authoritative, rejected history does not consume replay state, and branch
 reconstruction follows existing fork choice and transaction order. Type 5
 remains reserved and rejected.
+
+### Block 8 — production lifecycle state integration COMPLETE (2026-09-11)
+
+The lifecycle state is now owned by Chain state during candidate validation. The
+configured Genesis Initial Identity Set is canonical, sorted, duplicate-free,
+limited to 16 exact 32-byte identities, and separate from the Genesis Authority
+Root Set. Lifecycle-bearing candidates are applied to temporary cloned state and
+published only after the complete block passes semantic lifecycle validation.
+Persistence, fork-choice replacement, reorganization, restart reconstruction,
+and peer candidate validation therefore follow accepted history. No Block 9 or
+Phase 15 work was started.

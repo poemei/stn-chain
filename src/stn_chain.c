@@ -2,6 +2,15 @@
 #include "stn_chain.h"
 #include "stn_wire_internal.h"
 #include <string.h>
+#include <stdlib.h>
+
+#define STN_CHAIN_LIFECYCLE_GRANTS 16u
+#define STN_CHAIN_LIFECYCLE_REPLAYS 16u
+typedef struct stn_chain_lifecycle_owned {
+    stn_lifecycle_state state;
+    uint8_t grants[STN_CHAIN_LIFECYCLE_GRANTS * STN_AUTHORITY_GRANT_SIZE];
+    uint8_t replay[STN_CHAIN_LIFECYCLE_REPLAYS * STN_REPLAY_ID_SIZE];
+} stn_chain_lifecycle_owned;
 
 static int zero32(const uint8_t p[32])
 {
@@ -9,6 +18,12 @@ static int zero32(const uint8_t p[32])
     for (i=0;i<32;++i) { if (p[i]!=0) { return 0; } }
     return 1;
 }
+static stn_data_status initial_set_valid(const uint8_t *ids,size_t count)
+{size_t i;if(count>STN_GENESIS_INITIAL_IDENTITY_MAX||(count!=0&&ids==NULL))return STN_DATA_CONTENT;for(i=0;i<count;++i){uint8_t c[32];if(stn_identity_derive(ids+i*32,c)!=STN_IDENTITY_VALID||memcmp(c,ids+i*32,32)!=0)return STN_DATA_CONTENT;if(i&&memcmp(ids+(i-1)*32,ids+i*32,32)>=0)return STN_DATA_CONTENT;}return STN_DATA_OK;}
+static stn_chain_lifecycle_owned *lifecycle_new(const stn_chain_context *c)
+{stn_chain_lifecycle_owned *o=(stn_chain_lifecycle_owned*)calloc(1,sizeof(*o));uint8_t initial[32]={0};if(o==NULL)return NULL;if(c->genesis_initial_identity_count)memcpy(initial,c->genesis_initial_identities,32);stn_lifecycle_initialize(&o->state,o->grants,STN_CHAIN_LIFECYCLE_GRANTS,o->replay,STN_CHAIN_LIFECYCLE_REPLAYS,initial);stn_lifecycle_set_initial_identities(&o->state,c->genesis_initial_identities,c->genesis_initial_identity_count);return o;}
+static stn_chain_lifecycle_owned *lifecycle_clone(const stn_chain_state *s)
+{stn_chain_lifecycle_owned *o;if(s->lifecycle==NULL)return NULL;o=(stn_chain_lifecycle_owned*)calloc(1,sizeof(*o));if(o==NULL)return NULL;memcpy(&o->state,s->lifecycle,sizeof(o->state));if(s->lifecycle->grant_bytes&&s->lifecycle->grant_capacity<=STN_CHAIN_LIFECYCLE_GRANTS)memcpy(o->grants,s->lifecycle->grant_bytes,s->lifecycle->grant_capacity*STN_AUTHORITY_GRANT_SIZE);if(s->lifecycle->replay.consumed&&s->lifecycle->replay.consumed_capacity<=STN_CHAIN_LIFECYCLE_REPLAYS)memcpy(o->replay,s->lifecycle->replay.consumed,s->lifecycle->replay.consumed_capacity*STN_REPLAY_ID_SIZE);o->state.grant_bytes=o->grants;o->state.replay.consumed=o->replay;return o;}
 
 static stn_chain_report initial_report(void)
 {
@@ -39,6 +54,7 @@ static stn_data_status context_valid(const stn_chain_context *c)
     stn_block b;
     if (c==NULL || c->genesis_bytes==NULL) { return STN_DATA_ARGUMENT; }
     if(stn_authority_root_set_validate(c->genesis_authority_roots,c->genesis_authority_root_count)!=STN_AUTHORITY_AUTHORIZED){return STN_DATA_CONTENT;}
+    if(initial_set_valid(c->genesis_initial_identities,c->genesis_initial_identity_count)!=STN_DATA_OK)return STN_DATA_CONTENT;
     if (stn_block_decode(c->genesis_bytes,c->genesis_length,&b)!=STN_DATA_OK ||
         b.header.height!=0 || memcmp(b.header.network_id,c->network_id,32)!=0) { return STN_DATA_CONTENT; }
     if(c->pow_policy!=NULL) {
@@ -56,7 +72,7 @@ stn_data_status stn_chain_initialize(const stn_chain_context *context, stn_chain
     if (out==NULL) { return STN_DATA_ARGUMENT; }
     status=context_valid(context);
     if (status!=STN_DATA_OK) { return status; }
-    memcpy(s.network_id,context->network_id,32); *out=s;
+    memcpy(s.network_id,context->network_id,32); {stn_chain_lifecycle_owned *o=lifecycle_new(context);if(o==NULL)return STN_DATA_CAPACITY;s.lifecycle=&o->state;} *out=s;
     return STN_DATA_OK;
 }
 
@@ -142,7 +158,7 @@ stn_chain_report stn_chain_validate_candidate(const stn_chain_context *context,
 {
     stn_chain_report r=initial_report();
     stn_block b;
-    stn_chain_state next;
+    stn_chain_state next;stn_chain_lifecycle_owned *candidate_lifecycle;int has_lifecycle=0;
     stn_data_status status;
     uint8_t id[32];
     uint32_t i;
@@ -194,10 +210,10 @@ stn_chain_report stn_chain_validate_candidate(const stn_chain_context *context,
         stn_transaction tx; stn_record record;
         offset+=4;
         if (stn_transaction_decode(b.body+offset,n,&tx)!=STN_DATA_OK ||
-            stn_record_decode(tx.record_bytes,tx.record_length,&record)!=STN_RECORD_OK) {
+            (tx.type==STN_TX_PUBLICATION && stn_record_decode(tx.record_bytes,tx.record_length,&record)!=STN_RECORD_OK)) {
             r.body=STN_STAGE_REJECT; return fail(r,STN_CHAIN_BODY,STN_DATA_CONTENT);
         }
-        if (memcmp(record.network_id,context->network_id,32)!=0) {
+        if(tx.type!=STN_TX_PUBLICATION){has_lifecycle=1;} else if (memcmp(record.network_id,context->network_id,32)!=0) {
             r.body=STN_STAGE_REJECT; return fail(r,STN_CHAIN_NETWORK,STN_DATA_CONTENT);
         }
         offset+=n;
@@ -205,7 +221,7 @@ stn_chain_report stn_chain_validate_candidate(const stn_chain_context *context,
     status=stn_chain_block_id(bytes,length,&context->hash_provider,id); r.identifier=stage(status);
     if (status!=STN_DATA_OK) { return fail(r,STN_CHAIN_HASH,status); }
     if (zero32(id)) { r.identifier=STN_STAGE_REJECT; return fail(r,STN_CHAIN_ZERO_ID,STN_DATA_CONTENT); }
-    next=*prior; next.has_tip=1; next.height=b.header.height; next.timestamp=b.header.timestamp;
+    next=*prior;if(has_lifecycle){candidate_lifecycle=lifecycle_clone(prior);if(candidate_lifecycle==NULL)return fail(r,STN_CHAIN_BODY,STN_DATA_CAPACITY);if(stn_lifecycle_apply_block(&candidate_lifecycle->state,bytes,length,context->genesis_authority_roots,context->genesis_authority_root_count,&context->hash_provider)!=STN_LIFECYCLE_OK){return fail(r,STN_CHAIN_BODY,STN_DATA_CONTENT);}next.lifecycle=&candidate_lifecycle->state;} next.has_tip=1; next.height=b.header.height; next.timestamp=b.header.timestamp;
     if(context->pow_policy!=NULL) {
         stn_work unit;
         status=stn_pow_compare(id,b.header.reserved_target); r.pow=stage(status);

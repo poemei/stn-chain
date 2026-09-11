@@ -941,3 +941,15 @@ Integrated qualified authority grants, revocations, and identity rotations into
 the existing canonical transaction header. Added deterministic lifecycle replay
 nonce derivation and accepted-history reconstruction with branch replacement
 qualification. Transaction type 5 remains reserved and rejected.
+### Phase 14 Block 8 — production lifecycle state integration — 2026-09-11
+
+- Integrated grant, revocation, rotation, and replay state into Chain candidate
+  validation through temporary cloned state and atomic publication.
+- Added the separately governed Genesis Initial Identity Set: canonical sorted
+  unique 32-byte identities, maximum 16 entries, with membership granting no
+  authority. Rotation origin validation uses this set; authority roots remain
+  governed independently.
+- Accepted-history persistence, reorganization, restart reconstruction, and peer
+  candidate validation now carry the lifecycle state. Pending lifecycle evidence
+  remains non-authoritative. No Block 9 or Phase 15 work was started. No commit
+  or push.

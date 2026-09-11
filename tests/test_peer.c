@@ -369,7 +369,7 @@ static void convergence(void)
             stn_windows_peer listener={0},connection={0};stn_peer_transport transport;uint16_t port;
             CHECK(stn_windows_peer_listen(0,&listener,&port)==STN_PEER_OK);stn_windows_peer_close(&listener);
             CHECK(stn_windows_peer_connect("127.0.0.1",port,100,&connection,&transport)!=STN_PEER_OK);
-            CHECK(memcmp(&states[0],&prefix,sizeof(prefix))==0 && memcmp(&states[1],&prefix,sizeof(prefix))==0);
+            CHECK(memcmp(states[0].tip_id,prefix.tip_id,32)==0 && memcmp(states[1].tip_id,prefix.tip_id,32)==0 && states[0].height==prefix.height && states[1].height==prefix.height && memcmp(states[0].cumulative_work.bytes,prefix.cumulative_work.bytes,40)==0 && memcmp(states[1].cumulative_work.bytes,prefix.cumulative_work.bytes,40)==0);
         }
         /* No peer exchange while each node validates and persists its own branch. */
         for(j=0;j<2;++j){

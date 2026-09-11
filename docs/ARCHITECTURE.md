@@ -521,3 +521,12 @@ existing canonical Phase 14 payload directly. A portable lifecycle state
 reconstructor applies validated actions only while replaying accepted block and
 transaction order. Fork choice remains independent; replacing accepted history
 rebuilds grants, revocations, rotations, and replay state from that history.
+
+## Phase 14 Block 8 — accepted lifecycle state integration
+
+Chain state now carries the accepted lifecycle projection alongside the accepted
+chain tip. Candidate validation clones that projection, applies lifecycle
+transactions atomically, and publishes it only after block acceptance. The
+Genesis Initial Identity Set is a distinct context input, limited to 16 sorted
+unique canonical identities; it does not confer authority. Persistence, peer
+validation, fork choice, restart, and reorganization remain history-derived.

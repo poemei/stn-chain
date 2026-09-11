@@ -379,3 +379,13 @@ Pending admission remains evidence handling; accepted-history reconstruction is
 the authority and identity state transition boundary. The lifecycle replay
 nonce is deterministic SHA-256 over the lifecycle replay domain, transaction
 type, and canonical signed-statement fields.
+
+## Phase 14 Block 8 — production lifecycle state integration
+
+The Chain context accepts a separate Genesis Initial Identity Set of at most 16
+sorted unique canonical identities. Lifecycle transactions are applied to a
+candidate-local state clone and published atomically with accepted Chain state;
+rejected candidates cannot consume replay state or alter authority/identity
+state. The Release/x64 lifecycle qualification covers production candidate
+integration, initial-set validation, and accepted-state propagation. No Block 9
+or Phase 15 work is included.

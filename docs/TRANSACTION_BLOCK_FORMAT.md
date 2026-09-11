@@ -197,3 +197,13 @@ and type 4 exactly the 129-byte identity rotation. Type 5 remains reserved and
 invalid. Lifecycle payload bytes are not normalized or re-encoded. Accepted
 lifecycle state is reconstructed from persisted block history in canonical
 block and transaction order.
+
+## Phase 14 Block 8 accepted-state integration
+
+Transaction types 2, 3, and 4 retain their existing direct canonical payloads.
+When such a transaction appears in a candidate block, Chain validation applies
+it to a temporary lifecycle state clone in canonical transaction order. The
+clone becomes accepted state only with the block; failed validation leaves the
+prior state unchanged. The Genesis Initial Identity Set is carried by Chain
+context as a separate sorted, duplicate-free set of at most 16 canonical
+32-byte identities and is used only for rotation-lineage origin validation.

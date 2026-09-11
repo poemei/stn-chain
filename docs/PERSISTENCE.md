@@ -171,3 +171,13 @@ Persistence continues to store canonical accepted blocks. Lifecycle authority,
 identity, revocation, and replay state is derived by replaying that history;
 no sidecar lifecycle database is authoritative. Reorganization replaces the
 accepted history and therefore replaces the derived lifecycle state.
+
+## Phase 14 Block 8 lifecycle ownership
+
+Chain state now owns the accepted lifecycle projection used by candidate
+validation. A lifecycle-bearing candidate is applied to a temporary clone of the
+prior state; any malformed, unauthorized, conflicting, or replayed lifecycle
+action rejects the candidate without mutating the prior state. Canonical block
+persistence remains the source of truth. Restart, branch replacement, and peer
+candidate validation reconstruct the same lifecycle projection from accepted
+history; pending lifecycle evidence remains non-authoritative.

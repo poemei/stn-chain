@@ -104,3 +104,13 @@ domain, transaction type, and canonical signed-statement fields. Lifecycle
 state is derived only by replaying accepted blocks in canonical transaction
 order. Pending evidence, rejected blocks, and miner or peer origin do not
 change authority, identity, revocation, or replay state.
+
+## Production lifecycle state integration
+
+The Genesis Initial Identity Set is configured independently of authority roots,
+validated as a sorted duplicate-free list of canonical 32-byte identities, and
+bounded by `STN_GENESIS_INITIAL_IDENTITY_MAX` (16). The Chain context carries the
+set; membership alone grants no authority. Candidate validation applies lifecycle
+transactions to a temporary state clone and publishes it atomically with the
+accepted candidate. Reorganization and restart replace/rebuild this state from
+accepted canonical blocks.
