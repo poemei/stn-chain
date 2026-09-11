@@ -4,6 +4,59 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 12 Block 2 — automatic outbound connections — 2026-09-10
+
+- Added a portable candidate-consuming outbound lane with deterministic rotation,
+  five-second monotonic pacing, partial-resource cleanup and session reuse through
+  existing P2P validation/synchronization. Consensus and wire rules are unchanged.
+- Added repeated --peer IPv4:PORT startup options and an optional Windows worker,
+  private bounded scratch, existing RPC/pending exclusion and joined shutdown.
+  Optional outbound I/O deadlines bound partial streams without changing inbound
+  idle semantics. No global connection ceiling, discovery, scoring or Block 3.
+- Passed 165 targeted C checks (121 policy, 44 Winsock) and 30 executable checks:
+  unavailable fallback, loss/reconnect, invalid evidence, bounded retries and
+  independent inbound P2P/RPC/pending behavior. Total C: 1,133,882; probes: 34.
+  Phase 9: 1,544; Phase 10: 562; adjusted-target processes: 834. Affected Windows
+  Release/x64 builds have zero warnings/errors; all checks have zero failures.
+- Updated roadmap, peer/network and build/runtime documentation. No prior
+  production defect required correction. Other platforms/Internet operation
+  remain unqualified. No commit/push. Block 3 not started.
+
+### Phase 12 Block 3 — peer discovery — 2026-09-10
+
+- Added bounded STNP v2 `GET_PEERS`/`PEERS` discovery. Capability bit 2 enables
+  one demand-driven exchange per established session; payloads use canonical
+  big-endian count and fixed IPv4/port fields, capped at 64 entries / 386 bytes.
+- Discovered evidence is parsed as a complete temporary set, validated through the
+  existing candidate store, sorted deterministically, self-filtered where configured,
+  and committed atomically. Capacity, malformed, duplicate and invalid entries do
+  not evict or partially alter existing candidates. Block 2 consumes the same store.
+- Passed 974 focused C checks (955 policy/codec, 19 real Winsock) and 40 executable
+  checks, including failover to a discovered endpoint, malformed frame isolation,
+  unchanged accepted state/storage/pending state, and existing inbound/RPC safety.
+  Total Chain C: 1,134,856; build probes: 34; Windows Release/x64 has zero
+  warnings/errors/failures. Existing Phase 9/10/11 suites remain passing.
+- Discovery does not confer authority or affect consensus. No external bootstrap,
+  DNS, gossip, scoring, reputation, banning, or learned-peer database was added.
+  Updated peer protocol, roadmap, build/runtime documentation. No commit/push;
+  Block 4 not started.
+
+### Phase 12 Block 1 — deterministic peer candidates — 2026-09-10
+
+- Added local IPv4-octet/numeric-port endpoints and a 64-entry candidate set in
+  the existing peer core. Canonical field ordering is insertion-independent;
+  duplicate/full/malformed outcomes are explicit and preserve existing entries.
+  No allocation, eviction, connection management, wire changes or consensus change.
+- Added 440 focused checks covering three insertion orders, identity/port bounds,
+  invalid endpoints/store invariants, duplicate/full failure atomicity and unchanged
+  block-validation output. All 1,133,717 Chain C checks and 34 probes pass.
+- Passed 1,544 Phase 9, 562 Phase 10, 834 Phase 11 adjusted-target process checks,
+  27 Stratum parser checks and two session assertions. Affected Windows Release/x64
+  targets build with zero warnings/errors; all checks have zero failures.
+- Updated roadmap and peer API/network documentation. No existing production defect
+  required correction. IPv4 only, matching current transport; other platforms are
+  not qualified. Phase 12 remains open; no Block 2, commit or push.
+
 
 ### Phase 11 Chunk 4 — network convergence / Phase 11 COMPLETE — 2026-09-10
 

@@ -135,6 +135,39 @@ static int serve_once(stn_windows_peer *listener,const stn_rpc_service *service)
     }
     free(request);free(response);stn_windows_peer_close(&peer);return ok;
 }
+/* Optional outbound lane with private scratch and existing dispatch exclusion. */
+typedef struct outbound_runtime {
+    stn_peer_outbound manager;stn_windows_peer socket;stn_peer_workspace workspace;
+    stn_mining_service *mining;CRITICAL_SECTION *lock;HANDLE thread;
+} outbound_runtime;
+static DWORD WINAPI outbound_thread(void *user)
+{
+    outbound_runtime *runtime=user;
+    while(InterlockedCompareExchange(&stopping,0,0)==0){
+        EnterCriticalSection(runtime->lock);
+        runtime->socket.operation_deadline_ms=GetTickCount64()+5000;
+        (void)stn_peer_outbound_step(&runtime->manager,GetTickCount64(),runtime->mining->chain,
+            runtime->mining->storage,&runtime->workspace,&runtime->mining->active);
+        LeaveCriticalSection(runtime->lock);Sleep(100);
+    }
+    stn_peer_outbound_close(&runtime->manager);return 0;
+}
+static int candidate_argument(const char *text,stn_peer_candidates *set)
+{
+    stn_peer_endpoint endpoint;unsigned values[5]={0};size_t i;const char *p=text;
+    for(i=0;i<5;++i){
+        unsigned digits=0;
+        while(*p>='0' && *p<='9'){
+            if(++digits>(i==4 ? 5u : 3u)){return 0;}
+            values[i]=values[i]*10u+(unsigned)(*p++-'0');
+        }
+        if(digits==0 || values[i]>(i==4 ? 65535u : 255u)){return 0;}
+        if(i<4){if(*p++!=(i==3 ? ':' : '.')){return 0;}}
+    }
+    if(*p!='\0'){return 0;}
+    for(i=0;i<4;++i){endpoint.address[i]=(uint8_t)values[i];}endpoint.port=(uint16_t)values[4];
+    {stn_peer_status status=stn_peer_candidate_add(set,&endpoint);return status==STN_PEER_OK || status==STN_PEER_RETAINED;}
+}
 int stn_windows_app(int argc,char **argv)
 {
     const char *data="stn-chain-dev.stns",*genesis_path=NULL,*transaction_path=NULL;
@@ -147,9 +180,11 @@ int stn_windows_app(int argc,char **argv)
     stn_windows_peer listener={0};uint16_t bound;stn_storage_status status;
     stn_rpc_service service={&mining,stn_mining_handle};
     rpc_client *clients=NULL;CRITICAL_SECTION dispatch_lock;int lock_ready=0;
+    outbound_runtime outbound={0};stn_peer_candidates candidates={0};
     InterlockedExchange(&stopping,0);
     for(i=1;i<argc;++i){
         if(strcmp(argv[i],"--dev")==0){dev=1;}
+        else if(strcmp(argv[i],"--peer")==0 && i+1<argc){if(!candidate_argument(argv[++i],&candidates)){goto usage;}}
         else if(strcmp(argv[i],"--once")==0){once=1;}
         else if(strcmp(argv[i],"--data")==0 && i+1<argc){data=argv[++i];}
         else if(strcmp(argv[i],"--genesis")==0 && i+1<argc){genesis_path=argv[++i];}
@@ -161,6 +196,7 @@ int stn_windows_app(int argc,char **argv)
     }
     if((dev && ((genesis_path==NULL)!=(transaction_path==NULL))) ||
        (!dev && (genesis_path==NULL || transaction_path!=NULL))){goto usage;}
+    if(once && candidates.count!=0){goto usage;}
     genesis=malloc(STN_BLOCK_MAX_SIZE);body=malloc(STN_BLOCK_MAX_BODY);mining.template_bytes=malloc(STN_BLOCK_MAX_SIZE);
     if(genesis==NULL || body==NULL || mining.template_bytes==NULL){goto cleanup;}
     if(dev && genesis_path==NULL){development_genesis(genesis);genesis_length=364;memcpy(body,genesis+168,196);transaction_length=192;}
@@ -202,6 +238,20 @@ int stn_windows_app(int argc,char **argv)
     if(dev){puts("DEVELOPMENT FIXTURE: repeated structural test transaction; no signed intelligence admission or coin.");}
     puts("RPC v1 binary STNC; concurrent loopback clients limited only by host resources; read + solved-work submission. Ctrl+C stops.");fflush(stdout);
     result=EXIT_SUCCESS;
+    if(candidates.count!=0){
+        size_t cap=8u*1024u*1024u;stn_peer_connector connector={&outbound.socket,stn_windows_peer_open_candidate,stn_windows_peer_close_candidate};
+        if(mining.snapshot_capacity>cap){cap=mining.snapshot_capacity;}
+        outbound.workspace.storage.current_bytes=malloc(cap);outbound.workspace.storage.current_capacity=cap;
+        outbound.workspace.storage.next_bytes=malloc(cap);outbound.workspace.storage.next_capacity=cap;
+        outbound.workspace.candidate=malloc(cap);outbound.workspace.candidate_capacity=cap;
+        outbound.workspace.frame=malloc(STN_PEER_MAX_FRAME);outbound.workspace.frame_capacity=STN_PEER_MAX_FRAME;
+        outbound.workspace.pending=mining.pending;outbound.mining=&mining;outbound.lock=&dispatch_lock;
+        if(outbound.workspace.storage.current_bytes==NULL || outbound.workspace.storage.next_bytes==NULL ||
+            outbound.workspace.candidate==NULL || outbound.workspace.frame==NULL ||
+            stn_peer_outbound_init(&outbound.manager,&candidates,&connector)!=STN_PEER_OK){result=EXIT_FAILURE;goto shutdown;}
+        outbound.thread=CreateThread(NULL,0,outbound_thread,&outbound,0,NULL);
+        if(outbound.thread==NULL){result=EXIT_FAILURE;goto shutdown;}
+    }
     if(once){if(!serve_once(&listener,&service)){result=EXIT_FAILURE;}goto shutdown;}
     while(InterlockedCompareExchange(&stopping,0,0)==0){
 #ifdef STN_PHASE9_TEST_RUNTIME
@@ -221,17 +271,20 @@ int stn_windows_app(int argc,char **argv)
         client->next=clients;clients=client;reap_clients(&clients);
     }
 shutdown:
-    InterlockedExchange(&stopping,1);stop_clients(&clients);(void)SetConsoleCtrlHandler(stop,FALSE);
+    InterlockedExchange(&stopping,1);
+    if(outbound.thread!=NULL){WaitForSingleObject(outbound.thread,INFINITE);CloseHandle(outbound.thread);}
+    stop_clients(&clients);(void)SetConsoleCtrlHandler(stop,FALSE);
 cleanup:
 #ifdef STN_PHASE9_TEST_RUNTIME
     if(phase9_stop_event!=NULL){CloseHandle(phase9_stop_event);phase9_stop_event=NULL;}
 #endif
     stn_windows_peer_close(&listener);if(lock_ready){DeleteCriticalSection(&dispatch_lock);}
+    free(outbound.workspace.storage.current_bytes);free(outbound.workspace.storage.next_bytes);free(outbound.workspace.candidate);free(outbound.workspace.frame);
     stn_pending_clear(&pending);free(genesis);free(body);free(mining.snapshot);free(mining.workspace.current_bytes);free(mining.workspace.next_bytes);free(mining.template_bytes);
     return result;
 usage:
     puts("Usage: stn-chain --dev [--data PATH] [--rpc-port 18473]\n"
          "   or: stn-chain --genesis BLOCK --data PATH [--rpc-port PORT]\n"
-         "Explicit selected content: --dev --genesis BLOCK --transaction STNT.\nLoopback RPC only. --once serves one connection. Port 0 chooses a free port.");
+         "Explicit selected content: --dev --genesis BLOCK --transaction STNT.\nRepeat --peer IPv4:PORT for automatic outbound P2P (not with --once).\nLoopback RPC only. --once serves one connection. Port 0 chooses a free port.");
     return argc==1 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

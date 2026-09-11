@@ -203,3 +203,38 @@ two session assertions. Windows Release/x64 only; zero warnings/errors/failures.
 ## Phase 11 Chunk 4 — final qualification (2026-09-10)
 
 The existing stn-chain-tests.exe includes 1,109 new peer convergence checks (1,282 peer checks; 1,133,277 total C checks). Build/rebuild the Release/x64 solution in Visual Studio and run the existing executable. No new executable or dependency is needed. The harness uses ephemeral loopback sockets and private NTFS directories, then removes its files. Run the existing Phase 9 script, all five Phase 10 modes, and -DifficultyOnly sequentially as described above. Results: 34 probes, 1,544 Phase 9, 562 Phase 10, 834 adjusted-target process checks, 27 Stratum parser checks and two session assertions, all passing. Windows Release/x64 only; zero warnings/errors/failures. See ROADMAP.md for the real-hash versus scripted high-work fixture distinction.
+
+## Phase 12 Block 2 — outbound runtime
+
+Build Release/x64 in the existing Visual Studio solution. To configure outbound
+P2P, add repeated `--peer IPv4:PORT` arguments, for example:
+
+```text
+stn-chain.exe --dev --data chain.stns --peer 127.0.0.1:19000 --peer 127.0.0.1:19001
+```
+
+Those endpoints must serve STNP v2 with the selected network/genesis; they are not
+RPC ports. `--peer` is incompatible with `--once`. Without peers no worker starts.
+The candidate bound remains 64; duplicate endpoints coalesce. No DNS or discovery.
+The worker attempts/refreshes no more than once per five seconds and preserves
+one usable outbound session. Failure advances to the next canonical candidate.
+See PEER_PROTOCOL.md for scratch capacity, deadlines and RPC serialization.
+
+Run the existing C executable and `tools/test-node.ps1 -OutboundOnly` for 165 C
+and 30 process checks specific to this block. The latter uses ephemeral localhost
+ports and private files, verifies session reuse/reconnect and partial-response
+isolation, and disposes its test processes. Existing Phase 9/10/11 process suites
+were also run once against the updated runtime. No other-platform qualification.
+
+## Phase 12 Block 3 — peer discovery
+
+STNP v2 discovery uses types 7 and 8; capability bit 2 advertises support. After
+existing synchronization, the outbound manager performs at most one bounded
+`GET_PEERS` request per connection. `PEERS` is a two-byte count followed by six
+bytes per IPv4 endpoint, maximum 386-byte payload. Entries pass the existing
+64-entry candidate store and never bypass Chain validation.
+
+The focused C run reports 955 codec/policy and 19 real-Winsock discovery checks.
+`tools/test-node.ps1 -DiscoveryOnly` reports 40 checks using ephemeral local peers,
+including discovered-peer failover and malformed-discovery isolation. No external
+seed, DNS, multicast, NAT, gossip or learned-peer database is involved.

@@ -1,6 +1,6 @@
 # Copyright (c) 2026 STN-Labz. See docs/LICENSE.md.
 # Real executable / TCP / CNG / NTFS integration. No mining search loop.
-param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly, [switch]$LibraryOnly)
+param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly, [switch]$LibraryOnly, [switch]$OutboundOnly, [switch]$DiscoveryOnly)
 $ErrorActionPreference = 'Stop'
 $script:checks = 0
 function Check($condition, $message) {
@@ -38,13 +38,14 @@ function Request($stream, [int]$method, [byte[]]$payload, [int]$version = 2) {
     Check ($n -le 1051948) 'response bounded'
     return @{ Code = (ReadNumber $header[10..11]); Payload = (ReadExact $stream ([int]$n)) }
 }
-function StartNode([string]$data, [bool]$once = $true, [string]$genesis = '', [int]$rpcPort = 0) {
+function StartNode([string]$data, [bool]$once = $true, [string]$genesis = '', [int]$rpcPort = 0, [string]$peer = '') {
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = [IO.Path]::GetFullPath($Executable)
     $info.Arguments = '--dev --once --rpc-port 0 --data "' + $data + '"'
     $info.Arguments = $info.Arguments.Replace('--rpc-port 0', '--rpc-port ' + $rpcPort)
     if ($genesis) { $info.Arguments = $info.Arguments.Replace('--dev', '--genesis "' + $genesis + '"') }
     if (!$once) { $info.Arguments = $info.Arguments.Replace('--once ', '') }
+    if ($peer) { $info.Arguments += ' --peer ' + $peer }
     $info.UseShellExecute = $false; $info.CreateNoWindow = $true
     $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
     $p = [Diagnostics.Process]::Start($info)
@@ -97,7 +98,84 @@ try {
     $anchor = Request $node.Stream 2 (NumberBytes 0 8)
     Check ($anchor.Code -eq 0 -and $anchor.Payload.Length -eq 364) 'explicit normal-mode genesis'
     [IO.File]::WriteAllBytes($genesisPath, $anchor.Payload)
-    if ($PendingRpcOnly) {
+    if ($DiscoveryOnly) {
+        $node.Client.Close();Check ($node.Process.WaitForExit(5000)) 'bootstrap stopped'
+        $peerA=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
+        $peerB=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
+        $peerA.Start();$peerB.Start()
+        function ServeDiscovery($remote,[int]$port,[bool]$malformed) {
+            $remote.ReceiveTimeout=10000;$remote.SendTimeout=5000;$stream=$remote.GetStream()
+            foreach($expected in @(1,2,3,7)) {
+                $header=ReadExact $stream 12
+                Check (([Text.Encoding]::ASCII.GetString($header,0,4)) -eq 'STNP' -and (ReadNumber $header[4..5]) -eq 2) 'discovery STNP v2'
+                Check ((ReadNumber $header[6..7]) -eq $expected) 'establishment then one discovery request'
+                $payload=ReadExact $stream ([int](ReadNumber $header[8..11]))
+                if($expected -eq 1){$response=$payload;$response[67]=3;$type=1}
+                elseif($expected -eq 2){$response=[byte[]]::new(84);$response[83]=1;$type=2}
+                elseif($expected -eq 3){$response=[byte[]]((NumberBytes 0 4)+(NumberBytes 1 4)+$anchor.Payload[0..167]);$type=4}
+                else {
+                    Check ($payload.Length -eq 0) 'empty bounded discovery request'
+                    $response=[byte[]]((NumberBytes 1 2)+[byte[]]@(127,0,0,1)+(NumberBytes $port 2));$type=8
+                    if($malformed){$response[6]=0;$response[7]=0}
+                }
+                $frame=[byte[]]([Text.Encoding]::ASCII.GetBytes('STNP')+(NumberBytes 2 2)+(NumberBytes $type 2)+(NumberBytes $response.Length 4)+$response)
+                $stream.Write($frame,0,$frame.Length)
+            }
+        }
+        try {
+            $before=[IO.File]::ReadAllBytes($data)
+            $node=StartNode $data $false $genesisPath 0 ("127.0.0.1:"+$peerA.LocalEndpoint.Port)
+            $accept=$peerA.AcceptTcpClientAsync();Check ($accept.Wait(10000)) 'configured A connected'
+            $a=$accept.Result;$script:clients+=$a
+            ServeDiscovery $a $peerB.LocalEndpoint.Port $false
+            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq 0) 'discovery alone leaves accepted state unchanged'
+            Check ((Hex ([IO.File]::ReadAllBytes($data))) -eq (Hex $before)) 'discovery leaves canonical storage unchanged'
+            $a.Close()
+            $accept=$peerB.AcceptTcpClientAsync();Check ($accept.Wait(15000)) 'discovered B selected after A loss'
+            $b=$accept.Result;$script:clients+=$b
+            ServeDiscovery $b $peerA.LocalEndpoint.Port $true
+            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq 0) 'malformed discovery isolated from established RPC'
+            $r=Request $node.Stream 0x1004 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[0..3]) -eq 0) 'malformed discovery leaves pending unchanged'
+            Check ((Hex ([IO.File]::ReadAllBytes($data))) -eq (Hex $before)) 'malformed discovery leaves storage unchanged'
+            Write-Output "Peer discovery executable: $script:checks checks, 0 failures."
+        } finally {$peerA.Stop();$peerB.Stop()}
+        return
+    }    if ($OutboundOnly) {
+        $node.Client.Close(); Check ($node.Process.WaitForExit(5000)) 'bootstrap stopped'
+        $listener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0);$listener.Start()
+        try {
+            $peerPort=$listener.LocalEndpoint.Port
+            $node=StartNode $data $false $genesisPath 0 ("127.0.0.1:"+$peerPort)
+            $accept=$listener.AcceptTcpClientAsync();Check ($accept.Wait(10000)) 'automatic outbound accepted'
+            $remote=$accept.Result;$script:clients+=$remote;$remote.ReceiveTimeout=10000;$remote.SendTimeout=5000;$stream=$remote.GetStream()
+            # Serve the existing canonical genesis as evidence; headers are reused
+            # from local storage only after equality and ordinary revalidation.
+            foreach($expected in @(1,2,3,2,3)) {
+                $header=ReadExact $stream 12
+                Check (([Text.Encoding]::ASCII.GetString($header,0,4)) -eq 'STNP' -and (ReadNumber $header[4..5]) -eq 2) 'STNP v2'
+                Check ((ReadNumber $header[6..7]) -eq $expected) 'handshake once, then maintained session'
+                $payload=ReadExact $stream ([int](ReadNumber $header[8..11]))
+                if($expected -eq 1){$response=$payload;$type=1}
+                elseif($expected -eq 2){$response=[byte[]]::new(84);$response[83]=1;$type=2}
+                else {$response=[byte[]]((NumberBytes 0 4)+(NumberBytes 1 4)+$anchor.Payload[0..167]);$type=4}
+                $frame=[byte[]]([Text.Encoding]::ASCII.GetBytes('STNP')+(NumberBytes 2 2)+(NumberBytes $type 2)+(NumberBytes $response.Length 4)+$response)
+                $stream.Write($frame,0,$frame.Length)
+            }
+            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq 0) 'inbound RPC survives outbound validation'
+            $remote.Close()
+            $accept=$listener.AcceptTcpClientAsync();Check ($accept.Wait(15000)) 'automatic reconnect after loss'
+            $remote=$accept.Result;$script:clients+=$remote;$remote.ReceiveTimeout=10000;$stream=$remote.GetStream()
+            $header=ReadExact $stream 12;$null=ReadExact $stream ([int](ReadNumber $header[8..11]))
+            # A partial malformed response must exhaust the bounded operation,
+            # release dispatch exclusion and leave established RPC usable.
+            $stream.WriteByte(0)
+            Start-Sleep -Milliseconds 6200
+            $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq 0) 'partial outbound cannot alter state or strand RPC'
+            $r=Request $node.Stream 0x1004 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[0..3]) -eq 0) 'pending unchanged'
+            Write-Output "Automatic outbound executable: $script:checks checks, 0 failures."
+        } finally { $listener.Stop() }
+        return
+    }    if ($PendingRpcOnly) {
         $node.Client.Close(); Check ($node.Process.WaitForExit(5000)) 'bootstrap stopped'
         $node = StartNode $data $false $genesisPath
         $submission = [byte[]]::new(244)

@@ -3,14 +3,19 @@
 #include "stn_wire_internal.h"
 #include <string.h>
 #include <stdlib.h>
-static int type_valid(uint16_t t){return t>=STN_PEER_HELLO && t<=STN_PEER_BLOCK;}
+static int type_valid(uint16_t t){return t>=STN_PEER_HELLO && t<=STN_PEER_PEERS;}
+static int discovery_size(uint16_t type,size_t size)
+{
+    return type==STN_PEER_GET_PEERS ? size==0 :
+        (type!=STN_PEER_PEERS || (size>=2 && size<=STN_PEER_DISCOVERY_MAX && (size-2)%6==0));
+}
 stn_peer_status stn_peer_header(const uint8_t *p,size_t n,uint16_t *t,size_t *length)
 {
     uint16_t type;size_t size;
     if(p==NULL || t==NULL || length==NULL){return STN_PEER_ARGUMENT;}
     if(n!=12 || memcmp(p,"STNP",4)!=0 || stn_wire_read(p+4,2)!=2){return STN_PEER_PROTOCOL;}
     type=(uint16_t)stn_wire_read(p+6,2);size=(size_t)stn_wire_read(p+8,4);
-    if(!type_valid(type) || size>STN_PEER_MAX_PAYLOAD){return STN_PEER_PROTOCOL;}
+    if(!type_valid(type) || size>STN_PEER_MAX_PAYLOAD || !discovery_size(type,size)){return STN_PEER_PROTOCOL;}
     *t=type;*length=size;return STN_PEER_OK;
 }
 stn_peer_status stn_peer_decode(const uint8_t *p,size_t n,stn_peer_message *out)
@@ -26,7 +31,7 @@ stn_peer_status stn_peer_encode(uint16_t t,const uint8_t *p,size_t n,uint8_t *ou
 {
     if(written!=NULL){*written=0;}
     if(out==NULL || written==NULL || (n!=0 && p==NULL)){return STN_PEER_ARGUMENT;}
-    if(!type_valid(t) || n>STN_PEER_MAX_PAYLOAD){return STN_PEER_PROTOCOL;}
+    if(!type_valid(t) || n>STN_PEER_MAX_PAYLOAD || !discovery_size(t,n)){return STN_PEER_PROTOCOL;}
     if(cap<12 || n>cap-12){return STN_PEER_CAPACITY;}
     if(n!=0){memmove(out+12,p,n);}memcpy(out,"STNP",4);
     stn_wire_write(out+4,2,2);stn_wire_write(out+6,2,t);stn_wire_write(out+8,4,n);*written=n+12;return STN_PEER_OK;
@@ -61,7 +66,11 @@ stn_peer_status stn_peer_serve(const stn_chain_context *c,const stn_block_span *
         if(m.type!=STN_PEER_HELLO || m.length!=68){goto bad;}
         s=hello(c,greeting);if(s!=STN_PEER_OK){return s;}
         if(memcmp(m.payload,greeting,68)!=0){session->handshake=-1;return STN_PEER_NETWORK;}
+        if(session->known!=NULL){stn_wire_write(greeting+64,4,3);}
         memcpy(response+12,greeting,68);length=68;
+    }else if(m.type==STN_PEER_GET_PEERS && m.length==0 && session->known!=NULL && !session->discovery_sent){
+        s=stn_peer_discovery_encode(session->known,session->self,response+12,cap-12,&length);
+        if(s!=STN_PEER_OK){return s;}type=STN_PEER_PEERS;session->discovery_sent=1;
     }else if(m.type==STN_PEER_STATE && m.length==0){
         if(cap<96){return STN_PEER_CAPACITY;}
         stn_wire_write(response+12,8,state.height);memcpy(response+20,state.tip_id,32);
@@ -103,7 +112,7 @@ static stn_peer_status exchange(const stn_peer_transport *t,stn_peer_workspace *
     s=stn_peer_decode(w->frame,length,m);if(s!=STN_PEER_OK){return s;}
     return m->type==expected ? STN_PEER_OK : STN_PEER_PROTOCOL;
 }
-stn_peer_report stn_peer_sync(const stn_chain_context *c,const stn_storage_provider *storage,
+static stn_peer_report sync_session(int established,uint32_t *capabilities,const stn_chain_context *c,const stn_storage_provider *storage,
     const stn_peer_transport *t,stn_peer_workspace *w,stn_chain_state *active)
 {
     stn_peer_report r={0};stn_storage_view local={0};stn_peer_message m;stn_storage_status ss;
@@ -113,9 +122,13 @@ stn_peer_report stn_peer_sync(const stn_chain_context *c,const stn_storage_provi
     if(c==NULL || storage==NULL || t==NULL || t->send==NULL || t->receive==NULL || w==NULL || active==NULL || w->candidate==NULL || w->frame==NULL){return r;}
     ss=stn_storage_recovery_read(c,storage,w->storage.current_bytes,w->storage.current_capacity,&local,&r.recovery);
     if(ss!=STN_STORAGE_OK){r.status=STN_PEER_STORAGE;goto done;}
+    if(!established){
     r.status=hello(c,greeting);if(r.status!=STN_PEER_OK){goto done;}
     r.status=exchange(t,w,STN_PEER_HELLO,greeting,68,STN_PEER_HELLO,&m);if(r.status!=STN_PEER_OK){goto done;}
-    if(m.length!=68 || memcmp(m.payload,greeting,68)!=0){r.status=STN_PEER_NETWORK;goto done;}
+    if(m.length!=68 || memcmp(m.payload,greeting,64)!=0 ||
+        (stn_wire_read(m.payload+64,4)!=1 && stn_wire_read(m.payload+64,4)!=3)){r.status=STN_PEER_NETWORK;goto done;}
+    if(capabilities!=NULL){*capabilities=(uint32_t)stn_wire_read(m.payload+64,4);}
+    }
     r.status=exchange(t,w,STN_PEER_STATE,NULL,0,STN_PEER_STATE,&m);if(r.status!=STN_PEER_OK){goto done;}
     if(m.length!=84){r.status=STN_PEER_PROTOCOL;goto done;}
     count=(size_t)stn_wire_read(m.payload+80,4);
@@ -159,4 +172,136 @@ stn_peer_report stn_peer_sync(const stn_chain_context *c,const stn_storage_provi
     r.status=STN_PEER_OK;r.verified=checked;
 done:
     free(blocks);stn_storage_view_release(&local);return r;
+}
+
+/* Canonical local endpoint order compares fields, never structure padding. */
+static int endpoint_order(const stn_peer_endpoint *a,const stn_peer_endpoint *b)
+{
+    int c=memcmp(a->address,b->address,4);
+    if(c!=0){return c;}return a->port<b->port ? -1 : (a->port>b->port ? 1 : 0);
+}
+static int endpoint_valid(const stn_peer_endpoint *p)
+{
+    /* Reject unspecified/this-network, multicast, reserved and limited broadcast.
+     * Loopback/private/link-local unicast remain eligible for local operation.
+     * Subnet-directed broadcast cannot be inferred without interface policy. */
+    return p->port!=0 && p->address[0]!=0 && p->address[0]<224;
+}
+stn_peer_status stn_peer_candidate_add(stn_peer_candidates *set,const stn_peer_endpoint *endpoint)
+{
+    size_t i,position;stn_peer_endpoint candidate;
+    if(set==NULL || endpoint==NULL || set->count>STN_PEER_CANDIDATE_MAX){return STN_PEER_ARGUMENT;}
+    candidate=*endpoint;
+    if(!endpoint_valid(&candidate)){return STN_PEER_ARGUMENT;}
+    for(i=0;i<set->count;++i){
+        if(!endpoint_valid(&set->entries[i]) || (i!=0 && endpoint_order(&set->entries[i-1],&set->entries[i])>=0)){
+            return STN_PEER_ARGUMENT;
+        }
+    }
+    for(position=0;position<set->count;++position){
+        int comparison=endpoint_order(&candidate,&set->entries[position]);
+        if(comparison==0){return STN_PEER_RETAINED;}if(comparison<0){break;}
+    }
+    if(set->count==STN_PEER_CANDIDATE_MAX){return STN_PEER_CAPACITY;}
+    for(i=set->count;i>position;--i){set->entries[i]=set->entries[i-1];}
+    memcpy(set->entries[position].address,candidate.address,4);
+    set->entries[position].port=candidate.port;++set->count;return STN_PEER_OK;
+}
+
+stn_peer_report stn_peer_sync(const stn_chain_context *c,const stn_storage_provider *storage,
+    const stn_peer_transport *t,stn_peer_workspace *w,stn_chain_state *active)
+{return sync_session(0,NULL,c,storage,t,w,active);}
+
+stn_peer_status stn_peer_outbound_init(stn_peer_outbound *out,const stn_peer_candidates *candidates,
+    const stn_peer_connector *connector)
+{
+    stn_peer_outbound value={0};size_t i;
+    if(out==NULL || candidates==NULL || connector==NULL || connector->open==NULL || connector->close==NULL || candidates->count>64){return STN_PEER_ARGUMENT;}
+    for(i=0;i<candidates->count;++i){
+        if(stn_peer_candidate_add(&value.candidates,&candidates->entries[i])!=STN_PEER_OK){return STN_PEER_ARGUMENT;}
+    }
+    value.connector=*connector;*out=value;return STN_PEER_OK;
+}
+void stn_peer_outbound_close(stn_peer_outbound *out)
+{
+    if(out!=NULL && out->connected){out->connector.close(out->connector.user);out->connected=0;memset(&out->transport,0,sizeof(out->transport));}
+}
+stn_peer_status stn_peer_outbound_step(stn_peer_outbound *out,uint64_t now,
+    const stn_chain_context *c,const stn_storage_provider *storage,stn_peer_workspace *w,stn_chain_state *active)
+{
+    stn_peer_status status;int established;stn_peer_endpoint selected;
+    if(out==NULL || out->connector.open==NULL || out->connector.close==NULL || c==NULL || storage==NULL || w==NULL || active==NULL){return STN_PEER_ARGUMENT;}
+    if(out->candidates.count==0){return STN_PEER_RETAINED;}
+    if(out->started && (now<out->last_step || now-out->last_step<STN_PEER_OUTBOUND_INTERVAL_MS)){return STN_PEER_RETAINED;}
+    out->started=1;out->last_step=now;established=out->connected;selected=out->candidates.entries[out->next];
+    if(!out->connected){
+        status=out->connector.open(out->connector.user,&out->candidates.entries[out->next],&out->transport);
+        if(status!=STN_PEER_OK){
+            out->connector.close(out->connector.user);memset(&out->transport,0,sizeof(out->transport));
+            out->next=(out->next+1)%out->candidates.count;out->last_status=status;return status;
+        }
+    }
+    status=sync_session(out->connected,&out->remote_capabilities,c,storage,&out->transport,w,active).status;
+    if((status==STN_PEER_OK || status==STN_PEER_RETAINED) && !established){
+        out->last_discovery=STN_PEER_RETAINED;
+        if((out->remote_capabilities&2u)!=0){
+            stn_peer_message evidence;
+            out->last_discovery=exchange(&out->transport,w,STN_PEER_GET_PEERS,NULL,0,STN_PEER_PEERS,&evidence);
+            if(out->last_discovery==STN_PEER_OK){
+                out->last_discovery=stn_peer_discovery_admit(&out->candidates,out->self,evidence.payload,evidence.length);
+                /* Insertion may shift the selected endpoint's index. */
+                for(out->next=0;out->next<out->candidates.count;++out->next){
+                    if(endpoint_order(&selected,&out->candidates.entries[out->next])==0){break;}
+                }
+            }
+            if(out->last_discovery!=STN_PEER_OK && out->last_discovery!=STN_PEER_CAPACITY){status=out->last_discovery;}
+        }
+    }
+    if(status==STN_PEER_OK || status==STN_PEER_RETAINED){out->connected=1;}
+    else{
+        out->connector.close(out->connector.user);memset(&out->transport,0,sizeof(out->transport));out->connected=0;
+        out->next=(out->next+1)%out->candidates.count;
+    }
+    out->last_status=status;return status;
+}
+
+stn_peer_status stn_peer_discovery_admit(stn_peer_candidates *set,const stn_peer_endpoint *self,const uint8_t *bytes,size_t length)
+{
+    stn_peer_candidates ordered={0},merged;stn_peer_endpoint endpoint;size_t count,i;stn_peer_status status;
+    if(set==NULL || bytes==NULL || (self!=NULL && !endpoint_valid(self))){return STN_PEER_ARGUMENT;}
+    if(length<2 || length>STN_PEER_DISCOVERY_MAX){return STN_PEER_PROTOCOL;}
+    count=(size_t)stn_wire_read(bytes,2);
+    if(count>64 || length!=2+count*6){return STN_PEER_PROTOCOL;}
+    for(i=0;i<count;++i){
+        memcpy(endpoint.address,bytes+2+i*6,4);endpoint.port=(uint16_t)stn_wire_read(bytes+6+i*6,2);
+        status=stn_peer_candidate_add(&ordered,&endpoint);
+        if(status!=STN_PEER_OK && status!=STN_PEER_RETAINED){return STN_PEER_PROTOCOL;}
+    }
+    /* Validate current invariants even for an empty response. */
+    if(set->count>64){return STN_PEER_ARGUMENT;}
+    for(i=0;i<set->count;++i){
+        if(!endpoint_valid(&set->entries[i]) || (i!=0 && endpoint_order(&set->entries[i-1],&set->entries[i])>=0)){return STN_PEER_ARGUMENT;}
+    }
+    merged=*set;
+    for(i=0;i<ordered.count;++i){
+        if(self!=NULL && endpoint_order(self,&ordered.entries[i])==0){continue;}
+        status=stn_peer_candidate_add(&merged,&ordered.entries[i]);
+        if(status!=STN_PEER_OK && status!=STN_PEER_RETAINED){return status;}
+    }
+    *set=merged;return STN_PEER_OK;
+}
+stn_peer_status stn_peer_discovery_encode(const stn_peer_candidates *set,const stn_peer_endpoint *self,uint8_t *bytes,size_t capacity,size_t *written)
+{
+    uint8_t payload[STN_PEER_DISCOVERY_MAX];size_t i,count=0;
+    if(written!=NULL){*written=0;}
+    if(set==NULL || bytes==NULL || written==NULL || set->count>64 || (self!=NULL && !endpoint_valid(self))){return STN_PEER_ARGUMENT;}
+    for(i=0;i<set->count;++i){
+        const stn_peer_endpoint *endpoint=&set->entries[i];
+        if(!endpoint_valid(endpoint) || (i!=0 && endpoint_order(&set->entries[i-1],endpoint)>=0)){return STN_PEER_ARGUMENT;}
+        if(self!=NULL && endpoint_order(self,endpoint)==0){continue;}
+        memcpy(payload+2+count*6,endpoint->address,4);stn_wire_write(payload+6+count*6,2,endpoint->port);++count;
+    }
+    stn_wire_write(payload,2,count);
+    if(capacity<2+count*6){return STN_PEER_CAPACITY;}
+    memcpy(bytes,payload,2+count*6);*written=2+count*6;return STN_PEER_OK;
 }

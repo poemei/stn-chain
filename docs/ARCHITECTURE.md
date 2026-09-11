@@ -351,3 +351,18 @@ No hardware or production-identity qualification is implied.
 ## Phase 11 Chunk 4 — final qualification (2026-09-10)
 
 Phase 11 deterministic difficulty adjustment is COMPLETE on Windows Release/x64. Branch ancestry determines validation and mining targets; actual P2P evidence is independently validated before 320-bit work comparison and atomic adoption. Two NTFS node states converge after a bounded partition and reconstruct identical canonical history on reopen. Existing process regressions separately prove Chain/Stratum restart and continued mining. This qualification adds tests only, not production orchestration or consensus design. See ROADMAP.md for exact evidence, scripted-fixture boundaries and deferred qualification.
+
+## Phase 12 Block 3 — peer discovery
+
+Discovery is a local orchestration input layered onto the existing peer session.
+An established peer may answer one bounded STNP v2 `GET_PEERS` request when it
+advertises capability bit 2. The response contains only configured IPv4 endpoint
+evidence. The receiver validates the entire batch, omits its configured self
+endpoint, and merges it through the existing deterministic 64-entry candidate
+store. Block 2 remains the only outbound connection manager.
+
+Discovery never changes accepted Chain state and never establishes authority,
+trust, priority or consensus validity. All later synchronization follows the
+existing validation, proof-of-work, target, cumulative-work, fork-choice and
+persistence paths. No external bootstrap, recursive gossip, scoring, reputation,
+banning or learned-peer database is part of this block. Block 4 remains open.

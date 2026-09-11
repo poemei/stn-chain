@@ -4,12 +4,14 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
+#include <stdio.h>
 #include "stn_windows_peer.h"
 
 static stn_peer_status ready(stn_windows_peer *p,int writing)
 {
     fd_set f,e;TIMEVAL time;int result;
     if(!p->opened || p->io_timeout_ms==0){return STN_PEER_IO;}
+    if(p->operation_deadline_ms!=0 && GetTickCount64()>=p->operation_deadline_ms){return STN_PEER_IO;}
     time.tv_sec=(long)(p->io_timeout_ms/1000u);time.tv_usec=(long)((p->io_timeout_ms%1000u)*1000u);
     FD_ZERO(&f);FD_ZERO(&e);FD_SET((SOCKET)p->socket,&f);FD_SET((SOCKET)p->socket,&e);
     result=select(0,writing?NULL:&f,writing?&f:NULL,&e,&time);
@@ -95,3 +97,13 @@ stn_peer_status stn_windows_peer_accept(stn_windows_peer *listener,unsigned time
     if(WSAStartup(MAKEWORD(2,2),&data)!=0){closesocket(accepted);return STN_PEER_IO;}
     return setup(accepted,timeout,out,transport);
 }
+
+stn_peer_status stn_windows_peer_open_candidate(void *user,const stn_peer_endpoint *endpoint,stn_peer_transport *transport)
+{
+    stn_windows_peer *peer=user;char ip[16];
+    if(peer==NULL || endpoint==NULL || peer->opened){return STN_PEER_ARGUMENT;}
+    if(snprintf(ip,sizeof(ip),"%u.%u.%u.%u",(unsigned)endpoint->address[0],(unsigned)endpoint->address[1],
+        (unsigned)endpoint->address[2],(unsigned)endpoint->address[3])<0){return STN_PEER_ARGUMENT;}
+    return stn_windows_peer_connect(ip,endpoint->port,1000,peer,transport);
+}
+void stn_windows_peer_close_candidate(void *user){stn_windows_peer_close(user);}

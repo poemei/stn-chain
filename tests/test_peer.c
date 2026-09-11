@@ -61,6 +61,7 @@ static stn_peer_status mock_send(void *u,const uint8_t *p,size_t n)
     m->offset=0;if(s!=STN_PEER_OK){return s;}
     if(m->mode==2 && reply[7]==STN_PEER_HELLO){reply[12]^=1;}
     if(m->mode==3){reply[5]=1;}
+    if(m->mode==16 && reply[7]==STN_PEER_PEERS){reply[12]=0;reply[13]=65;}
     if(reply[7]==STN_PEER_STATE){
         if(m->mode==1){memset(reply+20,255,64);}
         if(m->mode==6){reply[7]=STN_PEER_HELLO;}
@@ -203,12 +204,13 @@ static void synchronization(stn_chain_context *c)
     r=stn_peer_sync(c,&p,&t,&w,&active);
     CHECK(r.status==STN_PEER_OK && r.recovery && r.received_blocks==130 && r.reused_blocks==0);
 }
-typedef struct server_args { stn_windows_peer listener;const stn_chain_context *c;stn_peer_status result; } server_args;
+typedef struct server_args { const stn_peer_candidates *known;unsigned limit;stn_windows_peer listener;const stn_chain_context *c;stn_peer_status result; } server_args;
 static DWORD WINAPI server_thread(void *u)
 {
     server_args *args=u;stn_windows_peer connection={0};stn_peer_transport t;stn_peer_session session={0};size_t n,reply_n;unsigned i;
+    session.known=args->known;
     args->result=stn_windows_peer_accept(&args->listener,10000,&connection,&t);
-    for(i=0;args->result==STN_PEER_OK && i<4;++i){
+    for(i=0;args->result==STN_PEER_OK && i<(args->limit==0 ? 4 : args->limit);++i){
         args->result=stn_peer_receive(&t,reply,sizeof(reply),&n);if(args->result!=STN_PEER_OK){break;}
         args->result=stn_peer_serve(args->c,bs,2,&session,reply,n,reply,sizeof(reply),&reply_n);if(args->result!=STN_PEER_OK){break;}
         args->result=t.send(t.user,reply,reply_n);
@@ -417,6 +419,240 @@ static void convergence(void)
     printf("Difficulty network convergence: %u targeted checks (real sockets/NTFS; high-work hash fixture separately).\n",checks-initial_checks);
 }
 
+typedef struct auto_mock { const stn_peer_candidates *known;mock peer;unsigned attempts,closes;uint16_t order[16];int unavailable; } auto_mock;
+static stn_peer_status auto_open(void *user,const stn_peer_endpoint *endpoint,stn_peer_transport *transport)
+{
+    auto_mock *m=user;m->order[m->attempts++]=endpoint->port;
+    memset(&m->peer.session,0,sizeof(m->peer.session));m->peer.session.known=m->known;m->peer.offset=0;
+    transport->user=&m->peer;transport->send=mock_send;transport->receive=mock_receive;
+    return m->unavailable && endpoint->port==1 ? STN_PEER_IO : STN_PEER_OK;
+}
+static void auto_close(void *user){auto_mock *m=user;++m->closes;memset(&m->peer.session,0,sizeof(m->peer.session));m->peer.session.known=m->known;m->peer.offset=0;}
+static void outbound_mock(stn_chain_context *c)
+{
+    stn_peer_candidates candidates={0};stn_peer_endpoint endpoint={{127,0,0,1},2};
+    auto_mock backend={0};stn_peer_connector connector={&backend,auto_open,auto_close};stn_peer_outbound manager;
+    stn_storage_provider storage={&mem,lock_mem,unlock_mem,read_mem,write_mem};
+    stn_peer_workspace workspace={{scratch,CAP,next_bytes,CAP},candidate_bytes,CAP,frame,sizeof(frame)};
+    stn_chain_state active,before;uint64_t tick=0;unsigned start=checks,i;
+    backend.peer.c=c;backend.peer.count=2;backend.unavailable=1;
+    CHECK(stn_peer_candidate_add(&candidates,&endpoint)==STN_PEER_OK);endpoint.port=1;
+    CHECK(stn_peer_candidate_add(&candidates,&endpoint)==STN_PEER_OK);
+    CHECK(stn_peer_outbound_init(&manager,&candidates,&connector)==STN_PEER_OK);
+    reset(c,1,&active);before=active;
+    CHECK(stn_peer_outbound_step(&manager,tick,c,&storage,&workspace,&active)==STN_PEER_IO);
+    CHECK(backend.attempts==1 && backend.order[0]==1 && backend.closes==1 && !manager.connected);
+    CHECK(memcmp(&before,&active,sizeof(active))==0 && !mem.locked);
+    for(i=0;i<100;++i){CHECK(stn_peer_outbound_step(&manager,i,c,&storage,&workspace,&active)==STN_PEER_RETAINED);}
+    CHECK(backend.attempts==1);
+    tick+=5000;CHECK(stn_peer_outbound_step(&manager,tick,c,&storage,&workspace,&active)==STN_PEER_OK);
+    CHECK(manager.connected && backend.order[1]==2 && backend.peer.session.handshake==1 && active.height==1);
+    tick+=5000;CHECK(stn_peer_outbound_step(&manager,tick,c,&storage,&workspace,&active)==STN_PEER_RETAINED && manager.connected && backend.attempts==2);
+    before=active;backend.peer.mode=4;tick+=5000;
+    CHECK(stn_peer_outbound_step(&manager,tick,c,&storage,&workspace,&active)==STN_PEER_DISCONNECTED);
+    CHECK(!manager.connected && manager.transport.user==NULL && backend.closes==2 && memcmp(&active,&before,sizeof(active))==0);
+    backend.unavailable=0;backend.peer.mode=0;tick+=5000;
+    CHECK(stn_peer_outbound_step(&manager,tick,c,&storage,&workspace,&active)==STN_PEER_RETAINED && manager.connected && backend.order[2]==1);
+    backend.peer.mode=3;tick+=5000;CHECK(stn_peer_outbound_step(&manager,tick,c,&storage,&workspace,&active)==STN_PEER_PROTOCOL && !manager.connected);
+    backend.peer.mode=8;tick+=5000;CHECK(stn_peer_outbound_step(&manager,tick,c,&storage,&workspace,&active)==STN_PEER_VALIDATION && !manager.connected);
+    CHECK(memcmp(&active,&before,sizeof(active))==0 && !mem.locked);
+    backend.peer.mode=0;tick+=5000;CHECK(stn_peer_outbound_step(&manager,tick,c,&storage,&workspace,&active)==STN_PEER_RETAINED && manager.connected);
+    stn_peer_outbound_close(&manager);i=backend.closes;stn_peer_outbound_close(&manager);CHECK(i==backend.closes && !manager.connected);
+    CHECK(stn_peer_outbound_step(&manager,tick-1,c,&storage,&workspace,&active)==STN_PEER_RETAINED);
+    printf("Automatic outbound policy: %u targeted checks.\n",checks-start);
+}
+static void outbound_actual(stn_chain_context *c)
+{
+    stn_storage_provider storage={&mem,lock_mem,unlock_mem,read_mem,write_mem};
+    stn_peer_workspace workspace={{scratch,CAP,next_bytes,CAP},candidate_bytes,CAP,frame,sizeof(frame)};
+    stn_chain_state active,before;unsigned start=checks,scenario;size_t i;
+    for(scenario=0;scenario<2;++scenario){
+        server_args servers[2]={{0}},inbound={0};HANDLE threads[2]={0},inbound_thread;uint16_t ports[2],inbound_port;
+        stn_windows_peer inbound_client={0};stn_peer_transport inbound_transport;
+        stn_peer_candidates candidates={0};stn_peer_endpoint endpoint={{127,0,0,1},0};
+        stn_windows_peer socket={0};stn_peer_connector connector={&socket,stn_windows_peer_open_candidate,stn_windows_peer_close_candidate};stn_peer_outbound manager;
+        for(i=0;i<2;++i){CHECK(stn_windows_peer_listen(0,&servers[i].listener,&ports[i])==STN_PEER_OK);servers[i].c=c;}
+        if(ports[0]>ports[1]){server_args swap=servers[0];uint16_t port=ports[0];servers[0]=servers[1];servers[1]=swap;ports[0]=ports[1];ports[1]=port;}
+        inbound.c=c;
+        CHECK(stn_windows_peer_listen(0,&inbound.listener,&inbound_port)==STN_PEER_OK);
+        inbound_thread=CreateThread(NULL,0,server_thread,&inbound,0,NULL);CHECK(inbound_thread!=NULL);
+        CHECK(stn_windows_peer_connect("127.0.0.1",inbound_port,1000,&inbound_client,&inbound_transport)==STN_PEER_OK);
+        if(scenario==0){stn_windows_peer_close(&servers[0].listener);}
+        for(i=scenario==0 ? 1 : 0;i<2;++i){threads[i]=CreateThread(NULL,0,server_thread,&servers[i],0,NULL);CHECK(threads[i]!=NULL);}
+        for(i=2;i!=0;){--i;endpoint.port=ports[i];CHECK(stn_peer_candidate_add(&candidates,&endpoint)==STN_PEER_OK);}
+        CHECK(stn_peer_outbound_init(&manager,&candidates,&connector)==STN_PEER_OK);reset(c,1,&active);before=active;
+        socket.operation_deadline_ms=GetTickCount64()+5000;
+        if(scenario==0){CHECK(stn_peer_outbound_step(&manager,0,c,&storage,&workspace,&active)!=STN_PEER_OK && !socket.opened && memcmp(&active,&before,sizeof(active))==0);}
+        else{
+            CHECK(stn_peer_outbound_step(&manager,0,c,&storage,&workspace,&active)==STN_PEER_OK && manager.connected && active.height==1);
+            CHECK(WaitForSingleObject(threads[0],10000)==WAIT_OBJECT_0);before=active;
+            CHECK(stn_peer_outbound_step(&manager,5000,c,&storage,&workspace,&active)!=STN_PEER_OK && !manager.connected && !socket.opened);
+            CHECK(memcmp(&before,&active,sizeof(active))==0);
+        }
+        socket.operation_deadline_ms=GetTickCount64()+5000;
+        {stn_peer_status status=stn_peer_outbound_step(&manager,10000,c,&storage,&workspace,&active);CHECK((status==STN_PEER_OK || status==STN_PEER_RETAINED) && manager.connected && manager.next==1 && active.height==1);}
+        stn_peer_outbound_close(&manager);CHECK(!socket.opened);
+        CHECK(stn_peer_sync(c,&storage,&inbound_transport,&workspace,&active).status==STN_PEER_RETAINED);
+        stn_windows_peer_close(&inbound_client);
+        CHECK(WaitForSingleObject(inbound_thread,10000)==WAIT_OBJECT_0);
+        CHECK(inbound.result==STN_PEER_OK || inbound.result==STN_PEER_DISCONNECTED);
+        CloseHandle(inbound_thread);stn_windows_peer_close(&inbound.listener);
+        for(i=0;i<2;++i){if(threads[i]!=NULL){CHECK(WaitForSingleObject(threads[i],10000)==WAIT_OBJECT_0);CHECK(servers[i].result==STN_PEER_OK || servers[i].result==STN_PEER_DISCONNECTED);CloseHandle(threads[i]);}stn_windows_peer_close(&servers[i].listener);}
+    }
+    printf("Automatic outbound Winsock: %u targeted checks.\n",checks-start);
+}
+static void discovery(stn_chain_context *c)
+{
+    stn_peer_candidates known={0},received={0},before,reverse={0};stn_peer_endpoint e={{10,0,0,1},65535};
+    uint8_t payload[STN_PEER_DISCOVERY_MAX],other[STN_PEER_DISCOVERY_MAX],wire[512];size_t n,w,i,j;
+    stn_peer_message message;unsigned start=checks;
+    CHECK(stn_peer_discovery_encode(&known,NULL,payload,sizeof(payload),&n)==STN_PEER_OK && n==2 && payload[0]==0 && payload[1]==0);
+    CHECK(stn_peer_discovery_admit(&received,NULL,payload,n)==STN_PEER_OK && received.count==0);
+    for(i=0;i<64;++i){e.address[3]=(uint8_t)(i+1);CHECK(stn_peer_candidate_add(&known,&e)==STN_PEER_OK);}
+    CHECK(stn_peer_discovery_encode(&known,NULL,payload,sizeof(payload),&n)==STN_PEER_OK && n==386 && payload[1]==64 && payload[6]==255 && payload[7]==255);
+    CHECK(stn_peer_discovery_admit(&received,NULL,payload,n)==STN_PEER_OK && received.count==64);
+    memcpy(other,payload,n);for(i=0;i<64;++i){memcpy(other+2+i*6,payload+2+(63-i)*6,6);}
+    CHECK(stn_peer_discovery_admit(&reverse,NULL,other,n)==STN_PEER_OK);
+    for(i=0;i<64;++i){CHECK(memcmp(received.entries[i].address,reverse.entries[i].address,4)==0 && received.entries[i].port==reverse.entries[i].port);}
+    before=received;CHECK(stn_peer_discovery_admit(&received,NULL,payload,n)==STN_PEER_OK && memcmp(&received,&before,sizeof(before))==0);
+    /* Whole-batch failure, including a valid addition before the excess item. */
+    received.count=63;before=received;memset(other,0,14);other[1]=2;
+    other[2]=11;other[5]=1;other[7]=1;other[8]=12;other[11]=1;other[13]=1;
+    CHECK(stn_peer_discovery_admit(&received,NULL,other,14)==STN_PEER_CAPACITY && memcmp(&received,&before,sizeof(before))==0);
+    CHECK(stn_peer_discovery_admit(&received,NULL,payload,n)==STN_PEER_OK && received.count==64);
+    before=received;other[1]=1;
+    CHECK(stn_peer_discovery_admit(&received,NULL,other,8)==STN_PEER_CAPACITY && memcmp(&received,&before,sizeof(before))==0);
+    for(i=0;i<n;++i){CHECK(stn_peer_discovery_admit(&received,NULL,payload,i)==STN_PEER_PROTOCOL && memcmp(&received,&before,sizeof(before))==0);}
+    memcpy(other,payload,n);other[1]=65;
+    CHECK(stn_peer_discovery_admit(&received,NULL,other,n)==STN_PEER_PROTOCOL);
+    for(i=0;i<3;++i){memcpy(other,payload,n);other[2]=(uint8_t)(i==0 ? 0 : (i==1 ? 224 : 255));CHECK(stn_peer_discovery_admit(&received,NULL,other,n)==STN_PEER_PROTOCOL);}
+    memcpy(other,payload,n);other[6]=0;other[7]=0;CHECK(stn_peer_discovery_admit(&received,NULL,other,n)==STN_PEER_PROTOCOL);
+    CHECK(memcmp(&received,&before,sizeof(before))==0);
+    memset(&received,0,sizeof(received));memcpy(other,payload,14);other[1]=2;memcpy(other+8,other+2,6);
+    CHECK(stn_peer_discovery_admit(&received,NULL,other,14)==STN_PEER_OK && received.count==1);
+    CHECK(stn_peer_discovery_admit(&received,&known.entries[1],payload,2)==STN_PEER_PROTOCOL);
+    CHECK(stn_peer_discovery_encode(&known,&known.entries[0],other,sizeof(other),&w)==STN_PEER_OK && w==380 && other[1]==63);
+    memset(&received,0,sizeof(received));CHECK(stn_peer_discovery_admit(&received,&known.entries[0],payload,n)==STN_PEER_OK && received.count==63);
+    CHECK(stn_peer_discovery_encode(&known,NULL,other,385,&w)==STN_PEER_CAPACITY && w==0);
+    CHECK(stn_peer_encode(STN_PEER_GET_PEERS,NULL,0,wire,sizeof(wire),&w)==STN_PEER_OK && w==12);
+    CHECK(stn_peer_decode(wire,w,&message)==STN_PEER_OK && message.type==7);
+    CHECK(stn_peer_encode(STN_PEER_GET_PEERS,payload,1,wire,sizeof(wire),&w)==STN_PEER_PROTOCOL);
+    CHECK(stn_peer_encode(STN_PEER_PEERS,payload,n,wire,sizeof(wire),&w)==STN_PEER_OK && w==398);
+    for(j=0;j<w;++j){CHECK(stn_peer_decode(wire,j,&message)==STN_PEER_PROTOCOL);}
+    wire[10]=1;wire[11]=136;CHECK(stn_peer_decode(wire,w,&message)==STN_PEER_PROTOCOL); /* 392 > 386 */
+    /* Discovery cannot bypass Block 2 or ordinary evidence validation. */
+    {
+        auto_mock backend={0};stn_peer_connector connector={&backend,auto_open,auto_close};stn_peer_outbound manager;
+        stn_storage_provider storage={&mem,lock_mem,unlock_mem,read_mem,write_mem};
+        stn_peer_workspace workspace={{scratch,CAP,next_bytes,CAP},candidate_bytes,CAP,frame,sizeof(frame)};
+        stn_chain_state active,accepted;size_t requests;
+        memset(&known,0,sizeof(known));memset(&received,0,sizeof(received));e.address[0]=127;e.address[3]=1;e.port=20;
+        CHECK(stn_peer_candidate_add(&received,&e)==STN_PEER_OK);CHECK(stn_peer_candidate_add(&known,&e)==STN_PEER_OK);
+        e.port=10;CHECK(stn_peer_candidate_add(&known,&e)==STN_PEER_OK);e.port=30;CHECK(stn_peer_candidate_add(&known,&e)==STN_PEER_OK);
+        backend.known=&known;backend.peer.c=c;backend.peer.count=2;
+        CHECK(stn_peer_outbound_init(&manager,&received,&connector)==STN_PEER_OK);manager.self=&e;reset(c,1,&active);
+        CHECK(stn_peer_outbound_step(&manager,0,c,&storage,&workspace,&active)==STN_PEER_OK && manager.connected);
+        CHECK(manager.candidates.count==2 && manager.next==1 && manager.candidates.entries[0].port==10 && manager.last_discovery==STN_PEER_OK);
+        CHECK(backend.peer.session.discovery_sent==1);requests=backend.peer.session.requests;accepted=active;
+        CHECK(stn_peer_outbound_step(&manager,5000,c,&storage,&workspace,&active)==STN_PEER_RETAINED && backend.peer.session.requests==requests+2);
+        CHECK(memcmp(&active,&accepted,sizeof(active))==0);
+        backend.peer.mode=4;CHECK(stn_peer_outbound_step(&manager,10000,c,&storage,&workspace,&active)==STN_PEER_DISCONNECTED && manager.next==0);
+        backend.peer.mode=8;CHECK(stn_peer_outbound_step(&manager,15000,c,&storage,&workspace,&active)==STN_PEER_VALIDATION && backend.order[1]==10);
+        CHECK(memcmp(&active,&accepted,sizeof(active))==0);
+        backend.peer.mode=16;before=manager.candidates;
+        CHECK(stn_peer_outbound_step(&manager,20000,c,&storage,&workspace,&active)==STN_PEER_PROTOCOL && !manager.connected);
+        CHECK(memcmp(&manager.candidates,&before,sizeof(before))==0 && memcmp(&active,&accepted,sizeof(active))==0);
+        backend.peer.mode=0;CHECK(stn_peer_outbound_step(&manager,25000,c,&storage,&workspace,&active)==STN_PEER_RETAINED && manager.connected);
+        stn_peer_outbound_close(&manager);
+    }
+    printf("Peer discovery codec/policy: %u targeted checks.\n",checks-start);
+}
+static void discovery_actual(stn_chain_context *c)
+{
+    server_args servers[2]={{0}};HANDLE threads[2];uint16_t ports[2];size_t i;unsigned start=checks;
+    stn_peer_candidates configured={0},known={0};stn_peer_endpoint e={{127,0,0,1},0};
+    stn_windows_peer socket={0};stn_peer_connector connector={&socket,stn_windows_peer_open_candidate,stn_windows_peer_close_candidate};stn_peer_outbound manager;
+    stn_storage_provider storage={&mem,lock_mem,unlock_mem,read_mem,write_mem};
+    stn_peer_workspace workspace={{scratch,CAP,next_bytes,CAP},candidate_bytes,CAP,frame,sizeof(frame)};stn_chain_state active,before;
+    for(i=0;i<2;++i){servers[i].c=c;CHECK(stn_windows_peer_listen(0,&servers[i].listener,&ports[i])==STN_PEER_OK);}
+    e.port=ports[0];CHECK(stn_peer_candidate_add(&configured,&e)==STN_PEER_OK);
+    e.port=ports[1];CHECK(stn_peer_candidate_add(&known,&e)==STN_PEER_OK);
+    servers[0].known=&known;servers[0].limit=5;servers[1].limit=3;
+    for(i=0;i<2;++i){threads[i]=CreateThread(NULL,0,server_thread,&servers[i],0,NULL);CHECK(threads[i]!=NULL);}
+    CHECK(stn_peer_outbound_init(&manager,&configured,&connector)==STN_PEER_OK);reset(c,1,&active);
+    CHECK(stn_peer_outbound_step(&manager,0,c,&storage,&workspace,&active)==STN_PEER_OK && manager.connected && manager.candidates.count==2);
+    CHECK(WaitForSingleObject(threads[0],10000)==WAIT_OBJECT_0);before=active;
+    CHECK(stn_peer_outbound_step(&manager,5000,c,&storage,&workspace,&active)!=STN_PEER_OK && !manager.connected);
+    CHECK(manager.candidates.entries[manager.next].port==ports[1]);
+    CHECK(stn_peer_outbound_step(&manager,10000,c,&storage,&workspace,&active)==STN_PEER_RETAINED && manager.connected);
+    CHECK(memcmp(&before,&active,sizeof(active))==0);stn_peer_outbound_close(&manager);
+    for(i=0;i<2;++i){CHECK(WaitForSingleObject(threads[i],10000)==WAIT_OBJECT_0);CHECK(servers[i].result==STN_PEER_OK);CloseHandle(threads[i]);stn_windows_peer_close(&servers[i].listener);}
+    printf("Peer discovery Winsock failover: %u targeted checks.\n",checks-start);
+}
+static void candidates(const stn_chain_context *context)
+{
+    stn_peer_candidates forward={0},reverse={0},permuted={0},saved_set,invalid;
+    stn_peer_endpoint e={{10,0,0,1},1},other;
+    size_t i,j;unsigned start=checks;
+    stn_chain_state empty={0},accepted_before={0},accepted_after={0};
+    CHECK(stn_chain_initialize(context,&empty)==STN_DATA_OK);
+    CHECK(stn_chain_validate_candidate(context,&empty,context->genesis_bytes,context->genesis_length,&accepted_before).acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    CHECK(stn_peer_candidate_add(NULL,&e)==STN_PEER_ARGUMENT);
+    CHECK(stn_peer_candidate_add(&forward,NULL)==STN_PEER_ARGUMENT);
+    /* Same set in ascending, descending and coprime-permutation order. Address
+     * and port both vary; numeric ports cross the one-byte boundary. */
+    for(i=0;i<64;++i){
+        e.address[3]=(uint8_t)(1+i/4);e.port=(uint16_t)(255+i%4);
+        CHECK(stn_peer_candidate_add(&forward,&e)==STN_PEER_OK);
+        j=63-i;e.address[3]=(uint8_t)(1+j/4);e.port=(uint16_t)(255+j%4);
+        CHECK(stn_peer_candidate_add(&reverse,&e)==STN_PEER_OK);
+        j=(i*17)%64;e.address[3]=(uint8_t)(1+j/4);e.port=(uint16_t)(255+j%4);
+        CHECK(stn_peer_candidate_add(&permuted,&e)==STN_PEER_OK);
+    }
+    CHECK(forward.count==64 && reverse.count==64 && permuted.count==64);
+    for(i=0;i<64;++i){
+        CHECK(forward.entries[i].address[3]==1+i/4 && forward.entries[i].port==255+i%4);
+        CHECK(memcmp(forward.entries[i].address,reverse.entries[i].address,4)==0 && forward.entries[i].port==reverse.entries[i].port);
+        CHECK(memcmp(forward.entries[i].address,permuted.entries[i].address,4)==0 && forward.entries[i].port==permuted.entries[i].port);
+    }
+    saved_set=forward;
+    CHECK(stn_peer_candidate_add(&forward,&forward.entries[31])==STN_PEER_RETAINED);
+    memset(&other,255,sizeof(other));memcpy(other.address,forward.entries[0].address,4);other.port=forward.entries[0].port;
+    CHECK(stn_peer_candidate_add(&forward,&other)==STN_PEER_RETAINED);
+    e.address[3]=99;e.port=65535;
+    CHECK(stn_peer_candidate_add(&forward,&e)==STN_PEER_CAPACITY);
+    CHECK(memcmp(&forward,&saved_set,sizeof(forward))==0);
+    e.port=0;CHECK(stn_peer_candidate_add(&forward,&e)==STN_PEER_ARGUMENT);
+    e.port=1;
+    for(i=0;i<33;++i){
+        e.address[0]=(uint8_t)(i==0 ? 0 : 223+i);
+        CHECK(stn_peer_candidate_add(&forward,&e)==STN_PEER_ARGUMENT);
+    }
+    CHECK(memcmp(&forward,&saved_set,sizeof(forward))==0);
+    memset(&reverse,0,sizeof(reverse));
+    e.address[0]=127;e.address[3]=1;e.port=1;
+    CHECK(stn_peer_candidate_add(&reverse,&e)==STN_PEER_OK);
+    e.address[0]=169;e.address[1]=254;e.port=65535;
+    CHECK(stn_peer_candidate_add(&reverse,&e)==STN_PEER_OK);
+    e.address[0]=192;e.address[1]=168;
+    CHECK(stn_peer_candidate_add(&reverse,&e)==STN_PEER_OK);
+    e.address[0]=223;e.address[1]=255;
+    CHECK(stn_peer_candidate_add(&reverse,&e)==STN_PEER_OK);
+    saved_set=reverse;
+    CHECK(stn_peer_candidate_add(&reverse,&e)==STN_PEER_RETAINED && reverse.count==4);
+    CHECK(memcmp(&reverse,&saved_set,sizeof(reverse))==0);
+    invalid=forward;invalid.count=65;saved_set=invalid;
+    CHECK(stn_peer_candidate_add(&invalid,&e)==STN_PEER_ARGUMENT && memcmp(&invalid,&saved_set,sizeof(invalid))==0);
+    invalid=forward;invalid.entries[0].port=0;saved_set=invalid;
+    CHECK(stn_peer_candidate_add(&invalid,&e)==STN_PEER_ARGUMENT && memcmp(&invalid,&saved_set,sizeof(invalid))==0);
+    invalid=forward;invalid.entries[1]=invalid.entries[0];saved_set=invalid;
+    CHECK(stn_peer_candidate_add(&invalid,&e)==STN_PEER_ARGUMENT && memcmp(&invalid,&saved_set,sizeof(invalid))==0);
+    invalid=forward;other=invalid.entries[0];invalid.entries[0]=invalid.entries[1];invalid.entries[1]=other;saved_set=invalid;
+    CHECK(stn_peer_candidate_add(&invalid,&e)==STN_PEER_ARGUMENT && memcmp(&invalid,&saved_set,sizeof(invalid))==0);
+    CHECK(stn_chain_validate_candidate(context,&empty,context->genesis_bytes,context->genesis_length,&accepted_after).acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    CHECK(memcmp(&accepted_before,&accepted_after,sizeof(accepted_before))==0);
+    printf("Peer candidate foundation: %u targeted checks.\n",checks-start);
+}
 int test_peer(void);
 int test_peer(void)
 {
@@ -424,7 +660,7 @@ int test_peer(void)
     branch(a,as,99);branch(b,bs,99);memcpy(policy.fixed_target,a[0]+120,32);
     c.network_id[0]=1;c.genesis_bytes=a[0];c.genesis_length=364;c.pow_policy=&policy;c.hash_provider.hash=test_hash;
     framing(&c);synchronization(&c);localhost(&c);
-    partial_io();convergence();
+    candidates(&c);outbound_mock(&c);outbound_actual(&c);discovery(&c);discovery_actual(&c);partial_io();convergence();
     printf("P2P/sync/recovery: %u checks, %u failures (localhost included).\n",checks,failures);
     return failures==0 ? 0 : 1;
 }

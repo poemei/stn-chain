@@ -194,3 +194,59 @@ and two session assertions. Windows Release/x64: zero warnings/errors/failures.
 No production defect or production-code change was required in Chunk 4.
 Production identities, hardware, Internet operation, performance and other
 platforms remain unqualified. Phase 12 was not started. No commit or push.
+
+## Phase 12 — Automatic P2P Orchestration
+
+### Block 1 — deterministic peer candidate foundation COMPLETE (2026-09-10)
+
+The existing peer core now provides a bounded 64-entry IPv4/port candidate set,
+canonical endpoint identity and deterministic sorted enumeration. Malformed
+endpoints, duplicates and full capacity have explicit outcomes without eviction
+or unrelated mutation. This is local resource/selection policy, not consensus.
+See PEER_PROTOCOL.md for the API, eligibility rules and platform boundary.
+
+440 targeted checks pass; total Chain C checks: 1,133,717. Also passing: 34 build
+probes, 1,544 Phase 9, 562 Phase 10, 834 adjusted-target process checks, 27 Stratum
+parser checks and two session assertions. Windows Release/x64 production, test
+and scripted-runtime builds: zero warnings/errors/failures. No prior production
+defect required correction; existing consensus and transport behavior is unchanged.
+
+Phase 12 remains open. Automatic connections, retries, reconnect, failover and
+discovery await later authorization. No other-platform qualification. Block 2
+was not started. This increment was not committed or pushed.
+### Block 2 — automatic outbound connection management COMPLETE (2026-09-10)
+
+Repeated configured IPv4 peers feed the qualified candidate set. A portable,
+monotonic-paced outbound lane selects deterministically, reuses existing P2P
+handshake/synchronization, retains usable sessions and closes/advances after
+failure. The Windows executable composes it with private scratch and existing
+RPC/pending exclusion. Candidate preference never confers consensus authority.
+
+Passed 165 new C checks (121 policy + 44 real Winsock), 30 executable checks,
+1,133,882 total Chain C checks, 34 probes, 1,544 Phase 9, 562 Phase 10 and 834
+adjusted-target process checks. Windows Release/x64 builds: zero warnings,
+errors and failures. Block 1's 440 checks remain passing. No existing production
+defect required correction; session reuse and bounded outbound I/O are additions.
+See PEER_PROTOCOL.md and BUILD.md for runtime limits and qualification scope.
+
+Phase 12 remains open. Discovery and later authorized orchestration work remain.
+Block 3 was not started. This increment was not committed or pushed.
+
+### Block 3 — peer discovery COMPLETE (2026-09-10)
+
+Established peers may advertise a bounded list of configured IPv4 candidates via
+STNP v2 capability bit 2 and one `GET_PEERS`/`PEERS` exchange. The 386-byte maximum
+payload carries at most 64 fixed-width endpoints. Receivers validate the complete
+batch through the Block 1 store, omit configured self endpoints, and commit only
+after deterministic sorting and capacity checks succeed. The existing Block 2
+manager then uses admitted candidates; no second store or connection path exists.
+
+Passed 974 new C checks (955 codec/policy and 19 real Winsock failover), 40
+executable discovery checks, and 30 outbound/27 pending executable regressions.
+The resulting 1,134,856 Chain C checks, 34 build probes and prior Phase 9/10/11
+process suites passed with zero failures on Windows Release/x64. Discovery does
+not alter accepted state, storage, pending state or consensus. No external
+bootstrap, gossip, scoring, reputation, banning or other platform qualification.
+
+Phase 12 remains open. Block 4 was not started. This increment was not committed
+or pushed.
