@@ -309,6 +309,13 @@ The focused runtime qualification opens 64 simultaneous clients, performs two
 requests per client, closes them, and verifies a healthy session remains
 usable. It performs 1,037 checks without adding a protocol connection cap.
 
+## Phase 13 Block 8 — final integration qualification
+
+The closeout evidence combines the focused framing, lifecycle, concurrency, and
+pending-RPC runs with the full Chain C executable and existing Phase 9–12 and
+Stratum evidence. Windows Release/x64 remains the only qualified execution
+environment; Phase 14 was not started.
+
 ## Phase 13 Block 6 — deterministic shutdown
 
 The Release/x64 build includes listener-close-before-worker-join shutdown

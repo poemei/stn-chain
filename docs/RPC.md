@@ -375,6 +375,16 @@ failure closes and releases that partial session locally. Qualification covers
 service of an independent healthy session. No healthy client is evicted to
 enforce an artificial global ceiling.
 
+## Phase 13 Block 8 — final integration closeout
+
+The final qualification composes Blocks 1–7 through the existing runtime:
+bounded framing, deadlines, complete-frame sequencing, protocol errors,
+disconnect/reconnect cleanup, listener-first shutdown, and concurrent clients.
+Representative failures remain transport-local, valid completed operations keep
+their existing atomicity, and no RPC transport result becomes consensus or
+authority evidence. Phase 13 is complete for Windows Release/x64; Phase 14
+Production Identity / Signatures / Authority is the next phase.
+
 ## Phase 13 Block 4 — deterministic protocol error behavior
 
 Complete, bounded requests that name an unsupported method or violate a known

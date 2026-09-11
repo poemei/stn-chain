@@ -442,3 +442,11 @@ host resources without a protocol-level connection limit. Partial setup closes
 the accepted peer and frees its record; completed workers are reclaimed through
 the existing reap path. The qualification is adapter/runtime evidence only
 and does not introduce a portable client-count policy.
+
+## Phase 13 Block 8 — RPC integration closeout
+
+Blocks 1–7 remain a single layered subsystem: portable framing, validation,
+dispatch, status, request association, and ownership policy sit above
+platform-specific sockets, workers, deadlines, and shutdown. Final integration
+qualification found no Windows coupling in portable `includes/` or `src/`, and
+Phase 14 identity/authority work remains outside this phase.

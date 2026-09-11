@@ -4,6 +4,17 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 13 Block 8 — final RPC integration qualification and closeout — 2026-09-10
+
+- Final integration qualification confirms Blocks 1–7 compose without an
+  unresolved RPC production-hardening gap.
+- Focused evidence: framing 33, lifecycle 153, concurrency 1,037, and pending
+  RPC 27 executable checks; full Chain C remains 1,134,866 checks with zero
+  failures. Windows Release/x64 completed with zero warnings and errors.
+- Phase 13 is COMPLETE for the qualified Windows environment. Phase 14
+  Production Identity / Signatures / Authority is next and was not started.
+- No commit or push was performed.
+
 ### Phase 13 Block 7 — sustained concurrent RPC resource bounds — 2026-09-10
 
 - Qualified 64 simultaneous RPC clients issuing repeated complete requests,

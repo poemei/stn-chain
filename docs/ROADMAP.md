@@ -387,3 +387,22 @@ qualified with 64 simultaneous clients issuing two complete requests each,
 followed by cleanup and a healthy-session request: 1,037 executable checks,
 zero failures. No protocol client ceiling or eviction policy was added. Block
 8 and Phase 14 were not started. This increment was not committed or pushed.
+
+### Block 8 — final RPC integration qualification and closeout COMPLETE (2026-09-10)
+
+Blocks 1–7 compose through the existing Windows RPC runtime without
+contradiction: framing preflight, bounded deadlines, complete-frame continuity,
+deterministic protocol errors, churn/reconnect, listener-first shutdown, and
+host-resource-scaled concurrency all remain isolated and bounded. Final focused
+qualification passed framing (33), lifecycle (153), concurrency (1,037), and
+pending-RPC (27) executable checks; the full Chain C suite passed with
+1,134,866 checks and zero failures. Phase 9/10/11, Phase 12, Stratum, and
+portability evidence remain passing. No unresolved Phase 13 RPC requirement was
+identified. This closeout was not committed or pushed.
+
+## Phase 13 — RPC Production Hardening — COMPLETE (2026-09-10)
+
+Phase 13 is complete for the qualified Windows Release/x64 environment. The
+next authorized phase is **Phase 14 — Production Identity / Signatures /
+Authority**. No Phase 14 implementation was started, and no other platform or
+production-security qualification is claimed.
