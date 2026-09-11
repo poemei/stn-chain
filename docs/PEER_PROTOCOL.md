@@ -85,7 +85,8 @@ priority, authentication, consensus validity, or Chain-state validity. The same
 Block 2 outbound lane consumes newly admitted candidates; synchronization evidence
 still passes the existing validation, PoW, target, work, fork-choice and persistence
 rules. No DNS, seed, multicast, LAN, NAT, HTTP, gossip, scoring, banning or
-learned-peer database is implemented.
+learned-peer database is implemented. Blocks 1–4 complete the bounded Phase 12
+orchestration qualification; Phase 13 is not included.
 
 The server answers from an immutable full snapshot and revalidates it before
 serving. It never advertises raw supplied state metadata. Type, range, length

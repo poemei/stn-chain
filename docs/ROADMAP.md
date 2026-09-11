@@ -250,3 +250,43 @@ bootstrap, gossip, scoring, reputation, banning or other platform qualification.
 
 Phase 12 remains open. Block 4 was not started. This increment was not committed
 or pushed.
+
+### Block 4 — portable orchestration boundary qualification COMPLETE (2026-09-10)
+
+The next smallest prerequisite is the cross-platform boundary required before
+further orchestration: portable candidate, discovery and outbound-policy values
+remain ISO C data with caller-supplied monotonic time, while socket, thread and
+operation-deadline behavior stays behind the existing platform adapter. Added
+portability checks round-trip candidates and discovery payloads without OS types
+or native structure serialization and verify the five-second policy constant.
+
+The affected architecture review found no new Windows coupling in `includes/`
+or `src/`; Windows-only behavior remains in `platforms/windows/`. The existing
+Windows Release/x64 qualification remains the only execution qualification.
+Seven targeted portability checks pass; total Chain C checks are 1,134,863.
+Block 1–3 behavior, consensus isolation, inbound/RPC/pending safety and clean
+shutdown remain unchanged. Block 5 was not started; Phase 13 was not started.
+This increment was not committed or pushed.
+
+## Phase 12 — Automatic P2P Orchestration — COMPLETE (2026-09-10)
+
+Final integration qualification confirms Blocks 1–4 operate together through
+the existing real Winsock/STNP paths. A bounded configured candidate set connects
+deterministically, a peer supplies additional candidates through one bounded
+discovery exchange, the candidates enter the same sorted 64-entry store, and the
+existing outbound manager uses a discovered endpoint after the original peer is
+lost. Existing synchronization independently validates all evidence; malformed
+discovery and invalid peer evidence leave accepted state, canonical storage,
+pending state and RPC operation unchanged. Shutdown joins the outbound worker and
+closes its resources; restart remains the supported configured `--peer IPv4:PORT`
+startup model.
+
+Final Windows Release/x64 evidence: 1,134,863 Chain C checks, 34 build probes,
+1,544 Phase 9 checks, 562 Phase 10 checks, 834 Phase 11 process checks, 1,586
+Phase 12 focused C checks across Blocks 1–4, 70 focused executable checks, and
+27 pending-RPC executable checks plus 29 Stratum parser/session checks. All passed with zero failures; builds completed
+with zero warnings and errors. No external bootstrap, gossip, scoring, reputation,
+banning, or other platform backend was introduced.
+
+Phase 12 is COMPLETE for bounded Windows Release/x64 qualification. Phase 13 was
+not started. No commit or push was performed.

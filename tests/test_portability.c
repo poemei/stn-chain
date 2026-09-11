@@ -20,6 +20,9 @@ int test_portability(void)
     stn_record a,b,decoded;stn_transaction t1,t2;stn_hash_provider hash={stn_sha256,NULL};
     stn_block_header h={0},again;uint8_t header[168],header_copy[176];
     stn_work work;uint8_t target[32]={0};stn_peer_message message;size_t n,m,i;
+    stn_peer_candidates candidates={0},decoded_candidates={0};
+    stn_peer_endpoint endpoint={{127,0,0,1},19000};
+    uint8_t discovery[STN_PEER_DISCOVERY_MAX];size_t discovery_length;
     CHECK(STN_HOST_OS>=STN_OS_WINDOWS && STN_HOST_OS<=STN_OS_MACOS);
     CHECK(STN_HOST_ARCH>=STN_ARCH_X86 && STN_HOST_ARCH<=STN_ARCH_ARM64);
     CHECK(STN_PEER_MAX_FRAME<=UINT32_MAX);
@@ -60,6 +63,15 @@ int test_portability(void)
     /* Truncation to 32 bits cannot turn the bound into a valid length/count. */
     memset(tx1+8,255,4);CHECK(stn_transaction_validate_structure(tx1,192)==STN_DATA_LENGTH);
     CHECK(stn_peer_decode(header_copy,SIZE_MAX,&message)!=STN_PEER_OK);
+    /* Phase 12 Block 4 portability contract: candidate/discovery/orchestration
+     * values are fixed-width ISO C data and remain independent of OS handles. */
+    CHECK(stn_peer_candidate_add(&candidates,&endpoint)==STN_PEER_OK);
+    endpoint.port=19001;CHECK(stn_peer_candidate_add(&candidates,&endpoint)==STN_PEER_OK);
+    CHECK(stn_peer_discovery_encode(&candidates,NULL,discovery,sizeof(discovery),&discovery_length)==STN_PEER_OK);
+    CHECK(discovery_length==14 && discovery[0]==0 && discovery[1]==2);
+    CHECK(stn_peer_discovery_admit(&decoded_candidates,NULL,discovery,discovery_length)==STN_PEER_OK);
+    CHECK(decoded_candidates.count==2 && decoded_candidates.entries[0].port==19000 && decoded_candidates.entries[1].port==19001);
+    CHECK(STN_PEER_OUTBOUND_INTERVAL_MS==UINT64_C(5000));
     target[31]=1;CHECK(stn_target_work(target,&work)==STN_DATA_OK && work.bytes[8]==128);
     target[31]=2;CHECK(stn_target_work(target,&work)==STN_DATA_OK);
     for(i=0;i<32;++i){CHECK(work.bytes[i+8]==0x55);}

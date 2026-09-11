@@ -238,3 +238,22 @@ The focused C run reports 955 codec/policy and 19 real-Winsock discovery checks.
 `tools/test-node.ps1 -DiscoveryOnly` reports 40 checks using ephemeral local peers,
 including discovered-peer failover and malformed-discovery isolation. No external
 seed, DNS, multicast, NAT, gossip or learned-peer database is involved.
+
+## Phase 12 Block 4 — portable orchestration boundary
+
+The shared candidate, discovery and outbound-policy interfaces compile as ISO C
+without Windows headers or OS handles. `test_portability` now round-trips the
+fixed-width candidate/discovery values and checks the explicit five-second pacing
+constant. Windows Release/x64 remains the only runtime qualification; Linux,
+ARM and macOS adapters are still reserved and were not implemented in this block.
+The portability addition contributes seven checks to the existing C qualification.
+
+## Phase 12 final integration qualification
+
+The combined bounded scenario uses real loopback Winsock/STNP paths: a configured
+candidate connects, one discovery exchange admits another endpoint, the existing
+outbound manager uses that endpoint after loss, and invalid discovery/evidence
+cannot alter accepted or persisted state. Blocks 1–4 contribute 1,586 focused C
+checks, 70 focused executable checks and 27 pending-RPC checks. The complete Chain C total is 1,134,863;
+Windows Release/x64 is the only qualified runtime. Phase 12 is complete and Phase
+13 has not started.

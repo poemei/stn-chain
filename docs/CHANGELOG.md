@@ -41,6 +41,35 @@ are not claims of a published or deployed release.
   Updated peer protocol, roadmap, build/runtime documentation. No commit/push;
   Block 4 not started.
 
+### Phase 12 — final integration qualification COMPLETE — 2026-09-10
+
+- Completed the bounded Phase 12 integration gate. Existing real Winsock/STNP
+  paths prove configured connection, deterministic fallback, one bounded discovery
+  exchange, admission into the same candidate store, discovered-peer failover,
+  normal Chain validation, invalid-evidence rejection and clean worker shutdown.
+- Blocks 1–4 remain compatible and isolated from consensus, accepted state,
+  persistence, pending state, RPC authority and identity authority. No additional
+  networking feature or platform backend was required.
+- Final Windows Release/x64 evidence: 1,134,863 Chain C checks, 34 probes,
+  1,544 Phase 9, 562 Phase 10, 834 Phase 11 process checks, 1,586 focused
+  Phase 12 C checks across Blocks 1–4, 70 focused executable checks, 27 pending-
+  RPC checks and 29 Stratum checks; zero failures, warnings or errors. Phase 12 is COMPLETE;
+  Phase 13 was not started.
+  No commit or push.
+
+### Phase 12 Block 4 — portable orchestration boundary — 2026-09-10
+
+- Qualified the smallest remaining prerequisite from the Phase 12 roadmap:
+  candidate, discovery and outbound-policy state remains portable ISO C data,
+  with caller-supplied monotonic time. Windows socket/thread/deadline behavior
+  remains behind the existing platform adapter; no new backend was added.
+- Added portability checks for fixed-width candidate/discovery round trips and
+  the explicit pacing boundary (7 targeted checks). No consensus, protocol, authority, storage,
+  pending-state or accepted-state behavior changed.
+- Architecture review found no new Windows coupling in `includes/` or `src/`.
+  Windows Release/x64 remains the only qualified runtime. Block 5 and Phase 13
+  were not started. No commit or push.
+
 ### Phase 12 Block 1 — deterministic peer candidates — 2026-09-10
 
 - Added local IPv4-octet/numeric-port endpoints and a 64-entry candidate set in

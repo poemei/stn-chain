@@ -365,4 +365,21 @@ Discovery never changes accepted Chain state and never establishes authority,
 trust, priority or consensus validity. All later synchronization follows the
 existing validation, proof-of-work, target, cumulative-work, fork-choice and
 persistence paths. No external bootstrap, recursive gossip, scoring, reputation,
-banning or learned-peer database is part of this block. Block 4 remains open.
+banning or learned-peer database is part of this block. Blocks 1–4 complete the
+bounded Phase 12 orchestration qualification; Phase 13 has not started.
+
+## Phase 12 Block 4 — portable orchestration boundary qualification
+
+The orchestration contract is platform-neutral ISO C. Candidate values, discovery
+codecs, deterministic ordering, outbound state, failure statuses and caller-
+supplied monotonic timestamps are defined in `includes/stn_peer.h` and `src/`.
+They contain no Windows handles, Winsock types, filesystem paths, native socket
+constants or scheduler assumptions. Native struct layout is never serialized.
+
+Windows conversion, socket readiness, operation deadlines, thread creation and
+shutdown remain in `platforms/windows/`. The core policy does not observe socket
+arrival order or platform timer representation. Portability checks round-trip the
+candidate/discovery contract and enforce the fixed pacing boundary. Linux, ARM and
+macOS implementations remain future adapter/qualification work; this block adds
+no unrelated backends. Blocks 1–4 complete the bounded Phase 12 orchestration
+qualification; Phase 13 has not started.
