@@ -348,6 +348,33 @@ requests and verify the returned association while an incomplete or failed
 client remains isolated. Existing malformed-complete-request error and close
 semantics are unchanged.
 
+## Phase 13 Block 5 — lifecycle churn and reclamation
+
+Each accepted RPC client owns its socket, request/response buffers, and worker
+lifetime. Clean disconnects, disconnects before the first request, and failed
+request sessions are reclaimed before their client record is reused or freed.
+Repeated reconnects cannot inherit prior frame or response state, while an
+independent healthy session continues to operate. The lifecycle policy does not
+alter STNC status, consensus, persistence, or authority semantics.
+
+## Phase 13 Block 6 — deterministic shutdown
+
+RPC shutdown first marks the node stopping and closes the listening socket, so
+no new sessions are accepted. Active client workers are then interrupted and
+joined through the existing stop path; their private buffers and peer handles
+are reclaimed before node cleanup completes. Shutdown does not alter accepted
+chain state or persistence, and transport termination remains distinct from
+protocol status.
+
+## Phase 13 Block 7 — sustained concurrent sessions
+
+RPC concurrency remains host-resource scaled rather than protocol-capped. A
+new client owns its accepted peer, bounded buffers, and worker record; setup
+failure closes and releases that partial session locally. Qualification covers
+64 simultaneous clients, repeated complete requests, cleanup, and continued
+service of an independent healthy session. No healthy client is evicted to
+enforce an artificial global ceiling.
+
 ## Phase 13 Block 4 — deterministic protocol error behavior
 
 Complete, bounded requests that name an unsupported method or violate a known

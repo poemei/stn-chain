@@ -4,6 +4,36 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 13 Block 7 — sustained concurrent RPC resource bounds — 2026-09-10
+
+- Qualified 64 simultaneous RPC clients issuing repeated complete requests,
+  deterministic cleanup, and continued service to an independent healthy
+  session: 1,037 checks, zero failures.
+- Preserved host-resource-scaled concurrency and local cleanup on partial setup;
+  no protocol-level client ceiling, eviction policy, wire change, consensus
+  change, or authority change was added.
+- Block 8 and Phase 14 were not started; no commit or push was performed.
+
+### Phase 13 Block 6 — deterministic RPC shutdown — 2026-09-10
+
+- Changed Windows RPC shutdown ordering to close the listener immediately after
+  entering the stopping state, preventing new sessions while active workers
+  are interrupted and joined.
+- Preserved session-owned cleanup, chain/persistence state, protocol semantics,
+  and portable architecture. Lifecycle qualification remains 153 checks with
+  zero failures; Block 7 and Phase 14 were not started.
+- No commit or push was performed.
+
+### Phase 13 Block 5 — RPC lifecycle churn and reclamation — 2026-09-10
+
+- Qualified deterministic cleanup across pre-request disconnects, repeated
+  request/teardown cycles, and reconnects. Session-owned buffers, workers and
+  sockets do not leak state into a new client.
+- Added 153 focused lifecycle executable checks with zero failures while a
+  separate healthy RPC session remained usable.
+- No wire, status, consensus, authority, or portable parser changes. Block 6
+  and Phase 14 were not started; no commit or push was performed.
+
 ### Phase 13 Block 4 — deterministic protocol error behavior — 2026-09-10
 
 - Qualified existing STNC status handling for unsupported methods and malformed

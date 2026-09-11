@@ -359,3 +359,31 @@ failure. The combined framing qualification is 33 checks with zero failures.
 No status codes, wire fields, consensus, authority, or transport semantics
 changed. Block 5 and Phase 14 were not started. This increment was not
 committed or pushed.
+
+### Block 5 — RPC lifecycle churn and failure reclamation COMPLETE (2026-09-10)
+
+The next smallest unresolved boundary was deterministic session reclamation
+under connection churn. Existing per-client ownership and joined cleanup were
+qualified with 153 executable checks covering twelve disconnects before a first
+request, twelve request/teardown/reconnect cycles, request-ID association, and
+a healthy session kept active throughout. No stale parser, response, socket, or
+accepted-state data crossed a connection boundary. Block 6 and Phase 14 were
+not started. This increment was not committed or pushed.
+
+### Block 6 — deterministic RPC shutdown and active-session release COMPLETE (2026-09-10)
+
+The next smallest unresolved boundary was shutdown ordering. The Windows node
+now closes the listening socket immediately after entering the stopping state,
+then joins outbound work and interrupts/reclaims active RPC workers. The
+LifecycleOnly qualification preserves a healthy session during churn and the
+full C suite remains passing. Block 7 and Phase 14 were not started. This
+increment was not committed or pushed.
+
+### Block 7 — sustained concurrent RPC resource-bound qualification COMPLETE (2026-09-10)
+
+The next smallest unresolved boundary was bounded per-session ownership under
+sustained concurrent clients. Existing host-resource-scaled acceptance was
+qualified with 64 simultaneous clients issuing two complete requests each,
+followed by cleanup and a healthy-session request: 1,037 executable checks,
+zero failures. No protocol client ceiling or eviction policy was added. Block
+8 and Phase 14 were not started. This increment was not committed or pushed.

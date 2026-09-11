@@ -292,3 +292,26 @@ malformed-complete-request responses, request-ID association where the request
 decodes, a valid request after protocol errors, and continued independent
 client operation. Transport disconnects remain session failures rather than
 STNC status responses.
+
+## Phase 13 Block 5 — RPC lifecycle churn
+
+After the Release/x64 build, run
+`powershell -ExecutionPolicy Bypass -File tools/test-node.ps1 -LifecycleOnly`.
+The focused runtime qualification performs 153 checks across pre-request
+disconnects, repeated request/teardown cycles, reconnects, request-ID
+association, and an independent healthy session.
+
+## Phase 13 Block 7 — sustained concurrent RPC load
+
+After the Release/x64 build, run
+`powershell -ExecutionPolicy Bypass -File tools/test-node.ps1 -ConcurrencyOnly`.
+The focused runtime qualification opens 64 simultaneous clients, performs two
+requests per client, closes them, and verifies a healthy session remains
+usable. It performs 1,037 checks without adding a protocol connection cap.
+
+## Phase 13 Block 6 — deterministic shutdown
+
+The Release/x64 build includes listener-close-before-worker-join shutdown
+ordering. Run the lifecycle qualification after the build; it confirms active
+session cleanup and independent-client continuity while the full C test
+executable remains the regression gate.

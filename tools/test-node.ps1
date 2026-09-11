@@ -1,6 +1,6 @@
 # Copyright (c) 2026 STN-Labz. See docs/LICENSE.md.
 # Real executable / TCP / CNG / NTFS integration. No mining search loop.
-param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly, [switch]$LibraryOnly, [switch]$OutboundOnly, [switch]$DiscoveryOnly, [switch]$FramingOnly)
+param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly, [switch]$LibraryOnly, [switch]$OutboundOnly, [switch]$DiscoveryOnly, [switch]$FramingOnly, [switch]$LifecycleOnly, [switch]$ConcurrencyOnly)
 $ErrorActionPreference = 'Stop'
 $script:checks = 0
 function Check($condition, $message) {
@@ -121,6 +121,47 @@ try {
         Check $timedOut 'incomplete frame session closes at bounded deadline'
         $r=Request $node.Stream 1 @() 2 7003 -VerifyId;Check ($r.Code -eq 0) 'healthy session survives incomplete frame deadline'
         Write-Output "RPC framing executable: $script:checks checks, 0 failures."
+        return
+    }
+    if ($LifecycleOnly) {
+        $node.Client.Close(); Check ($node.Process.WaitForExit(5000)) 'bootstrap stopped'
+        $node=StartNode $data $false $genesisPath
+        for ($i=0; $i -lt 12; $i++) {
+            $client=[Net.Sockets.TcpClient]::new('127.0.0.1',$node.Port)
+            $script:clients+=$client;$client.Dispose()
+            $r=Request $node.Stream 1 @() 2 (8000+$i) -VerifyId
+            Check ($r.Code -eq 0) 'healthy session survives pre-request disconnect'
+        }
+        for ($i=0; $i -lt 12; $i++) {
+            $client=[Net.Sockets.TcpClient]::new('127.0.0.1',$node.Port)
+            $script:clients+=$client;$client.ReceiveTimeout=5000;$client.SendTimeout=5000
+            $r=Request $client.GetStream() 1 @() 2 (9000+$i) -VerifyId
+            Check ($r.Code -eq 0) 'request session completes before teardown'
+            $client.Dispose()
+            $r=Request $node.Stream 1 @() 2 (10000+$i) -VerifyId
+            Check ($r.Code -eq 0) 'healthy session survives churn teardown'
+        }
+        Write-Output "RPC lifecycle executable: $script:checks checks, 0 failures."
+        return
+    }
+    if ($ConcurrencyOnly) {
+        $node.Client.Close(); Check ($node.Process.WaitForExit(5000)) 'bootstrap stopped'
+        $node=StartNode $data $false $genesisPath
+        $clients=@()
+        for ($i=0; $i -lt 64; $i++) {
+            $client=[Net.Sockets.TcpClient]::new('127.0.0.1',$node.Port)
+            $client.ReceiveTimeout=10000;$client.SendTimeout=5000;$clients+=$client;$script:clients+=$client
+        }
+        for ($round=0; $round -lt 2; $round++) {
+            for ($i=0; $i -lt $clients.Count; $i++) {
+                $r=Request $clients[$i].GetStream() 1 @() 2 (11000+($round*64)+$i) -VerifyId
+                Check ($r.Code -eq 0) 'concurrent client request completes'
+            }
+        }
+        foreach ($client in $clients) {$client.Dispose()}
+        $r=Request $node.Stream 1 @() 2 12000 -VerifyId
+        Check ($r.Code -eq 0) 'healthy session survives concurrent cleanup'
+        Write-Output "RPC concurrency executable: $script:checks checks, 0 failures."
         return
     }
     if ($DiscoveryOnly) {

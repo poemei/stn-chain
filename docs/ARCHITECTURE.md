@@ -418,3 +418,27 @@ unsupported methods and complete requests with invalid known shapes produce
 bounded canonical STNC responses, while transport failures stay in the Windows
 adapter and never become protocol status values. Request identifiers remain
 session-local correlation data; no authority or consensus path consumes them.
+
+## Phase 13 Block 5 — RPC lifecycle ownership
+
+RPC session state remains owned by the accepted client record and is released
+by the existing reap/stop paths after the worker joins. Socket reuse creates a
+new client record and cannot carry request, response, or parser state forward.
+The lifecycle qualification stays in the Windows adapter; portable RPC and
+consensus layers receive no platform lifecycle types.
+
+## Phase 13 Block 6 — shutdown ordering
+
+The Windows application transitions shutdown by stopping acceptance first,
+closing the listener, then joining outbound and RPC worker resources. Active
+sessions are interrupted through the adapter before their client records are
+freed. No shutdown control or handle type enters portable RPC, chain, or
+consensus code.
+
+## Phase 13 Block 7 — concurrent resource bounds
+
+The Windows accept loop continues to allocate session records and workers from
+host resources without a protocol-level connection limit. Partial setup closes
+the accepted peer and frees its record; completed workers are reclaimed through
+the existing reap path. The qualification is adapter/runtime evidence only
+and does not introduce a portable client-count policy.

@@ -279,6 +279,9 @@ int stn_windows_app(int argc,char **argv)
     }
 shutdown:
     InterlockedExchange(&stopping,1);
+    /* Close the listener before joining workers: shutdown must stop new
+     * accepts immediately while active client sessions are interrupted below. */
+    stn_windows_peer_close(&listener);
     if(outbound.thread!=NULL){WaitForSingleObject(outbound.thread,INFINITE);CloseHandle(outbound.thread);}
     stop_clients(&clients);(void)SetConsoleCtrlHandler(stop,FALSE);
 cleanup:
