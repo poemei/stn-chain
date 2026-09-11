@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_pending.h"
+#include "stn_lifecycle.h"
 #include "stn_wire_internal.h"
 #include <stdlib.h>
 #include <string.h>
@@ -20,10 +21,15 @@ static size_t find_id(const stn_pending *p,const uint8_t id[32])
 stn_pending_result stn_pending_insert(stn_pending *p,const uint8_t *bytes,
     size_t length,const stn_hash_provider *hash,uint8_t id[32])
 {
-    stn_pending_entry entry={0};stn_transaction tx;stn_record record;size_t at;
+    stn_pending_entry entry={0};stn_transaction tx;stn_record record;size_t at;uint8_t statement[256];size_t written=0;
     if(p==NULL || id==NULL){return STN_PENDING_INVALID;}
-    if(stn_transaction_decode(bytes,length,&tx)!=STN_DATA_OK ||
-       stn_record_decode(tx.record_bytes,tx.record_length,&record)!=STN_RECORD_OK){return STN_PENDING_INVALID;}
+    if(stn_transaction_decode(bytes,length,&tx)!=STN_DATA_OK){return STN_PENDING_INVALID;}
+    if(tx.type==STN_TX_PUBLICATION){if(stn_record_decode(tx.record_bytes,tx.record_length,&record)!=STN_RECORD_OK)return STN_PENDING_INVALID;memcpy(entry.signer,record.signer_public_key,32);memcpy(entry.nonce,record.nonce,32);}
+    else {const uint8_t *signer=tx.record_bytes+1;if(tx.type==STN_TX_AUTHORITY_GRANT){if(stn_authority_grant_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_GRANT)return STN_PENDING_INVALID;}
+        else if(tx.type==STN_TX_AUTHORITY_REVOKE){if(stn_authority_revocation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_REVOCATION)return STN_PENDING_INVALID;}
+        else if(tx.type==STN_TX_IDENTITY_ROTATE){if(stn_identity_rotation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_ROTATION)return STN_PENDING_INVALID;}
+        else return STN_PENDING_INVALID;
+        if(stn_lifecycle_replay_nonce(tx.type,statement,written,hash,entry.nonce)!=STN_LIFECYCLE_OK)return STN_PENDING_PROVIDER;memcpy(entry.signer,signer,32);}
     if(stn_transaction_id(bytes,length,hash,entry.id)!=STN_DATA_OK){return STN_PENDING_PROVIDER;}
     at=find_id(p,entry.id);
     if(at<p->count && memcmp(p->entries[at].id,entry.id,32)==0){return STN_PENDING_DUPLICATE;}
@@ -31,7 +37,6 @@ stn_pending_result stn_pending_insert(stn_pending *p,const uint8_t *bytes,
     entry.transaction=malloc(length);
     if(entry.transaction==NULL){return STN_PENDING_CAPACITY;}
     memcpy(entry.transaction,bytes,length);entry.length=length;
-    memcpy(entry.signer,record.signer_public_key,32);memcpy(entry.nonce,record.nonce,32);
     memmove(p->entries+at+1,p->entries+at,(p->count-at)*sizeof(entry));
     p->entries[at]=entry;++p->count;p->bytes+=length;
     memcpy(id,entry.id,32);return STN_PENDING_ACCEPTED;
@@ -74,11 +79,11 @@ void stn_pending_clear(stn_pending *p)
     size_t i;if(p==NULL){return;}
     for(i=0;i<p->count;++i){free(p->entries[i].transaction);}memset(p,0,sizeof(*p));
 }
-static int same_nonce(const stn_pending_entry *e,const stn_record *r)
-{return memcmp(e->signer,r->signer_public_key,32)==0 && memcmp(e->nonce,r->nonce,32)==0;}
+static int same_nonce(const stn_pending_entry *e,const uint8_t signer[32],const uint8_t nonce[32])
+{return memcmp(e->signer,signer,32)==0 && memcmp(e->nonce,nonce,32)==0;}
 static stn_data_status scan(const stn_pending *p,const stn_storage_view *v,uint8_t *mask,int replay,const stn_hash_provider *hash)
 {
-    size_t i,j,k,offset;stn_block b;stn_transaction tx;stn_record r;uint8_t id[32];
+    size_t i,j,k,offset;stn_block b;stn_transaction tx;stn_record r;uint8_t id[32],signer[32],nonce[32],statement[256];size_t written;int lifecycle;
     if(p==NULL || v==NULL || mask==NULL || (v->count!=0 && v->blocks==NULL)){return STN_DATA_ARGUMENT;}
     memset(mask,0,STN_PENDING_MAX_ENTRIES);
     for(i=0;i<v->count;++i){
@@ -86,10 +91,12 @@ static stn_data_status scan(const stn_pending *p,const stn_storage_view *v,uint8
         offset=0;
         for(j=0;j<b.header.transaction_count;++j){
             size_t n=(size_t)stn_wire_read(b.body+offset,4);
-            if(stn_transaction_decode(b.body+offset+4,n,&tx)!=STN_DATA_OK ||
-               stn_record_decode(tx.record_bytes,tx.record_length,&r)!=STN_RECORD_OK){return STN_DATA_CONTENT;}
+            if(stn_transaction_decode(b.body+offset+4,n,&tx)!=STN_DATA_OK){return STN_DATA_CONTENT;}
+            lifecycle=tx.type!=STN_TX_PUBLICATION;
+            if(!lifecycle){if(stn_record_decode(tx.record_bytes,tx.record_length,&r)!=STN_RECORD_OK)return STN_DATA_CONTENT;memcpy(signer,r.signer_public_key,32);memcpy(nonce,r.nonce,32);}
+            else {memcpy(signer,tx.record_bytes+1,32);if(hash!=NULL){if(tx.type==STN_TX_AUTHORITY_GRANT){if(stn_authority_grant_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_GRANT)return STN_DATA_CONTENT;}else if(tx.type==STN_TX_AUTHORITY_REVOKE){if(stn_authority_revocation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_REVOCATION)return STN_DATA_CONTENT;}else if(tx.type==STN_TX_IDENTITY_ROTATE){if(stn_identity_rotation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_ROTATION)return STN_DATA_CONTENT;}else return STN_DATA_CONTENT;if(stn_lifecycle_replay_nonce(tx.type,statement,written,hash,nonce)!=STN_LIFECYCLE_OK)return STN_DATA_CONTENT;}}
             if(!replay && stn_transaction_id(b.body+offset+4,n,hash,id)!=STN_DATA_OK){return STN_DATA_PROVIDER_ERROR;}
-            for(k=0;k<p->count;++k){if(replay ? same_nonce(&p->entries[k],&r) : memcmp(p->entries[k].id,id,32)==0){mask[k]=1;}}
+            for(k=0;k<p->count;++k){if(replay ? (lifecycle ? (p->entries[k].length==n && memcmp(p->entries[k].transaction,b.body+offset,n)==0) : same_nonce(&p->entries[k],signer,nonce)) : memcmp(p->entries[k].id,id,32)==0){mask[k]=1;}}
             offset+=4+n;
         }
     }
@@ -145,13 +152,11 @@ stn_pending_result stn_pending_admit(stn_pending *p,const uint8_t *record,size_t
     memcpy(id,e.id,32);memcpy(e.signer,r.signer_public_key,32);memcpy(e.nonce,r.nonce,32);e.length=n;
     i=find_id(p,e.id);
     if(i<p->count && memcmp(p->entries[i].id,e.id,32)==0){return STN_PENDING_DUPLICATE;}
-    for(i=0;i<p->count;++i){
-        if(same_nonce(&p->entries[i],&r)){return STN_PENDING_REPLAY;}
-    }
+    for(i=0;i<p->count;++i){if(memcmp(p->entries[i].signer,e.signer,32)==0 && memcmp(p->entries[i].nonce,e.nonce,32)==0){return STN_PENDING_REPLAY;}}
     /* This check supplements, never replaces, the configured replay hook.
      * Exact accepted IDs necessarily share this network/signer/nonce tuple. */
     probe.entries[0]=e;probe.count=1;
-    if(scan(&probe,active,mask,1,NULL)!=STN_DATA_OK){return STN_PENDING_PROVIDER;}
+    if(scan(&probe,active,mask,1,hash)!=STN_DATA_OK){return STN_PENDING_PROVIDER;}
     if(mask[0]){return STN_PENDING_REPLAY;}
     return stn_pending_insert(p,encoded,n,hash,id);
 }
@@ -159,7 +164,7 @@ stn_pending_result stn_pending_admit_transaction(stn_pending *p,const uint8_t *b
     size_t length,const stn_validation_context *c,const stn_storage_view *active,
     const stn_hash_provider *hash,stn_validation_report *report,uint8_t id[32])
 {
-    stn_transaction tx;stn_data_status status;
+    stn_transaction tx;stn_data_status status;stn_pending_result lifecycle_result;
     if(report==NULL || id==NULL){return STN_PENDING_PROVIDER;}
     memset(report,0,sizeof(*report));memset(id,0,32);
     status=stn_transaction_decode(bytes,length,&tx);
@@ -175,6 +180,12 @@ stn_pending_result stn_pending_admit_transaction(stn_pending *p,const uint8_t *b
             if(report->envelope_error==STN_RECORD_UNSUPPORTED){return STN_PENDING_UNSUPPORTED;}
         }
         return STN_PENDING_INVALID;
+    }
+    if(tx.type!=STN_TX_PUBLICATION){
+        if(c==NULL || active==NULL || memcmp(c->expected_network,active->state.network_id,32)!=0){report->acceptance=STN_ACCEPTANCE_UNRESOLVED;return STN_PENDING_UNAVAILABLE;}
+        lifecycle_result=stn_pending_insert(p,bytes,length,hash,id);
+        if(lifecycle_result==STN_PENDING_ACCEPTED){report->acceptance=STN_ACCEPTANCE_UNDER_CONTEXT;return lifecycle_result;}
+        report->acceptance=STN_ACCEPTANCE_REJECTED;return lifecycle_result;
     }
     return stn_pending_admit(p,tx.record_bytes,tx.record_length,c,active,hash,report,id);
 }
@@ -194,9 +205,7 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
         const stn_pending_entry *e=&p->entries[at];stn_transaction tx;stn_validation_report r;
         if(replay[at]){continue;}
         if(stn_transaction_decode(e->transaction,e->length,&tx)!=STN_DATA_OK){return STN_DATA_CONTENT;}
-        r=stn_validate_intelligence_record(tx.record_bytes,tx.record_length,c);
-        if(r.acceptance==STN_ACCEPTANCE_ERROR){return STN_DATA_PROVIDER_ERROR;}
-        if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){continue;}
+        if(tx.type==STN_TX_PUBLICATION){r=stn_validate_intelligence_record(tx.record_bytes,tx.record_length,c);if(r.acceptance==STN_ACCEPTANCE_ERROR){return STN_DATA_PROVIDER_ERROR;}if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){continue;}}
         if(e->length+4>STN_BLOCK_MAX_BODY-total){break;}
         /* A caller capacity failure must not silently change the chosen block. */
         if(e->length+4>capacity-total){return STN_DATA_CAPACITY;}

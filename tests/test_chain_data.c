@@ -83,7 +83,7 @@ static void malformed(void)
     CHECK(stn_transaction_validate_structure(tx, 192) == STN_DATA_VERSION);
     for (kind=0; kind<=6; ++kind) {
         memcpy(tx, tx_fixture, 192); tx[7]=(uint8_t)kind;
-        CHECK(stn_transaction_validate_structure(tx, 192) == (kind==1 ? STN_DATA_OK : STN_DATA_TYPE));
+        CHECK(stn_transaction_validate_structure(tx, 192) == (kind==1 ? STN_DATA_OK : (kind>=2 && kind<=4 ? STN_DATA_LENGTH : STN_DATA_TYPE)));
     }
     memcpy(tx, tx_fixture, 192); memset(tx+8,0,4);
     CHECK(stn_transaction_validate_structure(tx, 192) == STN_DATA_LENGTH);

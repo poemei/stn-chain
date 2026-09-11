@@ -511,3 +511,13 @@ The portable state is caller-owned accepted-history state; consuming an unseen
 identity marks it FRESH, while a consumed identity returns REPLAY. Pending and
 submitted evidence do not mutate this state. Reorganization and restart rebuild
 the state by replaying the applicable accepted history.
+
+## Phase 14 Block 7 — accepted-history lifecycle integration
+
+The reserved transaction classes are now bounded and explicit: type 2 is an
+authority grant, type 3 is a grant revocation, and type 4 is an identity
+rotation. Type 5 remains rejected. Each lifecycle transaction carries the
+existing canonical Phase 14 payload directly. A portable lifecycle state
+reconstructor applies validated actions only while replaying accepted block and
+transaction order. Fork choice remains independent; replacing accepted history
+rebuilds grants, revocations, rotations, and replay state from that history.

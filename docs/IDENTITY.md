@@ -93,3 +93,14 @@ evaluation, and peer receipt do not consume it. Rebuilding from the accepted
 history produces the same fresh/replay result, and replacing the accepted
 history rebuilds the replay state accordingly. **Replay of Accepted Evidence ≠
 New Authorized Action.** **Submitted ≠ Pending ≠ Accepted.**
+
+## Accepted-history lifecycle integration
+
+Phase 14 Block 7 activates transaction types 2–4 for the already-qualified
+194-byte grant and 129-byte revocation and rotation payloads. The existing
+transaction header is the only envelope; payload bytes and signing domains are
+unchanged. Lifecycle replay nonces are SHA-256 of the explicit lifecycle replay
+domain, transaction type, and canonical signed-statement fields. Lifecycle
+state is derived only by replaying accepted blocks in canonical transaction
+order. Pending evidence, rejected blocks, and miner or peer origin do not
+change authority, identity, revocation, or replay state.

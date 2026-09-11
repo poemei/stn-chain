@@ -934,3 +934,10 @@ are not claims of a published or deployed release.
 ### Removed
 
 - Historical Go implementation to begin a fresh redesign (0a7ae52).
+
+## 2026-09-11 — Phase 14 Block 7
+
+Integrated qualified authority grants, revocations, and identity rotations into
+the existing canonical transaction header. Added deterministic lifecycle replay
+nonce derivation and accepted-history reconstruction with branch replacement
+qualification. Transaction type 5 remains reserved and rejected.

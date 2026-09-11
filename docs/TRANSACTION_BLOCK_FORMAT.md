@@ -188,3 +188,12 @@ Difficulty adjustment, chain selection, reorganizations, mining rewards, coin
 economics, wallets, networking, RPC, and smart-contract execution remain
 unimplemented. This increment stops with the codecs, structural checks,
 provider-bound integrity interfaces, documentation, and regression tests.
+
+## Phase 14 lifecycle transaction mapping
+
+The existing transaction header remains the canonical envelope. Type 2 carries
+exactly the 194-byte authority grant, type 3 exactly the 129-byte revocation,
+and type 4 exactly the 129-byte identity rotation. Type 5 remains reserved and
+invalid. Lifecycle payload bytes are not normalized or re-encoded. Accepted
+lifecycle state is reconstructed from persisted block history in canonical
+block and transaction order.

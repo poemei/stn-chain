@@ -78,7 +78,7 @@ static void admission_checks(void)
     ADMISSION_REJECT(STN_PENDING_DUPLICATE);
     encoded[0]=0;ADMISSION_REJECT(STN_PENDING_INVALID);memcpy(encoded,original,sizeof(encoded));
     encoded[5]=2;ADMISSION_REJECT(STN_PENDING_UNSUPPORTED);memcpy(encoded,original,sizeof(encoded));
-    encoded[7]=2;ADMISSION_REJECT(STN_PENDING_UNSUPPORTED);memcpy(encoded,original,sizeof(encoded));
+    encoded[7]=2;ADMISSION_REJECT(STN_PENDING_INVALID);memcpy(encoded,original,sizeof(encoded));
     encoded[17]=2;ADMISSION_REJECT(STN_PENDING_UNSUPPORTED);memcpy(encoded,original,sizeof(encoded));
     encoded[19]=2;ADMISSION_REJECT(STN_PENDING_UNSUPPORTED);memcpy(encoded,original,sizeof(encoded));
     encoded[20]=2;ADMISSION_REJECT(STN_PENDING_NETWORK);memcpy(encoded,original,sizeof(encoded));

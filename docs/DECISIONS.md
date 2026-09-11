@@ -273,3 +273,13 @@ No hardware or production-identity qualification is implied.
 ## Phase 11 Chunk 4 — final qualification (2026-09-10)
 
 Phase 11 is COMPLETE for Windows Release/x64 bounded development qualification. Chunk 4 required no consensus or production changes. Peers remain evidence providers: each node reconstructs branch-specific targets and exact 320-bit work before existing fork choice. The full target domain, canonical 40-byte big-endian work and strict revalidation of legacy fixed-target development history remain controlling. See ROADMAP.md for the final evidence and limits; Phase 12 is not started.
+
+## Phase 14 Block 7 — accepted-history lifecycle integration
+
+Transaction types 2–4 are the authorized canonical lifecycle mapping: grant,
+revocation, and rotation. Their existing payload bytes remain unchanged. The
+lifecycle replay nonce is derived from canonical signed semantics, and replay
+IDs are consumed only during accepted-history application. **Lifecycle State
+Derives From Accepted Chain History. Pending Lifecycle Evidence ≠ Active
+Authority. Fork Choice Determines Accepted History; Accepted History Determines
+Authority State.**

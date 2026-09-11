@@ -159,6 +159,7 @@ int test_pending(void);
 int test_identity(void);
 int test_authority(void);
 int test_replay(void);
+int test_lifecycle(void);
 
 int main(void)
 {
@@ -177,6 +178,7 @@ int main(void)
     int identity_failed;
     int authority_failed;
     int replay_failed;
+    int lifecycle_failed;
     known_bytes(); malformed(); boundaries(); encode_failure();
     printf("Record codec: %u checks, %u failures.\n", checks, failures);
     intelligence_failed = test_intelligence();
@@ -194,5 +196,6 @@ int main(void)
     identity_failed = test_identity();
     authority_failed = test_authority();
     replay_failed = test_replay();
-    return failures == 0 && !intelligence_failed && !validation_failed && !chain_data_failed && !chain_failed && !pow_failed && !fork_failed && !storage_failed && !peer_failed && !portability_failed && !rpc_failed && !mining_failed && !pending_failed && !identity_failed && !authority_failed && !replay_failed ? EXIT_SUCCESS : EXIT_FAILURE;
+    lifecycle_failed = test_lifecycle();
+    return failures == 0 && !intelligence_failed && !validation_failed && !chain_data_failed && !chain_failed && !pow_failed && !fork_failed && !storage_failed && !peer_failed && !portability_failed && !rpc_failed && !mining_failed && !pending_failed && !identity_failed && !authority_failed && !replay_failed && !lifecycle_failed ? EXIT_SUCCESS : EXIT_FAILURE;
 }

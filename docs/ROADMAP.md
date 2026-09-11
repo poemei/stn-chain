@@ -465,3 +465,12 @@ explicitly caller-controlled after accepted-state publication. Fresh, replay,
 and malformed results are distinct, and state reconstruction follows accepted
 history rather than pending contents or a local cache. Grant, revocation, and
 rotation semantics remain intact. Block 7 was not started.
+
+### Block 7 — accepted-history identity and authority lifecycle integration COMPLETE (2026-09-11)
+
+Activated transaction types 2–4 for the qualified grant, revocation, and
+rotation payloads. Added deterministic lifecycle replay-nonce derivation and a
+portable accepted-history state reconstructor. Pending evidence remains
+non-authoritative, rejected history does not consume replay state, and branch
+reconstruction follows existing fork choice and transaction order. Type 5
+remains reserved and rejected.

@@ -164,3 +164,10 @@ Runtime buffers are explicitly malloc-owned; other callers receive CAPACITY rath
 than an unsafe realloc of borrowed memory. Snapshot replacement and its u32 count
 format remain unchanged. Full-history reads and snapshot rewrite cost remain;
 streaming/segmented storage is intentionally deferred, not claimed implemented.
+
+## Phase 14 lifecycle reconstruction
+
+Persistence continues to store canonical accepted blocks. Lifecycle authority,
+identity, revocation, and replay state is derived by replaying that history;
+no sidecar lifecycle database is authoritative. Reorganization replaces the
+accepted history and therefore replaces the derived lifecycle state.

@@ -370,3 +370,12 @@ The Release/x64 build includes listener-close-before-worker-join shutdown
 ordering. Run the lifecycle qualification after the build; it confirms active
 session cleanup and independent-client continuity while the full C test
 executable remains the regression gate.
+
+## Phase 14 Block 7 — lifecycle transaction integration
+
+Lifecycle transactions use the existing 12-byte transaction header and direct
+qualified payloads. No second envelope or serialization format was added.
+Pending admission remains evidence handling; accepted-history reconstruction is
+the authority and identity state transition boundary. The lifecycle replay
+nonce is deterministic SHA-256 over the lifecycle replay domain, transaction
+type, and canonical signed-statement fields.

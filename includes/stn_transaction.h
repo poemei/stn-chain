@@ -4,14 +4,13 @@
 #include "stn_record.h"
 
 #define STN_TX_HEADER_SIZE 12u
-#define STN_TX_MIN_SIZE (STN_TX_HEADER_SIZE + STN_RECORD_OVERHEAD)
+#define STN_TX_MIN_SIZE (STN_TX_HEADER_SIZE + STN_TX_AUTHORITY_REVOKE_SIZE)
 #define STN_TX_MAX_SIZE (STN_TX_HEADER_SIZE + STN_RECORD_MAX_SIZE)
 #define STN_TX_PUBLICATION 1u
-/* Reserved classes, rejected until their formats and activation are defined. */
-#define STN_TX_COIN_TRANSFER 2u
-#define STN_TX_CONTRACT_ACTION 3u
-#define STN_TX_ORGANIZATION_ACTION 4u
-#define STN_TX_TREASURY_ACTION 5u
+#define STN_TX_AUTHORITY_GRANT 2u
+#define STN_TX_AUTHORITY_REVOKE 3u
+#define STN_TX_IDENTITY_ROTATE 4u
+#define STN_TX_RESERVED 5u
 
 typedef enum stn_data_status {
     STN_DATA_OK = 0, STN_DATA_ARGUMENT, STN_DATA_LENGTH,
@@ -27,6 +26,10 @@ typedef struct stn_transaction {
     const uint8_t *record_bytes;
     uint32_t record_length;
 } stn_transaction;
+
+#define STN_TX_AUTHORITY_GRANT_SIZE 194u
+#define STN_TX_AUTHORITY_REVOKE_SIZE 129u
+#define STN_TX_IDENTITY_ROTATE_SIZE 129u
 
 /* Provider must calculate SHA-256(domain || bytes), including domain's NUL.
  * Return OK, UNRESOLVED, or PROVIDER_ERROR. Other returns become errors.
