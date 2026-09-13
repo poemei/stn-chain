@@ -110,7 +110,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
     }
     code=storage_code(stn_storage_load(s->chain,s->storage,s->snapshot,s->snapshot_capacity,&v));
     if(code!=STN_RPC_OK){return code;}
-    if(q->method==STN_RPC_GET_ACCEPTED_RECORD){
+    if(q->method==STN_RPC_GET_ACCEPTED_RECORD || q->method==STN_RPC_GET_FIRST_ACCEPTED_RECORD || q->method==STN_RPC_GET_NEXT_ACCEPTED_RECORD){
         query.chain=s->chain;query.blocks=v.blocks;query.count=v.count;query.intelligence=s->intelligence;
         code=stn_node_service_handle(&query,q,p,cap,written);goto done;
     }

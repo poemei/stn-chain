@@ -51,7 +51,34 @@ stn_rpc_code stn_node_service_handle(void *user,const stn_rpc_message *q,uint8_t
         fields[8]=(uint16_t)r.envelope_error;fields[9]=(uint16_t)r.payload_error;
         for(i=0;i<10;++i){stn_wire_write(p+i*2,2,fields[i]);}*written=20;return STN_RPC_OK;
     }
-    if(q->method==STN_RPC_GET_ACCEPTED_RECORD){
+    if(q->method==STN_RPC_GET_FIRST_ACCEPTED_RECORD || q->method==STN_RPC_GET_NEXT_ACCEPTED_RECORD){
+        stn_chain_record_match match;stn_chain_cursor cursor,position;
+        if(q->method==STN_RPC_GET_FIRST_ACCEPTED_RECORD){
+            stn_first_result result;
+            if(q->length!=0)return STN_RPC_INVALID;
+            result=stn_chain_first_record(s->chain,s->blocks,s->count,&match,&position);
+            if(result==STN_FIRST_END)return STN_RPC_END;
+            if(result==STN_FIRST_UNAVAILABLE)return STN_RPC_UNAVAILABLE;
+            if(result==STN_FIRST_CAPACITY)return STN_RPC_CAPACITY;
+            if(result!=STN_FIRST_RECORD)return STN_RPC_PROVIDER;
+        }else{
+            stn_next_result result;
+            if(stn_chain_cursor_decode(q->payload,q->length,&cursor)!=STN_CURSOR_VALID)return STN_RPC_INVALID;
+            result=stn_chain_next_record(s->chain,s->blocks,s->count,&cursor,&match,&position);
+            if(result==STN_NEXT_END)return STN_RPC_END;
+            if(result==STN_NEXT_DETACHED)return STN_RPC_DETACHED;
+            if(result==STN_NEXT_MALFORMED)return STN_RPC_INVALID;
+            if(result==STN_NEXT_UNAVAILABLE)return STN_RPC_UNAVAILABLE;
+            if(result==STN_NEXT_CAPACITY)return STN_RPC_CAPACITY;
+            if(result!=STN_NEXT_RECORD)return STN_RPC_PROVIDER;
+        }
+        if(cap<125 || match.transaction.length>cap-125)return STN_RPC_CAPACITY;
+        memcpy(p,match.record_id,32);stn_wire_write(p+32,8,match.height);memcpy(p+40,match.block_id,32);
+        stn_wire_write(p+72,4,position.transaction_position);
+        if(stn_chain_cursor_encode(&position,p+76,45)!=STN_CURSOR_VALID)return STN_RPC_PROVIDER;
+        stn_wire_write(p+121,4,match.transaction.length);memcpy(p+125,match.transaction.bytes,match.transaction.length);
+        *written=125+match.transaction.length;return STN_RPC_OK;
+    }    if(q->method==STN_RPC_GET_ACCEPTED_RECORD){
         stn_chain_record_match match;stn_data_status status;
         if(q->payload==NULL || q->length!=32)return STN_RPC_INVALID;
         status=stn_chain_lookup_record(s->chain,s->blocks,s->count,q->payload,&match);

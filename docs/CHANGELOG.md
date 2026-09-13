@@ -5,6 +5,51 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 15 Micro-Chunk 3G — STNC first/next accepted records — 2026-09-13
+
+- Added READ 0x0005 FIRST (empty request) and 0x0006 NEXT (45-byte Cursor v1).
+  Shared 125-byte response prefix precedes exact canonical transaction bytes.
+  END=11 and DETACHED=12 are restricted to applicable traversal responses;
+  malformed input retains INVALID=1. Existing STNC frame version 2 and 0x0004
+  encoding remain unchanged. Chain primitives retain all traversal semantics.
+- Windows Release/x64: 975 targeted checks, zero failures; includes 58 new TCP
+  assertions across separate FIRST/NEXT connections, plus existing 0x0004 TCP.
+  34 build probes pass; zero final warnings/errors. Restart/reorg/eligibility
+  regressions reused; no broad process/full-suite or other platform qualification.
+- Updated local ignored test infrastructure and RPC/architecture documentation.
+  Stratum interface impact NONE; requalification not required. No 3H work.
+
+### Phase 15 Micro-Chunk 3F — first accepted production record — 2026-09-13
+
+- Added stn_chain_first_record using the same internal historical eligibility
+  walker as lookup/next. FIRST_RECORD returns the existing borrowed match and
+  Cursor v1; END leaves outputs unchanged. Argument, unavailable history and
+  provider/capacity failures remain separate. No input/synthetic cursor.
+- Windows Release/x64: 605 targeted checks (55 added assertions), 34 build
+  probes, zero failures/warnings/errors. Covers historical skips, pending-only
+  END, canonical ordering, metadata/cursor, first-to-next continuity, greater-work
+  replacement, persisted-view restart equivalence and state preservation.
+  Replay semantics remain unchanged. No full-suite/additional platform run.
+- No STNC/mining/Stratum changes, consumer state, recovery or Micro-Chunk 3G.
+
+### Phase 15 Micro-Chunk 3E — next accepted production record — 2026-09-13
+
+- Added stn_chain_next_record with exclusive cursor traversal and NEXT_RECORD,
+  END, DETACHED and MALFORMED outcomes plus separate local failure outcomes.
+  Lookup and traversal share the same historical eligibility implementation,
+  reconstructing replay from genesis even when searching after a later cursor.
+  Returns the existing record match and a version-1 cursor; outputs change only
+  on NEXT_RECORD. No record-ID deduplication or consumer state is maintained.
+- Windows Release/x64: 550 targeted checks (60 added assertions) and 34 build
+  probes pass, zero failures, warnings or errors. Covers transaction/block
+  ordering, replay-witness exclusion, returned-cursor advancement, pending
+  exclusion, detached input, persisted-view restart equivalence and read-only
+  state/persistence behavior. Same-semantic witnesses share the existing replay
+  discriminator, so the repeated witness remains ineligible under current rules;
+  no independently eligible duplicate fixture or replay exception was invented.
+- No STNC/mining/Stratum changes, full-suite run or additional platform
+  qualification. No initial cursor, recovery, batching or Micro-Chunk 3F work.
+
 ### Phase 15 Micro-Chunk 3D — consumer cursor foundation — 2026-09-13
 
 - Added portable Chain cursor codec and read-only current-history validation.

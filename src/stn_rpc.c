@@ -15,6 +15,7 @@ stn_rpc_code stn_rpc_payload_length(const uint8_t *p,size_t n,size_t *payload_le
 static uint32_t capability(uint16_t method)
 {
     switch(method){
+    case STN_RPC_GET_FIRST_ACCEPTED_RECORD:case STN_RPC_GET_NEXT_ACCEPTED_RECORD:
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:case STN_RPC_GET_ACCEPTED_RECORD:
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_INTELLIGENCE_CURSOR:
     case STN_RPC_MINING_CONTEXT:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_MINING_TEMPLATE:return STN_RPC_READ;
@@ -26,6 +27,8 @@ static uint32_t capability(uint16_t method)
 static int shape(uint16_t method,const uint8_t *p,size_t n)
 {
     switch(method){
+    case STN_RPC_GET_FIRST_ACCEPTED_RECORD:return n==0;
+    case STN_RPC_GET_NEXT_ACCEPTED_RECORD:return n==45;
     case STN_RPC_SUBMIT_TRANSACTION:return n<=STN_TX_MAX_SIZE;
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_MINING_CONTEXT:case STN_RPC_MINING_TEMPLATE:case STN_RPC_ADMIN_CONTROL:return n==0;
     case STN_RPC_BLOCK_HEIGHT:return n==8;
@@ -39,7 +42,18 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
 static int response_shape(uint16_t method,const uint8_t *p,size_t n)
 {
     switch(method){
-    case STN_RPC_GET_ACCEPTED_RECORD:{
+    case STN_RPC_GET_FIRST_ACCEPTED_RECORD:case STN_RPC_GET_NEXT_ACCEPTED_RECORD:{
+        stn_transaction tx;stn_record record;stn_intelligence payload;stn_chain_cursor cursor;
+        stn_hash_provider hash={stn_sha256,NULL};uint8_t id[32];
+        if(n<125 || n-125>STN_TX_MAX_SIZE || stn_wire_read(p+121,4)!=n-125)return 0;
+        if(stn_chain_cursor_decode(p+76,45,&cursor)!=STN_CURSOR_VALID ||
+            cursor.height!=stn_wire_read(p+32,8) || memcmp(cursor.block_id,p+40,32)!=0 ||
+            cursor.transaction_position!=stn_wire_read(p+72,4))return 0;
+        return stn_transaction_decode(p+125,n-125,&tx)==STN_DATA_OK && tx.type==STN_TX_PUBLICATION &&
+            stn_record_decode(tx.record_bytes,tx.record_length,&record)==STN_RECORD_OK &&
+            stn_intelligence_decode(record.payload,record.payload_length,&payload)==STN_INTELLIGENCE_OK &&
+            stn_record_id(tx.record_bytes,tx.record_length,&hash,id)==STN_DATA_OK && memcmp(id,p,32)==0;
+    }    case STN_RPC_GET_ACCEPTED_RECORD:{
         stn_transaction tx;stn_record record;stn_intelligence payload;uint8_t id[32];
         stn_hash_provider hash={stn_sha256,NULL};
         if(n<STN_RPC_ACCEPTED_RECORD_PREFIX || n-STN_RPC_ACCEPTED_RECORD_PREFIX>STN_TX_MAX_SIZE ||
@@ -66,7 +80,9 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
 }
 static int message_valid(const stn_rpc_message *m)
 {
-    if(m->length>STN_RPC_MAX_PAYLOAD || (m->length!=0 && m->payload==NULL) || m->code<STN_RPC_OK || m->code>STN_RPC_STALE){return 0;}
+    if(m->length>STN_RPC_MAX_PAYLOAD || (m->length!=0 && m->payload==NULL) || m->code<STN_RPC_OK || m->code>STN_RPC_DETACHED){return 0;}
+    if((m->code==STN_RPC_END && m->method!=5 && m->method!=6) ||
+        (m->code==STN_RPC_DETACHED && m->method!=6))return 0;
     if(m->kind==1){return m->code==STN_RPC_OK && shape(m->method,m->payload,m->length);}
     return m->kind==2 && (m->code==STN_RPC_OK ? response_shape(m->method,m->payload,m->length) : m->length==0);
 }
@@ -109,7 +125,9 @@ stn_rpc_code stn_rpc_dispatch(const uint8_t *request,size_t length,uint32_t allo
         size_t payload_capacity=cap-24;
         if(payload_capacity>STN_RPC_MAX_PAYLOAD){payload_capacity=STN_RPC_MAX_PAYLOAD;}
         r.code=service->handle(service->user,&q,response+24,payload_capacity,&n);
-        if(r.code<STN_RPC_OK || r.code>STN_RPC_STALE || n>payload_capacity ||
+        if(r.code<STN_RPC_OK || r.code>STN_RPC_DETACHED ||
+            (r.code==STN_RPC_END && q.method!=STN_RPC_GET_FIRST_ACCEPTED_RECORD && q.method!=STN_RPC_GET_NEXT_ACCEPTED_RECORD) ||
+            (r.code==STN_RPC_DETACHED && q.method!=STN_RPC_GET_NEXT_ACCEPTED_RECORD) || n>payload_capacity ||
             (r.code==STN_RPC_OK && !response_shape(q.method,response+24,n))){r.code=STN_RPC_PROVIDER;}
         if(r.code==STN_RPC_OK){r.payload=response+24;r.length=n;}
     }

@@ -461,3 +461,35 @@ transaction IDs within one block remain governed by the existing block rule.
 No query index or database exists. Restart/reorganization reconstructs results
 from the selected branch. Pending contents neither satisfy nor change a query;
 the runtime read route bypasses pending cleanup and mining-template construction.
+
+## Phase 15 Micro-Chunk 3G — accepted-record traversal
+
+READ operations 0x0005 GET_FIRST_ACCEPTED_RECORD and 0x0006
+GET_NEXT_ACCEPTED_RECORD use the existing STNC frame (current wire version 2,
+unchanged). FIRST takes exactly zero payload bytes. NEXT takes exactly the
+45-byte Cursor v1. Wrong length maps to INVALID (1) before service traversal;
+malformed Cursor v1 maps to INVALID (1). No new capability is introduced.
+
+Both successful responses use OK (0) and this exact body:
+
+| Offset | Field | Bytes |
+| --- | --- | --- |
+| 0 | record ID | 32 |
+| 32 | accepted height, unsigned BE | 8 |
+| 40 | accepted block ID | 32 |
+| 72 | zero-based transaction position, unsigned BE | 4 |
+| 76 | canonical Cursor v1 | 45 |
+| 121 | transaction length, unsigned BE | 4 |
+| 125 | exact canonical publication transaction | transaction length |
+
+Cursor location must equal the separate height/block/position fields.
+Existing canonical transaction bounds apply. END (11) has zero payload and
+is valid for FIRST/NEXT only; DETACHED (12) has zero payload and is valid for
+NEXT only. These append statuses without renumbering existing values.
+Unavailable/provider/capacity failures retain codes 5/8/9. No fake record or
+replacement cursor is returned. GET_ACCEPTED_RECORD 0x0004 is unchanged.
+
+The adapter calls Chain first/next primitives; accepted snapshot loading stays
+in the existing storage adapter. No pending cleanup, lifecycle evaluation or
+cursor state is added to RPC. Cursor meaning is independent of connections and
+request IDs. Detachment never triggers automatic recovery.

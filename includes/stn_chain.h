@@ -113,6 +113,29 @@ stn_data_status stn_chain_lookup_record(const stn_chain_context *context,
     const stn_block_span *blocks,size_t count,const uint8_t record_id[32],
     stn_chain_record_match *out);
 
+typedef enum stn_next_result {
+    STN_NEXT_RECORD=0, STN_NEXT_END, STN_NEXT_DETACHED, STN_NEXT_MALFORMED,
+    STN_NEXT_UNAVAILABLE, STN_NEXT_PROVIDER, STN_NEXT_CAPACITY
+} stn_next_result;
+/* Exclusive traversal from an existing valid position. Uses historical lookup
+ * eligibility, including all replay evidence before the cursor. No record-ID
+ * deduplication. Output assigned only for NEXT_RECORD; encode position with the
+ * existing 45-byte cursor codec. Borrowed transaction lifetime matches lookup.
+ * All inputs/outputs disjoint and immutable history held by caller. */
+stn_next_result stn_chain_next_record(const stn_chain_context *context,
+    const stn_block_span *blocks,size_t count,const stn_chain_cursor *after,
+    stn_chain_record_match *out,stn_chain_cursor *position);
+typedef enum stn_first_result {
+    STN_FIRST_RECORD=0, STN_FIRST_END, STN_FIRST_ARGUMENT,
+    STN_FIRST_UNAVAILABLE, STN_FIRST_PROVIDER, STN_FIRST_CAPACITY
+} stn_first_result;
+/* Search from the beginning of current accepted history, without a cursor.
+ * Same eligibility, borrowed-byte lifetime and disjointness rules as next.
+ * Only FIRST_RECORD assigns outputs. END means no eligible accepted record;
+ * absent/unavailable history is a separate failure, not END. */
+stn_first_result stn_chain_first_record(const stn_chain_context *context,
+    const stn_block_span *blocks,size_t count,stn_chain_record_match *out,
+    stn_chain_cursor *position);
 /* Context/input spans and provider state must stay immutable during calls.
  * No allocation, persistence, global state, ambient time, or replay database.
  * The initial state is EMPTY, not an accepted genesis. Anchor validity beyond

@@ -346,15 +346,16 @@ stn_chain_report stn_chain_validate_sequence(const stn_chain_context *context,
 /* Revalidate the complete immutable accepted history before lookup. The two
  * replay projections deliberately differ: legacy qualifying publications affect
  * query eligibility, never historical consensus acceptance of later actions. */
-stn_data_status stn_chain_lookup_record(const stn_chain_context *context,
-    const stn_block_span *blocks,size_t count,const uint8_t key[32],stn_chain_record_match *out)
+static stn_data_status record_search(const stn_chain_context *context,
+    const stn_block_span *blocks,size_t count,const uint8_t key[32],const stn_chain_cursor *after,
+    stn_chain_record_match *out,stn_chain_cursor *position)
 {
     stn_lifecycle_state historical,observed;stn_replay_state eligible;
     stn_block block;stn_transaction tx;size_t i,j,offset,total=0,grants=0,gb,rb;
     uint8_t *memory,initial[32]={0},id[32],block_id[32];stn_data_status code=STN_DATA_OK;
     stn_chain_state current,next;stn_chain_report report;stn_chain_record_match match={0};
     uint64_t activation;
-    if(key==NULL || out==NULL)return STN_DATA_ARGUMENT;
+    if(out==NULL)return STN_DATA_ARGUMENT;
     if(context==NULL || context->pow_policy==NULL || blocks==NULL || count==0)return STN_DATA_UNRESOLVED;
     if(stn_chain_initialize(context,&current)!=STN_DATA_OK)return STN_DATA_PROVIDER_ERROR;
     for(i=0;i<count;++i){
@@ -396,10 +397,13 @@ stn_data_status stn_chain_lookup_record(const stn_chain_context *context,
                 if(result==STN_LIFECYCLE_PROVIDER || result==STN_LIFECYCLE_CAPACITY){code=STN_DATA_PROVIDER_ERROR;goto done;}
                 if(result==STN_LIFECYCLE_OK){
                     if(stn_record_id(tx.record_bytes,tx.record_length,&context->hash_provider,id)!=STN_DATA_OK){code=STN_DATA_PROVIDER_ERROR;goto done;}
-                    if(memcmp(id,key,32)==0){
+                    if((key==NULL && after==NULL) || (key!=NULL && memcmp(id,key,32)==0) || (after!=NULL &&
+                        (block.header.height>after->height || (block.header.height==after->height && j>after->transaction_position)))){
                         if(stn_chain_block_id(blocks[i].bytes,blocks[i].length,&context->hash_provider,block_id)!=STN_DATA_OK){code=STN_DATA_PROVIDER_ERROR;goto done;}
                         match.found=1;memcpy(match.record_id,id,32);match.height=block.header.height;memcpy(match.block_id,block_id,32);
-                        match.transaction.bytes=block.body+offset;match.transaction.length=(uint32_t)n;code=STN_DATA_OK;goto done;
+                        match.transaction.bytes=block.body+offset;match.transaction.length=(uint32_t)n;
+                        if(position!=NULL){position->version=1;position->height=block.header.height;memcpy(position->block_id,block_id,32);position->transaction_position=(uint32_t)j;}
+                        code=STN_DATA_OK;goto done;
                     }
                     if(stn_lifecycle_apply_transaction(&observed,&tx,context->genesis_authority_roots,context->genesis_authority_root_count,&context->hash_provider)!=STN_LIFECYCLE_OK){code=STN_DATA_PROVIDER_ERROR;goto done;}
                     eligible=observed.replay;
@@ -456,4 +460,42 @@ stn_cursor_result stn_chain_cursor_validate(const stn_chain_context *context,
         }
     }
     return result;
+}
+stn_data_status stn_chain_lookup_record(const stn_chain_context *context,
+    const stn_block_span *blocks,size_t count,const uint8_t key[32],stn_chain_record_match *out)
+{
+    if(key==NULL)return STN_DATA_ARGUMENT;
+    return record_search(context,blocks,count,key,NULL,out,NULL);
+}
+stn_next_result stn_chain_next_record(const stn_chain_context *context,
+    const stn_block_span *blocks,size_t count,const stn_chain_cursor *after,
+    stn_chain_record_match *out,stn_chain_cursor *position)
+{
+    stn_cursor_result valid;stn_data_status status;stn_chain_record_match match;
+    stn_chain_cursor next={0};
+    if(out==NULL || position==NULL)return STN_NEXT_MALFORMED;
+    valid=stn_chain_cursor_validate(context,blocks,count,after);
+    if(valid==STN_CURSOR_MALFORMED)return STN_NEXT_MALFORMED;
+    if(valid==STN_CURSOR_DETACHED)return STN_NEXT_DETACHED;
+    if(valid==STN_CURSOR_UNAVAILABLE)return STN_NEXT_UNAVAILABLE;
+    if(valid!=STN_CURSOR_VALID)return STN_NEXT_PROVIDER;
+    status=record_search(context,blocks,count,NULL,after,&match,&next);
+    if(status==STN_DATA_UNRESOLVED)return STN_NEXT_UNAVAILABLE;
+    if(status==STN_DATA_CAPACITY)return STN_NEXT_CAPACITY;
+    if(status!=STN_DATA_OK)return STN_NEXT_PROVIDER;
+    if(!match.found)return STN_NEXT_END;
+    *out=match;*position=next;return STN_NEXT_RECORD;
+}
+stn_first_result stn_chain_first_record(const stn_chain_context *context,
+    const stn_block_span *blocks,size_t count,stn_chain_record_match *out,
+    stn_chain_cursor *position)
+{
+    stn_data_status status;stn_chain_record_match match;stn_chain_cursor first={0};
+    if(out==NULL || position==NULL)return STN_FIRST_ARGUMENT;
+    status=record_search(context,blocks,count,NULL,NULL,&match,&first);
+    if(status==STN_DATA_UNRESOLVED)return STN_FIRST_UNAVAILABLE;
+    if(status==STN_DATA_CAPACITY)return STN_FIRST_CAPACITY;
+    if(status!=STN_DATA_OK)return STN_FIRST_PROVIDER;
+    if(!match.found)return STN_FIRST_END;
+    *out=match;*position=first;return STN_FIRST_RECORD;
 }

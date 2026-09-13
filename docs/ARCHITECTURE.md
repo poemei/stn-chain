@@ -597,3 +597,34 @@ not a detached historical snapshot.
 
 The cursor detects detachment without recovery or advancement. It adds no
 STNC wire fields, record eligibility rules, persistence format or cache.
+### Phase 15 Micro-Chunk 3E — exclusive next-record traversal
+
+stn_chain_next_record accepts an existing valid cursor and searches strictly
+after it, by accepted block height then canonical transaction position. It shares
+the lookup eligibility traversal, including historical authority and replay
+evidence before the cursor. The first eligible witness returns NEXT_RECORD,
+the existing borrowed record match, and a version-1 cursor encodable by the
+45-byte codec. Outputs remain unchanged on END, DETACHED, MALFORMED or a local
+failure. END means no later eligible record in the supplied current history.
+
+There is no record-ID deduplication. Existing replay eligibility still applies:
+a repeated semantic record cannot be made eligible merely by advancing a cursor.
+The caller holds the current immutable accepted snapshot and owns its cursor.
+No before-genesis sentinel, server-side consumer state, STNC method, automatic
+recovery or persistence change is introduced.
+### Phase 15 Micro-Chunk 3F — first accepted production record
+
+stn_chain_first_record starts at the beginning of current accepted history,
+without a cursor or sentinel. It shares lookup/next historical eligibility and
+returns the first eligible transaction by height and transaction position.
+FIRST_RECORD assigns the borrowed record match and Cursor v1; END leaves outputs
+unchanged when valid accepted history has no eligible record. Local failures are
+separate. Pass the returned cursor to stn_chain_next_record for exclusive
+advancement. No STNC protocol or persistent consumer state is added.
+### Phase 15 Micro-Chunk 3G — STNC traversal exposure
+
+STNC READ 0x0005/0x0006 expose Chain first/next respectively. The node adapter
+maps Chain outcomes and encodes the shared 125-byte prefix plus canonical
+transaction; the existing storage adapter supplies accepted history before
+pending maintenance. Eligibility and traversal remain exclusively Chain-owned.
+No per-session consumer state, recovery, or mining contract change is introduced.
