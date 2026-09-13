@@ -628,3 +628,39 @@ maps Chain outcomes and encodes the shared 125-byte prefix plus canonical
 transaction; the existing storage adapter supplies accepted history before
 pending maintenance. Eligibility and traversal remain exclusively Chain-owned.
 No per-session consumer state, recovery, or mining contract change is introduced.
+### Phase 15 Block 4 / Micro-Chunk 4A — cursor ancestry
+
+stn_chain_resolve_cursor_reorg, in the existing fork interface, accepts current
+accepted history plus optional caller-retained full historical spans. It
+revalidates cursor location and evidence using existing cursor/fork primitives.
+A current location returns CURRENT. Valid retained detached evidence yields
+the highest common block's height and ID; absent/unresolvable evidence yields
+NO_COMMON_ANCESTOR without assuming genesis. Invalid cursor syntax remains
+MALFORMED; failed current-history/provider validation is a separate failure.
+Only the common-ancestor result assigns output. No transaction position,
+replacement cursor, reactivation, fetch or consumer action is returned.
+
+Retention is caller-owned under existing span lifetimes. The accepted-only
+store does not automatically retain detached history across restart. Resolution
+after reconstruction is possible only when that historical evidence remains
+available; no new persistence or branch-retention mechanism is introduced.
+### Phase 15 Block 4 / Micro-Chunk 4B — consumer recovery plan
+
+stn_chain_build_consumer_recovery_plan reuses 4A ancestry, then FIRST/NEXT
+to select the latest eligible current record at or before that exact common
+block. AFTER_CURSOR returns that Cursor v1 and the rollback height/block ID.
+FROM_START returns the same boundary when no eligible anchor exists; its unused
+resume storage is zero, not a valid synthetic cursor. Consumers use NEXT or
+FIRST respectively after handling their own derived state beyond the boundary.
+
+CURRENT needs no recovery; unavailable ancestry yields UNAVAILABLE without
+inventing a boundary. Malformed input and provider failures remain separate.
+Only recovery outcomes assign output. No rollback, replay, consumer persistence,
+peer fetch or detached-evidence retention is performed by Chain.
+### Phase 15 Block 4 / Micro-Chunk 4C — STNC recovery exposure
+
+READ 0x0007/0x0008 map directly to 4A ancestry/4B recovery primitives. The
+node snapshot may include optional caller-retained immutable branch spans,
+revalidated by Chain. The accepted-only executable adapter leaves them absent.
+RPC encodes the qualified boundary/resume outputs; it performs no recovery,
+record selection, ancestry algorithm or retention. Results are session-independent.

@@ -14,6 +14,9 @@ typedef struct stn_node_service {
     const stn_block_span *blocks;
     size_t count;
     const stn_validation_context *intelligence;
+    /* Optional caller-retained immutable evidence; zero-initialize when absent. */
+    const stn_block_span *retained;
+    size_t retained_count;
 } stn_node_service;
 /* Bind to stn_rpc_service.handle; requests must originate from RPC dispatch.
  * No accepted-state mutation or submission acceptance exists in this adapter.

@@ -51,4 +51,37 @@ stn_fork_report stn_fork_evaluate(const stn_chain_context *context,
 stn_fork_report stn_fork_evaluate_history(const stn_chain_context *context,
     const stn_block_span *current,size_t current_count,
     const stn_block_span *candidate,size_t candidate_count,stn_reorg_plan *out);
+typedef enum stn_cursor_reorg_result {
+    STN_CURSOR_REORG_CURRENT=0, STN_CURSOR_REORG_COMMON_ANCESTOR,
+    STN_CURSOR_REORG_NO_COMMON_ANCESTOR, STN_CURSOR_REORG_MALFORMED,
+    STN_CURSOR_REORG_UNAVAILABLE, STN_CURSOR_REORG_PROVIDER
+} stn_cursor_reorg_result;
+typedef struct stn_cursor_ancestor {
+    uint64_t height;
+    uint8_t block_id[32];
+} stn_cursor_ancestor;
+/* Current and optional retained full histories use existing immutable span
+ * ownership. Revalidate evidence; never accept claimed ancestry. NULL/0 retained
+ * history means unavailable evidence, not implicit genesis. Output assigned only
+ * for COMMON_ANCESTOR. No retention, fetch, reactivation or recovery is performed.
+ * All inputs/output disjoint; caller holds current accepted selection stable. */
+stn_cursor_reorg_result stn_chain_resolve_cursor_reorg(const stn_chain_context *context,
+    const stn_block_span *current,size_t current_count,
+    const stn_block_span *retained,size_t retained_count,
+    const stn_chain_cursor *cursor,stn_cursor_ancestor *out);
+typedef enum stn_consumer_recovery_result {
+    STN_RECOVERY_CURRENT=0, STN_RECOVERY_FROM_START, STN_RECOVERY_AFTER_CURSOR,
+    STN_RECOVERY_UNAVAILABLE, STN_RECOVERY_MALFORMED, STN_RECOVERY_PROVIDER
+} stn_consumer_recovery_result;
+typedef struct stn_consumer_recovery_plan {
+    stn_cursor_ancestor rollback;
+    stn_chain_cursor resume; /* meaningful only for AFTER_CURSOR */
+} stn_consumer_recovery_plan;
+/* Observational: assigns output only for FROM_START/AFTER_CURSOR. FROM_START
+ * has no resume cursor (zeroed unused storage). Caller owns application rollback.
+ * Same retained-evidence, immutable/disjoint input rules as ancestry resolution. */
+stn_consumer_recovery_result stn_chain_build_consumer_recovery_plan(
+    const stn_chain_context *context,const stn_block_span *current,size_t current_count,
+    const stn_block_span *retained,size_t retained_count,
+    const stn_chain_cursor *cursor,stn_consumer_recovery_plan *out);
 #endif

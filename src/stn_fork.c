@@ -103,3 +103,54 @@ stn_fork_report stn_fork_evaluate(const stn_chain_context *context,
     }
     return stn_fork_evaluate_history(context,current,current_count,candidate,candidate_count,out);
 }
+
+stn_cursor_reorg_result stn_chain_resolve_cursor_reorg(const stn_chain_context *context,
+    const stn_block_span *current,size_t current_count,
+    const stn_block_span *retained,size_t retained_count,
+    const stn_chain_cursor *cursor,stn_cursor_ancestor *out)
+{
+    stn_cursor_result valid;stn_reorg_plan plan;stn_fork_report report;
+    if(out==NULL || (retained==NULL && retained_count!=0))return STN_CURSOR_REORG_MALFORMED;
+    valid=stn_chain_cursor_validate(context,current,current_count,cursor);
+    if(valid==STN_CURSOR_MALFORMED)return STN_CURSOR_REORG_MALFORMED;
+    if(valid==STN_CURSOR_UNAVAILABLE)return STN_CURSOR_REORG_UNAVAILABLE;
+    if(valid==STN_CURSOR_PROVIDER)return STN_CURSOR_REORG_PROVIDER;
+    if(valid==STN_CURSOR_VALID)return STN_CURSOR_REORG_CURRENT;
+    if(retained_count==0)return STN_CURSOR_REORG_NO_COMMON_ANCESTOR;
+    valid=stn_chain_cursor_validate(context,retained,retained_count,cursor);
+    if(valid==STN_CURSOR_PROVIDER)return STN_CURSOR_REORG_PROVIDER;
+    if(valid!=STN_CURSOR_VALID)return STN_CURSOR_REORG_NO_COMMON_ANCESTOR;
+    report=stn_fork_evaluate_history(context,current,current_count,retained,retained_count,&plan);
+    if(report.result==STN_FORK_ERROR)return STN_CURSOR_REORG_PROVIDER;
+    if(report.result!=STN_FORK_CURRENT && report.result!=STN_FORK_CANDIDATE && report.result!=STN_FORK_TIE)
+        return STN_CURSOR_REORG_NO_COMMON_ANCESTOR;
+    out->height=(uint64_t)plan.ancestor_index;memcpy(out->block_id,plan.ancestor_id,32);
+    return STN_CURSOR_REORG_COMMON_ANCESTOR;
+}
+stn_consumer_recovery_result stn_chain_build_consumer_recovery_plan(
+    const stn_chain_context *context,const stn_block_span *current,size_t current_count,
+    const stn_block_span *retained,size_t retained_count,
+    const stn_chain_cursor *cursor,stn_consumer_recovery_plan *out)
+{
+    stn_consumer_recovery_plan plan={0};stn_cursor_reorg_result ancestry;
+    stn_chain_record_match match;stn_chain_cursor position,next;
+    stn_first_result first;stn_next_result following;int found=0;
+    if(out==NULL)return STN_RECOVERY_MALFORMED;
+    ancestry=stn_chain_resolve_cursor_reorg(context,current,current_count,retained,retained_count,cursor,&plan.rollback);
+    if(ancestry==STN_CURSOR_REORG_CURRENT)return STN_RECOVERY_CURRENT;
+    if(ancestry==STN_CURSOR_REORG_MALFORMED)return STN_RECOVERY_MALFORMED;
+    if(ancestry==STN_CURSOR_REORG_PROVIDER)return STN_RECOVERY_PROVIDER;
+    if(ancestry!=STN_CURSOR_REORG_COMMON_ANCESTOR)return STN_RECOVERY_UNAVAILABLE;
+    first=stn_chain_first_record(context,current,current_count,&match,&position);
+    if(first!=STN_FIRST_RECORD && first!=STN_FIRST_END)return STN_RECOVERY_PROVIDER;
+    if(first==STN_FIRST_RECORD){
+        while(position.height<=plan.rollback.height){
+            plan.resume=position;found=1;
+            following=stn_chain_next_record(context,current,current_count,&position,&match,&next);
+            if(following==STN_NEXT_END)break;
+            if(following!=STN_NEXT_RECORD)return STN_RECOVERY_PROVIDER;
+            position=next;
+        }
+    }
+    *out=plan;return found?STN_RECOVERY_AFTER_CURSOR:STN_RECOVERY_FROM_START;
+}

@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_node_service.h"
+#include "stn_fork.h"
 #include "stn_wire_internal.h"
 #include <string.h>
 #include <stdlib.h>
@@ -51,7 +52,32 @@ stn_rpc_code stn_node_service_handle(void *user,const stn_rpc_message *q,uint8_t
         fields[8]=(uint16_t)r.envelope_error;fields[9]=(uint16_t)r.payload_error;
         for(i=0;i<10;++i){stn_wire_write(p+i*2,2,fields[i]);}*written=20;return STN_RPC_OK;
     }
-    if(q->method==STN_RPC_GET_FIRST_ACCEPTED_RECORD || q->method==STN_RPC_GET_NEXT_ACCEPTED_RECORD){
+    if(q->method==STN_RPC_GET_CURSOR_REORG_STATUS || q->method==STN_RPC_GET_CONSUMER_RECOVERY_PLAN){
+        stn_chain_cursor cursor;stn_cursor_ancestor boundary;stn_consumer_recovery_plan plan;
+        stn_rpc_code result;size_t needed;
+        if(stn_chain_cursor_decode(q->payload,q->length,&cursor)!=STN_CURSOR_VALID)return STN_RPC_INVALID;
+        if(q->method==STN_RPC_GET_CURSOR_REORG_STATUS){
+            stn_cursor_reorg_result status=stn_chain_resolve_cursor_reorg(s->chain,s->blocks,s->count,s->retained,s->retained_count,&cursor,&boundary);
+            if(status==STN_CURSOR_REORG_CURRENT)return STN_RPC_CURRENT;
+            if(status==STN_CURSOR_REORG_NO_COMMON_ANCESTOR)return STN_RPC_NO_COMMON_ANCESTOR;
+            if(status==STN_CURSOR_REORG_MALFORMED)return STN_RPC_INVALID;
+            if(status==STN_CURSOR_REORG_UNAVAILABLE)return STN_RPC_UNAVAILABLE;
+            if(status!=STN_CURSOR_REORG_COMMON_ANCESTOR)return STN_RPC_PROVIDER;
+            result=STN_RPC_COMMON_ANCESTOR;needed=40;
+        }else{
+            stn_consumer_recovery_result status=stn_chain_build_consumer_recovery_plan(s->chain,s->blocks,s->count,s->retained,s->retained_count,&cursor,&plan);
+            if(status==STN_RECOVERY_CURRENT)return STN_RPC_CURRENT;
+            if(status==STN_RECOVERY_UNAVAILABLE)return STN_RPC_UNAVAILABLE;
+            if(status==STN_RECOVERY_MALFORMED)return STN_RPC_INVALID;
+            if(status!=STN_RECOVERY_FROM_START && status!=STN_RECOVERY_AFTER_CURSOR)return STN_RPC_PROVIDER;
+            boundary=plan.rollback;result=status==STN_RECOVERY_FROM_START?STN_RPC_RECOVER_FROM_START:STN_RPC_RECOVER_AFTER_CURSOR;
+            needed=status==STN_RECOVERY_FROM_START?40:85;
+        }
+        if(cap<needed)return STN_RPC_CAPACITY;
+        stn_wire_write(p,8,boundary.height);memcpy(p+8,boundary.block_id,32);
+        if(needed==85 && stn_chain_cursor_encode(&plan.resume,p+40,45)!=STN_CURSOR_VALID)return STN_RPC_PROVIDER;
+        *written=needed;return result;
+    }    if(q->method==STN_RPC_GET_FIRST_ACCEPTED_RECORD || q->method==STN_RPC_GET_NEXT_ACCEPTED_RECORD){
         stn_chain_record_match match;stn_chain_cursor cursor,position;
         if(q->method==STN_RPC_GET_FIRST_ACCEPTED_RECORD){
             stn_first_result result;

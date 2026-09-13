@@ -95,7 +95,7 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
 stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t cap,size_t *written)
 {
     stn_mining_service *s=user;stn_storage_view v={0};stn_rpc_code code;size_t n=0,required=0;stn_chain_state accepted;
-    uint8_t id[32],remove[STN_PENDING_MAX_ENTRIES]={0};stn_node_service query;
+    uint8_t id[32],remove[STN_PENDING_MAX_ENTRIES]={0};stn_node_service query={0};
     if(written!=NULL){*written=0;}
     if(s==NULL || q==NULL || p==NULL || written==NULL || s->chain==NULL || s->storage==NULL ||
        s->storage->acquire==NULL || s->storage->release==NULL || s->storage->read==NULL || s->storage->replace==NULL ||
@@ -110,7 +110,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
     }
     code=storage_code(stn_storage_load(s->chain,s->storage,s->snapshot,s->snapshot_capacity,&v));
     if(code!=STN_RPC_OK){return code;}
-    if(q->method==STN_RPC_GET_ACCEPTED_RECORD || q->method==STN_RPC_GET_FIRST_ACCEPTED_RECORD || q->method==STN_RPC_GET_NEXT_ACCEPTED_RECORD){
+    if(q->method==STN_RPC_GET_ACCEPTED_RECORD || q->method==STN_RPC_GET_FIRST_ACCEPTED_RECORD || q->method==STN_RPC_GET_NEXT_ACCEPTED_RECORD || q->method==STN_RPC_GET_CURSOR_REORG_STATUS || q->method==STN_RPC_GET_CONSUMER_RECOVERY_PLAN){
         query.chain=s->chain;query.blocks=v.blocks;query.count=v.count;query.intelligence=s->intelligence;
         code=stn_node_service_handle(&query,q,p,cap,written);goto done;
     }

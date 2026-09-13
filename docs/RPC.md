@@ -493,3 +493,32 @@ The adapter calls Chain first/next primitives; accepted snapshot loading stays
 in the existing storage adapter. No pending cleanup, lifecycle evaluation or
 cursor state is added to RPC. Cursor meaning is independent of connections and
 request IDs. Detachment never triggers automatic recovery.
+## Phase 15 Block 4 / Micro-Chunk 4C — reorganization information
+
+READ 0x0007 GET_CURSOR_REORG_STATUS and 0x0008 GET_CONSUMER_RECOVERY_PLAN
+each accept exactly one 45-byte Cursor v1. Existing frame version 2 is unchanged.
+Wrong lengths fail before service dispatch; malformed cursors map to INVALID=1.
+
+| Code | Meaning | Operation | Body |
+| --- | --- | --- | --- |
+| 13 | CURRENT | 7, 8 | empty |
+| 14 | DETACHED_WITH_COMMON_ANCESTOR | 7 | ancestor height BE8 + block ID32 |
+| 15 | NO_COMMON_ANCESTOR | 7 | empty |
+| 16 | RECOVER_AFTER_CURSOR | 8 | rollback height BE8 + block ID32 + Cursor v1[45] |
+| 17 | RECOVER_FROM_START | 8 | rollback height BE8 + block ID32 |
+| 5 | UNAVAILABLE | 7, 8 | empty |
+| 1 | malformed input | 7, 8 | empty |
+| 8 / 9 | provider / capacity failure | 7, 8 | empty |
+
+Codes 13–17 are appended, restricted to their listed operations, and do not
+renumber earlier statuses. Bodies are exactly 40 or 85 bytes as specified.
+Resume cursor height cannot exceed rollback height; at equal height its block
+ID must match the boundary. Other error/status-only responses remain empty.
+
+The node adapter calls the existing 4A/4B primitives with current history and
+optional caller-retained immutable historical spans. No request branch hint,
+peer fetch, retention or consumer state is introduced. The executable's
+accepted-only storage adapter supplies no detached history: unknown detached
+ancestry returns NO_COMMON_ANCESTOR/UNAVAILABLE. Rich recovery results require
+already-retained evidence supplied by the host; tests qualify that boundary.
+Operations 0x0004–0x0006 and all mining contracts remain unchanged.

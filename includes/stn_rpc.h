@@ -13,12 +13,15 @@
 typedef enum stn_rpc_code {
     STN_RPC_OK=0,STN_RPC_INVALID,STN_RPC_VERSION,STN_RPC_METHOD,
     STN_RPC_FORBIDDEN,STN_RPC_UNAVAILABLE,STN_RPC_NOT_FOUND,
-    STN_RPC_REJECTED,STN_RPC_PROVIDER,STN_RPC_CAPACITY,STN_RPC_STALE,STN_RPC_END=11,STN_RPC_DETACHED=12
+    STN_RPC_REJECTED,STN_RPC_PROVIDER,STN_RPC_CAPACITY,STN_RPC_STALE,STN_RPC_END=11,STN_RPC_DETACHED=12,
+    STN_RPC_CURRENT=13,STN_RPC_COMMON_ANCESTOR=14,STN_RPC_NO_COMMON_ANCESTOR=15,
+    STN_RPC_RECOVER_AFTER_CURSOR=16,STN_RPC_RECOVER_FROM_START=17
 } stn_rpc_code;
 typedef enum stn_rpc_method {
     STN_RPC_INFO=1,STN_RPC_BLOCK_HEIGHT=2,STN_RPC_BLOCK_ID=3,
     STN_RPC_GET_ACCEPTED_RECORD=4,
     STN_RPC_GET_FIRST_ACCEPTED_RECORD=5,STN_RPC_GET_NEXT_ACCEPTED_RECORD=6,
+    STN_RPC_GET_CURSOR_REORG_STATUS=7,STN_RPC_GET_CONSUMER_RECOVERY_PLAN=8,
     STN_RPC_CHECK_INTELLIGENCE=0x1000,STN_RPC_SUBMIT_INTELLIGENCE=0x1001,
     STN_RPC_INTELLIGENCE_ID=0x1002,STN_RPC_INTELLIGENCE_CURSOR=0x1003,
     STN_RPC_PENDING=0x1004,STN_RPC_SUBMIT_TRANSACTION=0x1005,
@@ -56,7 +59,8 @@ stn_rpc_code stn_rpc_decode(const uint8_t *bytes,size_t length,stn_rpc_message *
 stn_rpc_code stn_rpc_encode(const stn_rpc_message *message,uint8_t *bytes,size_t capacity,size_t *written);
 /* Internal service boundary. Only validated, authorized, known requests reach
  * the handler. Handler is trusted to obey capacity/lifetime and capability
- * semantics; it must not mutate read-only snapshots. Error responses carry no
+ * semantics; it must not mutate read-only snapshots. Operation-specific recovery statuses may carry their qualified bodies.
+ * Error responses carry no
  * payload. No authentication is implied by a local allowed-capability mask. */
 typedef stn_rpc_code (*stn_rpc_handler)(void *user,const stn_rpc_message *request,
     uint8_t *payload,size_t capacity,size_t *written);

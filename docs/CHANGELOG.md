@@ -5,6 +5,67 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 15 Block 4 / Micro-Chunk 4D — integration closeout — 2026-09-13
+
+- Qualified actual STNC recovery outputs as FIRST/NEXT continuation inputs,
+  validating returned resume cursors and replacement records strictly beyond
+  the boundary, including separate TCP connections. Existing current, retained/
+  unavailable ancestry, malformed, reconstruction and state-preservation
+  scenarios remain passing. No production defect or repair was required.
+- Windows Release/x64: 1,408 targeted checks (261 TCP assertions included),
+  40 executable/TCP checks and 34 build probes: 1,482 total, zero failures.
+  Final build: zero warnings/errors. No million-check run or other platform
+  qualification. Test-only initialization warning corrected before final build.
+- Block 4 COMPLETE / QUALIFIED in ROADMAP. Phase 15 not marked complete;
+  roadmap does not specify a subsequent authorized block. Only local ignored
+  tests, changelog and roadmap changed in 4D. STNC frame version 2 and mining/
+  Stratum unchanged; no Stratum requalification required. No further block work.
+
+### Phase 15 Block 4 / Micro-Chunk 4C — STNC recovery exposure — 2026-09-13
+
+- Added READ 0x0007/0x0008 with exact 45-byte requests and operation-specific
+  statuses 13–17. Bodies are empty, ancestor/rollback BE8+ID32 (40), or rollback
+  plus canonical resume cursor (85). Existing INVALID/UNAVAILABLE/provider/
+  capacity mappings remain. Frame version 2 and 0x0004–0x0006 unchanged.
+- Adapter calls existing 4A/4B; optional caller-retained spans carry evidence,
+  not new storage. Executable accepted-only routing leaves detached evidence
+  absent and returns unknown/unavailable ancestry without guessing.
+- Windows Release/x64: 1,256 targeted checks, including 219 added assertions
+  (58 TCP assertions on separate connections), plus 34 build probes; zero
+  final failures/warnings/errors. Direct equivalence, retained reconstruction,
+  reorg, state and existing traversal regressions pass. No broad process suite.
+- Updated RPC/architecture docs and local ignored tests. Stratum impact NONE;
+  requalification not required. No consumer action, storage expansion or 4D.
+
+### Phase 15 Block 4 / Micro-Chunk 4B — consumer recovery plan — 2026-09-13
+
+- Added stn_chain_build_consumer_recovery_plan using qualified 4A ancestry and
+  FIRST/NEXT eligibility. Reports CURRENT, FROM_START, AFTER_CURSOR, UNAVAILABLE
+  or MALFORMED, with provider failures separate. Recovery boundaries are exactly
+  the common ancestor; resume is the latest eligible current position at/before
+  it. Outputs are assigned only for recovery, never guessed for missing evidence.
+- Windows Release/x64: 1,037 targeted checks (33 added), 34 build probes;
+  zero failures/warnings/errors. Covers latest anchor, exclusive continuation,
+  no-anchor FIRST recovery, missing evidence, current/malformed input and retained
+  evidence reconstruction. Existing ancestry/state/traversal regressions pass.
+- No consumer mutation, retention/storage expansion or STNC/Stratum changes.
+  No full-suite/additional platform qualification. Micro-Chunk 4C not started.
+
+### Phase 15 Block 4 / Micro-Chunk 4A — cursor common ancestor — 2026-09-13
+
+- Added stn_chain_resolve_cursor_reorg in the existing fork interface. Reuses
+  cursor validation and full-history fork evaluation over caller-retained spans.
+  CURRENT, COMMON_ANCESTOR, NO_COMMON_ANCESTOR and MALFORMED remain distinct;
+  unavailable current history/provider errors remain separate. Only a resolved
+  ancestor assigns height/block ID. No retention database or recovery is added.
+- Windows Release/x64: 1,004 targeted checks (29 added), 34 build probes, zero
+  failures/warnings/errors. Qualifies highest shared block, immediate/deeper
+  divergence, missing evidence, malformed/current cursors and reconstruction
+  from retained canonical bytes. Existing state/traversal tests remain passing.
+- Restart resolution requires the caller still has retained branch evidence;
+  the existing accepted-only store does not preserve detached branches.
+  No STNC/Stratum change or requalification; no full suite or 4B work.
+
 ### Phase 15 Micro-Chunk 3G — STNC first/next accepted records — 2026-09-13
 
 - Added READ 0x0005 FIRST (empty request) and 0x0006 NEXT (45-byte Cursor v1).

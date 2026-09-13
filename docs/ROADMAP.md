@@ -530,3 +530,23 @@ warnings/errors. Stratum interface impact is NONE. Block 3 was not started.
 Filtering, pagination, application schemas, production credential provisioning,
 P2P query methods and Phase 16 storage/lifecycle ownership evolution remain outside
 this block. No commit or push is performed by this increment.
+
+### Block 4 — consumer reorganization semantics COMPLETE / QUALIFIED (2026-09-13)
+
+4A–4D qualify common-ancestor resolution, observational rollback/resume plans,
+and STNC 0x0007/0x0008. Integrated recovery feeds the actual returned cursor into
+NEXT (or invokes FIRST for FROM_START), including independent connections.
+Current/unknown/malformed results, exact Chain/STNC equivalence, retained-evidence
+reconstruction, greater-work reorganization and existing 0x0004–0x0006 regressions
+pass. Accepted-only persistence still does not retain detached branches.
+
+Windows Release/x64: 1,408 targeted consumer checks (including 261 TCP assertions),
+40 executable/TCP checks, 34 build probes; zero failures, warnings or errors.
+No full Chain suite or additional platform qualification was performed.
+No production repair was required in 4D. Existing long-duration lifecycle ownership
+limitations are unchanged. Mining/Stratum interfaces and STNC frame version remain
+unchanged. No commit/push or subsequent block started.
+
+This closes Block 4 only. The current roadmap does not establish it as Phase 15's
+final required block or define a subsequent authorized block; Phase 15 is not
+marked complete and no additional work is inferred.
