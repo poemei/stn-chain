@@ -6,6 +6,8 @@
 /* Node-owned immutable snapshot held for the complete dispatch. Caller owns
  * synchronization/lifetime; no persistence paths or cached work are exposed.
  * Each supported query independently validates full history incrementally.
+ * GET_ACCEPTED_RECORD reconstructs historical production eligibility and
+ * returns exact canonical transaction evidence; pending is never consulted.
  * Intelligence context is a separate existing staged-validation snapshot. */
 typedef struct stn_node_service {
     const stn_chain_context *chain;

@@ -107,3 +107,8 @@ This document does not define block size, block headers, Merkle trees,
 transport framing, multi-signature authorization, coin transactions, or VM
 bytecode. Future record kinds need their own schemas and activation rules.
 See [SIGNED_RECORD_PROPOSAL.md](SIGNED_RECORD_PROPOSAL.md).
+
+Phase 15 Block 2 exposes accepted production evidence by this record ID through
+STNC 0x0004 (RPC.md). Successful ID derivation alone does not make a legacy
+publication queryable: the complete Block 1 production checks must pass at its
+historical position. Returned transaction bytes retain the original signature.

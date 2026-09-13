@@ -198,3 +198,12 @@ disappears, making it eligible again under retained authority. Pending re-additi
 is not automatic. Storage publication failure retains the existing accepted-state
 atomicity. The low-level lifecycle apply/rebuild helpers are not substitutes for
 Chain revalidation and do not independently select the legacy activation profile.
+
+## Phase 15 Block 2 — query reconstruction
+
+Accepted-record lookup reads the existing validated canonical snapshot through
+the node adapter; STNS and storage providers are unchanged. Each lookup reconstructs
+historical production eligibility, so restart and greater-work adoption require
+no record cache repair. A detached-only record becomes NOT_FOUND; an independently
+eligible witness on the replacement branch returns that branch's location.
+The query neither writes persistence nor consumes accepted replay state.

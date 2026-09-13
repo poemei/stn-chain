@@ -4,6 +4,30 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 15 Block 2 — accepted production-record query — 2026-09-12
+
+- Assigned STNC READ opcode 0x0004, GET_ACCEPTED_RECORD, with an exact 32-byte
+  production record-ID request. FOUND returns canonical record ID, accepted
+  height/block ID and the exact signed publication transaction. Existing error
+  and status semantics handle malformed requests, absence and local failures.
+- Added full accepted-history lookup using Block 1 production validation at the
+  historical transaction position. Private historical/observational replay views
+  implement the Operations pre-activation decision without changing accepted
+  state, legacy compatibility or later lifecycle actions. Earlier invalid
+  witnesses do not suppress later eligible evidence; later semantic replays are
+  excluded. Pending is neither read as authority nor modified by the new route.
+- Added exact nested response validation and bounded call-local reconstruction;
+  no index, cache, record database, persistence/P2P format or application schema.
+  Mining/Stratum interface impact is NONE; reserved intelligence methods remain
+  reserved. Block 3 and Phase 16 were not started.
+- Qualified 354 targeted C checks and 40 executable/TCP checks. Full C: 1,135,945;
+  process/Stratum: 5,255; probes: 34; total: 1,141,234, zero failures. Windows
+  Release/x64 solution and Phase 9 fixture builds: zero warnings/errors.
+- Updated RPC, decisions, architecture, record/transaction encoding, persistence,
+  roadmap and build documentation. Existing long-duration snapshot ownership
+  limitations remain documented. Local tests retain their existing Git-ignore
+  policy. No commit or push.
+
 ### Phase 15 Block 1 — canonical production record foundation — 2026-09-12
 
 - Reused STNT publication type 1 / STNR class 1, its canonical payload bounds and

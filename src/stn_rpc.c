@@ -1,6 +1,8 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_rpc.h"
 #include "stn_wire_internal.h"
+#include "stn_sha256.h"
+#include "stn_intelligence.h"
 #include <string.h>
 stn_rpc_code stn_rpc_payload_length(const uint8_t *p,size_t n,size_t *payload_length)
 {
@@ -13,7 +15,7 @@ stn_rpc_code stn_rpc_payload_length(const uint8_t *p,size_t n,size_t *payload_le
 static uint32_t capability(uint16_t method)
 {
     switch(method){
-    case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:
+    case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:case STN_RPC_GET_ACCEPTED_RECORD:
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_INTELLIGENCE_CURSOR:
     case STN_RPC_MINING_CONTEXT:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_MINING_TEMPLATE:return STN_RPC_READ;
     case STN_RPC_SUBMIT_TRANSACTION:case STN_RPC_SUBMIT_INTELLIGENCE:case STN_RPC_SUBMIT_WORK:return STN_RPC_SUBMISSION;
@@ -27,7 +29,7 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
     case STN_RPC_SUBMIT_TRANSACTION:return n<=STN_TX_MAX_SIZE;
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_MINING_CONTEXT:case STN_RPC_MINING_TEMPLATE:case STN_RPC_ADMIN_CONTROL:return n==0;
     case STN_RPC_BLOCK_HEIGHT:return n==8;
-    case STN_RPC_BLOCK_ID:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_CHECK_WORK_BASE:return n==32;
+    case STN_RPC_BLOCK_ID:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_GET_ACCEPTED_RECORD:return n==32;
     case STN_RPC_INTELLIGENCE_CURSOR:return n==40;
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_SUBMIT_INTELLIGENCE:return n>=STN_RECORD_OVERHEAD && n<=STN_RECORD_MAX_SIZE;
     case STN_RPC_SUBMIT_WORK:return n>=68+STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY && n<=68+STN_BLOCK_MAX_SIZE && stn_wire_read(p+64,4)==n-68;
@@ -37,6 +39,16 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
 static int response_shape(uint16_t method,const uint8_t *p,size_t n)
 {
     switch(method){
+    case STN_RPC_GET_ACCEPTED_RECORD:{
+        stn_transaction tx;stn_record record;stn_intelligence payload;uint8_t id[32];
+        stn_hash_provider hash={stn_sha256,NULL};
+        if(n<STN_RPC_ACCEPTED_RECORD_PREFIX || n-STN_RPC_ACCEPTED_RECORD_PREFIX>STN_TX_MAX_SIZE ||
+            stn_wire_read(p+72,4)!=n-STN_RPC_ACCEPTED_RECORD_PREFIX)return 0;
+        return stn_transaction_decode(p+76,n-76,&tx)==STN_DATA_OK && tx.type==STN_TX_PUBLICATION &&
+            stn_record_decode(tx.record_bytes,tx.record_length,&record)==STN_RECORD_OK &&
+            stn_intelligence_decode(record.payload,record.payload_length,&payload)==STN_INTELLIGENCE_OK &&
+            stn_record_id(tx.record_bytes,tx.record_length,&hash,id)==STN_DATA_OK && memcmp(id,p,32)==0;
+    }
     case STN_RPC_SUBMIT_TRANSACTION:return n==36 && stn_wire_read(p,2)==1 && stn_wire_read(p+2,2)<=8;
     case STN_RPC_MINING_TEMPLATE:return shape(STN_RPC_SUBMIT_WORK,p,n);
     case STN_RPC_SUBMIT_WORK:return n==80;

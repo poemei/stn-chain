@@ -9,6 +9,7 @@
 #define STN_RPC_READ 1u
 #define STN_RPC_SUBMISSION 2u
 #define STN_RPC_ADMIN 4u
+#define STN_RPC_ACCEPTED_RECORD_PREFIX 76u
 typedef enum stn_rpc_code {
     STN_RPC_OK=0,STN_RPC_INVALID,STN_RPC_VERSION,STN_RPC_METHOD,
     STN_RPC_FORBIDDEN,STN_RPC_UNAVAILABLE,STN_RPC_NOT_FOUND,
@@ -16,6 +17,7 @@ typedef enum stn_rpc_code {
 } stn_rpc_code;
 typedef enum stn_rpc_method {
     STN_RPC_INFO=1,STN_RPC_BLOCK_HEIGHT=2,STN_RPC_BLOCK_ID=3,
+    STN_RPC_GET_ACCEPTED_RECORD=4,
     STN_RPC_CHECK_INTELLIGENCE=0x1000,STN_RPC_SUBMIT_INTELLIGENCE=0x1001,
     STN_RPC_INTELLIGENCE_ID=0x1002,STN_RPC_INTELLIGENCE_CURSOR=0x1003,
     STN_RPC_PENDING=0x1004,STN_RPC_SUBMIT_TRANSACTION=0x1005,
@@ -43,7 +45,7 @@ typedef struct stn_rpc_message {
  * It only permits an exact 24-byte header and a declared payload within the
  * global bound before the caller reads that payload from an untrusted stream. */
 stn_rpc_code stn_rpc_payload_length(const uint8_t *bytes,size_t length,size_t *payload_length);
-/* STNC,u16 version=1,u16 kind,u16 method,u16 code,u64 ID,u32 length.
+/* STNC,u16 version=2,u16 kind,u16 method,u16 code,u64 ID,u32 length.
  * Big-endian; exact length; no implicit fields. Request code must be zero.
  * Decode checks method payload shape for known requests; unknown methods are
  * well-framed requests for dispatch to answer METHOD, never service calls.

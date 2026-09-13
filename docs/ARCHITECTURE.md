@@ -560,3 +560,19 @@ or rotation can invalidate an older pending entry. Full candidate validation
 remains authoritative, including interactions between transactions in one block.
 Accepted record existence is membership in accepted canonical block history;
 there is no extra ID index, trust cache, or record lookup service in this block.
+
+## Phase 15 Block 2 — accepted-record read boundary
+
+Applications may query an accepted production record through STNC opcode 0x0004.
+The existing node snapshot adapter validates accepted history and locates the
+earliest production-eligible match, returning its exact canonical transaction and
+accepted block height/ID. Applications need no persistence path, lifecycle state
+or consensus implementation to request that evidence.
+
+Historical eligibility reuses the Block 1 validator with reconstructed authority
+and separate observational replay state (DECISIONS.md). All new traversal storage
+is call-local and freed on success/failure. No global per-client state, query
+cache, index or separate truth database exists. The runtime routes this read
+before pending cleanup; no accepted state or pending store is changed. Existing
+full-history snapshot validation costs and Phase 14 snapshot ownership limitations
+remain; this block does not implement Phase 16 storage evolution.

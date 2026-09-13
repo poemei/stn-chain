@@ -366,3 +366,41 @@ a signed producer assertion without a freshness window; accepted time is the
 containing canonical block timestamp. Local validation hooks cannot disable or
 strengthen production consensus. Replay is consumed in a candidate clone and
 published only on success; persistence publication retains its existing atomicity.
+
+## Phase 15 Block 2 — accepted-record query and historical eligibility
+
+Operations authorized GET_ACCEPTED_RECORD at the next available canonical
+general read opcode, assigned 0x0004 after 0x0003 BLOCK_ID. STNC version 2 and
+all existing opcodes remain unchanged. The exact 32-byte record-ID request and
+76-byte location/length prefix followed by canonical publication transaction are
+specified in RPC.md. Existing OK, NOT_FOUND, INVALID, UNAVAILABLE, PROVIDER and
+CAPACITY results cover the operation. Mining/Stratum interface impact is NONE.
+
+The subsequent Operations decision requires complete Block 1 production
+validation for pre-activation query eligibility, using the lifecycle state
+immediately before each transaction. Historical acceptance and successful
+record-ID hashing alone are insufficient. The record remains accepted legacy
+evidence when production-query eligibility fails. No wall-clock tolerance or
+present-day authority may replace historical context.
+
+Lookup reconstructs two temporary replay views. The historical consensus view
+applies accepted lifecycle actions and activated publications under unchanged
+Block 1 rules. The observational eligibility view additionally consumes each
+qualifying pre-activation publication, excluding synthetic/invalid ones. Before
+checking a publication, the latter view is combined with the historical grant,
+revocation and lineage projection and passed to the existing production validator.
+This separation prevents observational legacy replay from invalidating a later
+lifecycle action that was validly accepted under legacy compatibility rules.
+Both views are private to the call and are discarded; accepted state is untouched.
+
+Only eligible witnesses participate in ascending-height/transaction-position
+selection. An earlier ineligible witness cannot suppress a later eligible one.
+The first qualifying semantic witness establishes observational replay history;
+later identical semantics are therefore not FRESH. No new record-ID uniqueness
+rule, duplicate-history rejection, signature malleability exception or fabricated
+second eligible replay is introduced to test the ordering rule.
+
+The implementation performs accepted-history traversal without an index/cache,
+persistence extension, P2P query, class expansion or application interpretation.
+Temporary storage is sized with checked arithmetic from the validated transaction
+and grant counts, with explicit failure on host allocation/capacity failure.

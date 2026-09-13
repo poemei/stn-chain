@@ -223,3 +223,13 @@ signature and exact matching accepted, unrevoked publication grant, active
 identity lineage and fresh signer-plus-nonce replay identity. Pending contents
 cannot establish authority. Existing preactivation development bytes remain
 subject to their historical structural and active PoW rules.
+
+## Phase 15 Block 2 — returned publication evidence
+
+GET_ACCEPTED_RECORD (STNC 0x0004) returns the exact accepted STNT publication
+bytes, including the complete signed STNR witness. It does not re-encode the
+record, substitute the transaction ID for record ID, or add an application
+envelope. RPC.md specifies the external 76-byte record-ID/block-location/length
+prefix. Transaction, record, block and mining formats themselves are unchanged.
+Historical query eligibility is stricter than legacy historical acceptance and
+is governed by the Operations decision in DECISIONS.md.

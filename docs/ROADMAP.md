@@ -509,3 +509,24 @@ No Block 2, additional record class, external artifact fetch, record index/API,
 contract, economics, production credential provisioning or Stratum interface work
 is introduced. Existing lifecycle snapshot ownership outside rejected-candidate
 cleanup is not redesigned or qualified for unbounded-duration operation here.
+
+### Block 2 — accepted production-record query COMPLETE (2026-09-12)
+
+STNC `GET_ACCEPTED_RECORD = 0x0004` provides the bounded 32-byte record-ID lookup.
+FOUND returns the earliest eligible accepted witness with canonical block height,
+block ID and exact publication transaction. Existing status codes cover absence,
+malformed requests and local unavailable/error/capacity outcomes.
+
+The lookup reuses Block 1 production validation at each historical transaction
+position. Private historical and observational replay projections implement the
+Operations decision for pre-activation evidence without changing legacy acceptance
+or allowing later grants to authorize earlier records. Pending is excluded and
+untouched. No cache, index or persistence format was introduced.
+
+Qualification: 354 targeted C checks plus 40 executable/TCP query checks;
+1,135,945 full C checks, 5,255 process/Stratum checks and 34 build probes:
+**1,141,234 total checks, zero failures**. Windows Release/x64 builds have zero
+warnings/errors. Stratum interface impact is NONE. Block 3 was not started.
+Filtering, pagination, application schemas, production credential provisioning,
+P2P query methods and Phase 16 storage/lifecycle ownership evolution remain outside
+this block. No commit or push is performed by this increment.

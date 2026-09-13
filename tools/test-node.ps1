@@ -1,6 +1,6 @@
 # Copyright (c) 2026 STN-Labz. See docs/LICENSE.md.
 # Real executable / TCP / CNG / NTFS integration with bounded test-fixture solving.
-param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly, [switch]$LibraryOnly, [switch]$OutboundOnly, [switch]$DiscoveryOnly, [switch]$FramingOnly, [switch]$LifecycleOnly, [switch]$ConcurrencyOnly)
+param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly, [switch]$LibraryOnly, [switch]$OutboundOnly, [switch]$DiscoveryOnly, [switch]$FramingOnly, [switch]$LifecycleOnly, [switch]$ConcurrencyOnly, [switch]$AcceptedRecordOnly)
 $ErrorActionPreference = 'Stop'
 $script:checks = 0
 function Check($condition, $message) {
@@ -99,6 +99,30 @@ try {
     $anchor = Request $node.Stream 2 (NumberBytes 0 8)
     Check ($anchor.Code -eq 0 -and $anchor.Payload.Length -eq 364) 'explicit normal-mode genesis'
     [IO.File]::WriteAllBytes($genesisPath, $anchor.Payload)
+    if ($AcceptedRecordOnly) {
+        $sha=[Security.Cryptography.SHA256]::Create()
+        try {$recordId=$sha.ComputeHash([byte[]]([Text.Encoding]::ASCII.GetBytes('STN-CHAIN:RECORD:ID:1')+$anchor.Payload[184..299]))} finally {$sha.Dispose()}
+        $r=Request $node.Stream 4 $recordId;Check ($r.Code -eq 6 -and $r.Payload.Length -eq 0) 'synthetic accepted genesis is not production-queryable'
+        $r=Request $node.Stream 4 ([byte[]]::new(31));Check ($r.Code -eq 1 -and $r.Payload.Length -eq 0) 'short record query rejected'
+        $r=Request $node.Stream 4 ([byte[]]::new(33));Check ($r.Code -eq 1 -and $r.Payload.Length -eq 0) 'oversized record query rejected'
+        $node.Client.Close();Check ($node.Process.WaitForExit(5000) -and $node.Process.ExitCode -eq 0) 'query bootstrap stopped'
+        $node=StartNode $data $false $genesisPath
+        $streams=@()
+        for($i=0;$i -lt 4;$i++){
+            $client=[Net.Sockets.TcpClient]::new('127.0.0.1',$node.Port);$client.ReceiveTimeout=10000;$script:clients+=$client;$streams+=$client.GetStream()
+            $frame=[byte[]]([Text.Encoding]::ASCII.GetBytes('STNC')+(NumberBytes 2 2)+(NumberBytes 1 2)+(NumberBytes 4 2)+(NumberBytes 0 2)+(NumberBytes (9100+$i) 8)+(NumberBytes 32 4)+$recordId)
+            foreach($b in $frame){$streams[$i].WriteByte($b)}
+        }
+        for($i=0;$i -lt 4;$i++){
+            $header=ReadExact $streams[$i] 24
+            Check ((ReadNumber $header[10..11]) -eq 6 -and (ReadNumber $header[20..23]) -eq 0 -and (ReadNumber $header[12..19]) -eq (9100+$i)) 'concurrent fragmented query deterministic after restart'
+            $r=Request $streams[$i] 1 @();Check ($r.Code -eq 0) 'query leaves session usable'
+        }
+        $r=Request $node.Stream 4 ([byte[]]::new(32));Check ($r.Code -eq 6 -and $r.Payload.Length -eq 0) 'unknown ID not found'
+        $r=Request $node.Stream 1 @();Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[64..71]) -eq 0) 'query leaves accepted history unchanged'
+        Write-Output "Accepted-record executable/TCP: $script:checks checks, 0 failures."
+        return
+    }
     if ($FramingOnly) {
         $node.Client.Close(); Check ($node.Process.WaitForExit(5000)) 'bootstrap stopped'
         $node=StartNode $data $false $genesisPath

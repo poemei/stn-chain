@@ -428,3 +428,51 @@ including 34 build probes: **1,140,840**. Release/x64 solution and the separate
 Phase 9 fixture build finish with **0 warnings, 0 errors, 0 failures**. The
 production lifecycle checks use real Ed25519/SHA-256; old development-hook and
 high-work hash-fixture tests retain their documented narrower interpretation.
+
+## Phase 15 Block 2 — accepted-record query qualification (2026-09-12)
+
+Build the existing solution in Visual Studio Release | x64 and run the existing
+test startup project. The local lifecycle suite includes `test_record_query.c`;
+the existing Git exclusion for local test sources is preserved. No new test
+executable, credential file or production signing facility is required.
+
+The Block 2 fixture adds **354 C checks**, including real Ed25519 historical
+eligibility, later grants/revocation/rotation, observational replay collision with
+an accepted lifecycle action, witness ordering, exact transaction/block location,
+capacity/malformed response boundaries and maximum class-1 response. It qualifies
+pending-only absence, failed-candidate absence, persistence restart and greater-work
+reorganizations removing, adding and relocating a record. Four concurrent Winsock
+clients exchange byte-fragmented FOUND requests/responses through the real dispatcher
+and immutable node adapter. Exact duplicate transaction IDs remain rejected by the
+existing block rule; later semantic replays are ineligible under the Operations
+FRESH rule rather than manufactured as a second eligible witness.
+
+Run `powershell -NoProfile -ExecutionPolicy Bypass -File tools/test-node.ps1
+-AcceptedRecordOnly` for **40 additional executable/TCP checks**. The normal
+development executable excludes its synthetic genesis record from production
+lookup, rejects wrong key lengths, handles fragmented concurrent requests after
+restart and preserves session/history state. FOUND with configured test authority
+is covered by the C integration; this executable test does not claim production
+credential provisioning.
+
+| Qualification | Checks | Failures |
+| --- | ---: | ---: |
+| Full Chain C (includes Block 2's 354 and Block 1's 610) | 1,135,945 | 0 |
+| Block 2 executable query | 40 | 0 |
+| Phase 9 | 1,544 | 0 |
+| Phase 10, five Stratum integration modes | 562 | 0 |
+| Phase 11 adjusted targets | 834 | 0 |
+| Pending RPC executable | 27 | 0 |
+| Phase 12 outbound/discovery executable | 70 | 0 |
+| RPC framing/lifecycle/concurrency executable | 1,223 | 0 |
+| Unfiltered executable/TCP/NTFS | 926 | 0 |
+| Stratum parser/session | 29 | 0 |
+| Build boundary probes | 34 | 0 |
+| Total | 1,141,234 | 0 |
+
+Process/Stratum subtotal is 5,255. Targeted query subtotal is 394 (354 C + 40
+executable); do not add targeted/subgroup counts again to their parent suites.
+The solution and separate Phase 9 fixture build finish with zero warnings/errors.
+Windows Release/x64 alone is qualified; compile probes are not other-platform
+qualification. Mining request/response formats, work-ID, target and nonce rules,
+statuses and STN-Stratum sources remain unchanged.

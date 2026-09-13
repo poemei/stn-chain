@@ -133,6 +133,7 @@ This classification is not authentication. No remote policy is configured.
 | 0x0001 INFO | READ | empty | 184-byte validated active chain summary |
 | 0x0002 BLOCK_HEIGHT | READ | height u64 | Canonical full block or NOT_FOUND |
 | 0x0003 BLOCK_ID | READ | ID 32 | Bounded scan by calculated block ID or NOT_FOUND |
+| 0x0004 GET_ACCEPTED_RECORD | READ | Production record ID, exactly 32 bytes | Earliest eligible accepted publication and canonical block location, or NOT_FOUND |
 | 0x1000 CHECK_INTELLIGENCE | READ | Whole STNR record, 180..65,716 bytes | 20-byte existing validation report; no admission |
 | 0x1001 SUBMIT_INTELLIGENCE | SUBMISSION | Whole STNR record | Preserved legacy record-admission/report path in the configured pending service; snapshot-only adapter cannot admit |
 | 0x1002 INTELLIGENCE_ID | READ | Identifier 32 | UNAVAILABLE; standalone record ID/index is not implemented |
@@ -411,3 +412,51 @@ Existing block queries continue to expose accepted canonical evidence. Dedicated
 record lookup/cursor services remain unavailable. The default development lineage
 retains its approved unsigned prefix through height 129; this does not provision
 production publishing keys or grants for the executable.
+
+## Phase 15 Block 2 — accepted production record lookup
+
+`GET_ACCEPTED_RECORD = 0x0004` is the next unassigned value after the existing
+general accepted-chain read methods 0x0001–0x0003. No opcode was renumbered;
+the intelligence-specific reserved methods 0x1002/0x1003 remain unavailable.
+The new operation requires READ, uses STNC version 2 and takes exactly 32 opaque
+record-ID bytes. All 32-byte values are syntactically valid keys, including zero.
+Short, oversized and 64-byte replay-ID requests produce existing INVALID (1).
+
+FOUND uses existing OK (0) with this exact payload:
+
+| Offset | Bytes | Value |
+| --- | --- | --- |
+| 0 | 32 | Calculated production record ID |
+| 32 | 8 | Accepted block height, unsigned big-endian |
+| 40 | 32 | Calculated accepted block ID |
+| 72 | 4 | Exact transaction length, unsigned big-endian |
+| 76 | transaction length | Exact canonical STNT publication, including STNR signature |
+
+The payload is bounded by `76 + STN_TX_MAX_SIZE` (65,804 bytes) within the
+unchanged STNC global limit. Current class-1 payload rules narrow successful
+responses to 320–1,658 bytes. The codec validates the exact nested length,
+publication type, record/payload structure and matching calculated record ID.
+It does not make an untrusted response authoritative merely because it decodes.
+
+Absence is NOT_FOUND (6) with no payload. No validated snapshot is UNAVAILABLE
+(5); invalid/inconsistent history or local validation failure is PROVIDER (8).
+Insufficient output or representational capacity uses CAPACITY (9). Existing
+framing, request association, fragmentation, concurrent-session and error behavior
+remain unchanged. No new result enum, successful empty record or timestamp exists.
+Consumers obtain accepted time through the containing canonical block's timestamp.
+
+The adapter validates the entire immutable accepted history, then traverses
+ascending height and transaction order. It reconstructs historical authority,
+lineage and replay and reuses the Block 1 production validator. An accepted
+legacy publication is returned only if fully production-valid at its original
+position. Synthetic, malformed-payload, unauthorized, revoked, retired-identity
+and replayed evidence is excluded without changing historical acceptance. A
+later grant never retroactively authorizes an earlier publication.
+
+The earliest eligible match wins. Earlier ineligible witnesses do not hide a
+later eligible witness. Under the approved FRESH rule, a later semantic replay
+is ineligible; this is not a new consensus uniqueness prohibition. Exact duplicate
+transaction IDs within one block remain governed by the existing block rule.
+No query index or database exists. Restart/reorganization reconstructs results
+from the selected branch. Pending contents neither satisfy nor change a query;
+the runtime read route bypasses pending cleanup and mining-template construction.
