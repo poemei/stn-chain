@@ -64,7 +64,54 @@ typedef struct stn_chain_report {
     int height_available; /* Only a structurally decoded header supplies height. */
 } stn_chain_report;
 
+#define STN_CHAIN_CURSOR_SIZE 45u
+#define STN_CHAIN_CURSOR_VERSION 1u
+typedef struct stn_chain_cursor {
+    uint8_t version;
+    uint64_t height;
+    uint8_t block_id[32];
+    uint32_t transaction_position;
+} stn_chain_cursor;
+typedef enum stn_cursor_result {
+    STN_CURSOR_VALID=0, STN_CURSOR_DETACHED, STN_CURSOR_MALFORMED,
+    STN_CURSOR_UNAVAILABLE, STN_CURSOR_PROVIDER
+} stn_cursor_result;
+/* Exact-size buffers; failures leave output unchanged. Inputs/output disjoint.
+ * All uint64 heights and uint32 positions are structurally representable. */
+stn_cursor_result stn_chain_cursor_encode(const stn_chain_cursor *cursor,
+    uint8_t *bytes,size_t length);
+stn_cursor_result stn_chain_cursor_decode(const uint8_t *bytes,size_t length,
+    stn_chain_cursor *cursor);
+
 typedef struct stn_block_span { const uint8_t *bytes; size_t length; } stn_block_span;
+
+/* Caller holds the current immutable accepted history, including genesis.
+ * Revalidates the entire history. Missing location (including a position beyond
+ * the block's transaction count) is DETACHED, not malformed cursor syntax.
+ * Unavailable/invalid history or provider failure is not evidence of detachment.
+ * No eligibility, enumeration, mutation, or consumer recovery is performed. */
+stn_cursor_result stn_chain_cursor_validate(const stn_chain_context *context,
+    const stn_block_span *blocks,size_t count,const stn_chain_cursor *cursor);
+
+/* In-memory result, not a wire format. On a match, transaction borrows exact
+ * canonical bytes from the supplied immutable accepted history. */
+typedef struct stn_chain_record_match {
+    int found;
+    uint8_t record_id[32];
+    uint64_t height;
+    uint8_t block_id[32];
+    stn_transaction_span transaction;
+} stn_chain_record_match;
+
+/* Revalidate the complete accepted history, then select the earliest eligible
+ * production record using the qualified historical authority/replay rules.
+ * OK with found=0 means absence; failures leave out unchanged. Inputs and out
+ * must be disjoint. Caller selects/holds the immutable accepted snapshot and
+ * keeps it alive while using the borrowed transaction. No pending, persistence
+ * or accepted-state mutation. Temporary eligibility storage is call-local. */
+stn_data_status stn_chain_lookup_record(const stn_chain_context *context,
+    const stn_block_span *blocks,size_t count,const uint8_t record_id[32],
+    stn_chain_record_match *out);
 
 /* Context/input spans and provider state must stay immutable during calls.
  * No allocation, persistence, global state, ambient time, or replay database.
@@ -102,6 +149,5 @@ stn_chain_report stn_chain_validate_sequence(const stn_chain_context *context,
     const stn_chain_state *prior, const stn_block_span *blocks, size_t count,
     stn_chain_state *out);
 #endif
-
 
 

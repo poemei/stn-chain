@@ -476,3 +476,9 @@ The solution and separate Phase 9 fixture build finish with zero warnings/errors
 Windows Release/x64 alone is qualified; compile probes are not other-platform
 qualification. Mining request/response formats, work-ID, target and nonce rules,
 statuses and STN-Stratum sources remain unchanged.
+
+For Phase 15 Micro-Chunk 3A, the existing local test harness can run only
+accepted-record qualification with
+`build\x64\Release\stn-chain-tests.exe --record-query`, followed by
+`tools/test-node.ps1 -AcceptedRecordOnly`. These reuse Block 2 vectors;
+the test sources remain locally ignored under the existing repository policy.

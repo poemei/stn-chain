@@ -4,6 +4,60 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+
+### Phase 15 Micro-Chunk 3D — consumer cursor foundation — 2026-09-13
+
+- Added portable Chain cursor codec and read-only current-history validation.
+  Version 1 is exactly 45 bytes: version[1], height[8], block ID[32], canonical
+  zero-based transaction position[4], with explicit unsigned big-endian integers.
+  VALID, DETACHED and MALFORMED remain distinct; unavailable history/provider
+  failures cannot masquerade as detachment. No record eligibility or recovery.
+- Windows Release/x64: 490 targeted checks (44 added cursor assertions) and
+  34 build probes pass; zero failures, warnings or errors. Reused greater-work
+  reorganization, persisted-view reconstruction and deep state-preservation
+  fixtures. No full suite or additional platform qualification.
+- STNC/mining/Stratum unchanged. No enumeration, cursor RPC or recovery;
+  Micro-Chunk 3E not started.
+
+### Phase 15 Micro-Chunk 3C — accepted-history restart/reorganization qualification — 2026-09-13
+
+- Reused existing persistence and greater-work adoption fixtures for direct
+  lookup qualification: detached record removal, replacement-only records,
+  and stable semantic IDs at the replacement branch's canonical location.
+  Released and reconstructed accepted views solely from persisted canonical
+  bytes; found/unknown results and complete match fields survive reconstruction.
+  Lookup leaves persistence bytes unchanged; existing direct state-preservation
+  checks remain passing.
+- Added 72 targeted assertions in the existing locally ignored test source.
+  Windows Release/x64: 446 accepted-record checks and 34 existing build probes,
+  zero failures, warnings or errors. Restart coverage is persisted-view
+  destruction/reconstruction, not an additional executable process suite.
+  Production code and Stratum unchanged; no full-suite run or additional
+  platform qualification. Micro-Chunk 3D not started.
+
+### Phase 15 Micro-Chunk 3B — direct accepted-record qualification — 2026-09-13
+
+- Reused existing accepted-record fixtures for direct Chain calls: eligible
+  match, unknown ID, skipped historical witnesses, earliest repeated witness,
+  pending exclusion, and deep caller state/byte preservation. Compared all
+  semantic result fields against a decoded STNC 0x0004 response.
+- Added 15 focused assertions to the existing locally ignored test source.
+  Windows Release/x64: 374 targeted accepted-record checks and 34 existing
+  build probes passed; zero failures, build warnings or errors. No full-suite
+  or unrelated process qualification. Production code and Stratum unchanged.
+  No additional platform qualification; Micro-Chunk 3C not started.
+
+### Phase 15 Micro-Chunk 3A — transport-neutral accepted-record lookup — 2026-09-13
+
+- Extracted Block 2 history validation and eligibility traversal from the node
+  adapter into stn_chain_lookup_record. Returns ordinary match fields and a
+  borrowed canonical transaction span; STNC 0x0004 retains its exact encoding.
+  Historical eligibility, ordering, replay projections and read-only behavior
+  are unchanged. Mining/Stratum impact: NONE.
+- Windows Release/x64: 359 targeted C checks, 40 executable/TCP checks and
+  34 existing build probes, all passing; final build has zero warnings/errors.
+  Local ignored test harness supports --record-query; the full suite was not
+  rerun. No additional platform qualification. Micro-Chunk 3B is not started.
 ### Phase 15 Block 2 — accepted production-record query — 2026-09-12
 
 - Assigned STNC READ opcode 0x0004, GET_ACCEPTED_RECORD, with an exact 32-byte

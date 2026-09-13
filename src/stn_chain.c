@@ -343,3 +343,117 @@ stn_chain_report stn_chain_validate_sequence(const stn_chain_context *context,
     return r;
 }
 
+/* Revalidate the complete immutable accepted history before lookup. The two
+ * replay projections deliberately differ: legacy qualifying publications affect
+ * query eligibility, never historical consensus acceptance of later actions. */
+stn_data_status stn_chain_lookup_record(const stn_chain_context *context,
+    const stn_block_span *blocks,size_t count,const uint8_t key[32],stn_chain_record_match *out)
+{
+    stn_lifecycle_state historical,observed;stn_replay_state eligible;
+    stn_block block;stn_transaction tx;size_t i,j,offset,total=0,grants=0,gb,rb;
+    uint8_t *memory,initial[32]={0},id[32],block_id[32];stn_data_status code=STN_DATA_OK;
+    stn_chain_state current,next;stn_chain_report report;stn_chain_record_match match={0};
+    uint64_t activation;
+    if(key==NULL || out==NULL)return STN_DATA_ARGUMENT;
+    if(context==NULL || context->pow_policy==NULL || blocks==NULL || count==0)return STN_DATA_UNRESOLVED;
+    if(stn_chain_initialize(context,&current)!=STN_DATA_OK)return STN_DATA_PROVIDER_ERROR;
+    for(i=0;i<count;++i){
+        report=stn_chain_validate_candidate(context,&current,blocks[i].bytes,blocks[i].length,&next);
+        if(report.acceptance==STN_ACCEPTANCE_UNRESOLVED)return STN_DATA_UNRESOLVED;
+        if(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT)return STN_DATA_PROVIDER_ERROR;
+        current=next;
+    }
+    activation=current.publication_activation_height;
+    for(i=0;i<count;++i){
+        if(stn_block_decode(blocks[i].bytes,blocks[i].length,&block)!=STN_DATA_OK)return STN_DATA_PROVIDER_ERROR;
+        if(total>SIZE_MAX-block.header.transaction_count)return STN_DATA_CAPACITY;
+        total+=block.header.transaction_count;offset=0;
+        for(j=0;j<block.header.transaction_count;++j){
+            size_t n=(size_t)stn_wire_read(block.body+offset,4);offset+=4;
+            if(stn_transaction_decode(block.body+offset,n,&tx)!=STN_DATA_OK)return STN_DATA_PROVIDER_ERROR;
+            if(tx.type==STN_TX_AUTHORITY_GRANT)++grants;
+            offset+=n;
+        }
+    }
+    if(grants>SIZE_MAX/STN_AUTHORITY_GRANT_SIZE || total>SIZE_MAX/(2u*STN_REPLAY_ID_SIZE))return STN_DATA_CAPACITY;
+    gb=grants*STN_AUTHORITY_GRANT_SIZE;rb=total*STN_REPLAY_ID_SIZE;
+    if(gb>SIZE_MAX-2u*rb)return STN_DATA_CAPACITY;
+    memory=malloc(gb+2u*rb);if(memory==NULL)return STN_DATA_PROVIDER_ERROR;
+    if(context->genesis_initial_identity_count)memcpy(initial,context->genesis_initial_identities,32);
+    stn_lifecycle_initialize(&historical,memory,grants,memory+gb,total,initial);
+    stn_lifecycle_set_initial_identities(&historical,context->genesis_initial_identities,context->genesis_initial_identity_count);
+    stn_replay_state_initialize(&eligible,memory+gb+rb,total);
+    for(i=0;i<count;++i){
+        if(stn_block_decode(blocks[i].bytes,blocks[i].length,&block)!=STN_DATA_OK){code=STN_DATA_PROVIDER_ERROR;goto done;}
+        offset=0;
+        for(j=0;j<block.header.transaction_count;++j){
+            size_t n=(size_t)stn_wire_read(block.body+offset,4);stn_lifecycle_result result;
+            offset+=4;
+            if(stn_transaction_decode(block.body+offset,n,&tx)!=STN_DATA_OK){code=STN_DATA_PROVIDER_ERROR;goto done;}
+            if(tx.type==STN_TX_PUBLICATION){
+                observed=historical;observed.replay=eligible;
+                result=stn_lifecycle_check_publication(&observed,tx.record_bytes,tx.record_length,&context->hash_provider);
+                if(result==STN_LIFECYCLE_PROVIDER || result==STN_LIFECYCLE_CAPACITY){code=STN_DATA_PROVIDER_ERROR;goto done;}
+                if(result==STN_LIFECYCLE_OK){
+                    if(stn_record_id(tx.record_bytes,tx.record_length,&context->hash_provider,id)!=STN_DATA_OK){code=STN_DATA_PROVIDER_ERROR;goto done;}
+                    if(memcmp(id,key,32)==0){
+                        if(stn_chain_block_id(blocks[i].bytes,blocks[i].length,&context->hash_provider,block_id)!=STN_DATA_OK){code=STN_DATA_PROVIDER_ERROR;goto done;}
+                        match.found=1;memcpy(match.record_id,id,32);match.height=block.header.height;memcpy(match.block_id,block_id,32);
+                        match.transaction.bytes=block.body+offset;match.transaction.length=(uint32_t)n;code=STN_DATA_OK;goto done;
+                    }
+                    if(stn_lifecycle_apply_transaction(&observed,&tx,context->genesis_authority_roots,context->genesis_authority_root_count,&context->hash_provider)!=STN_LIFECYCLE_OK){code=STN_DATA_PROVIDER_ERROR;goto done;}
+                    eligible=observed.replay;
+                }
+                if(block.header.height<activation){offset+=n;continue;}
+            }
+            result=stn_lifecycle_apply_transaction(&historical,&tx,context->genesis_authority_roots,context->genesis_authority_root_count,&context->hash_provider);
+            if(result!=STN_LIFECYCLE_OK){code=STN_DATA_PROVIDER_ERROR;goto done;}
+            if(stn_replay_state_consume(&eligible,historical.replay.consumed+(historical.replay.consumed_count-1)*STN_REPLAY_ID_SIZE)==STN_REPLAY_MALFORMED){code=STN_DATA_PROVIDER_ERROR;goto done;}
+            offset+=n;
+        }
+    }
+done:
+    free(memory);if(code==STN_DATA_OK)*out=match;return code;
+}
+
+stn_cursor_result stn_chain_cursor_encode(const stn_chain_cursor *cursor,
+    uint8_t *bytes,size_t length)
+{
+    if(cursor==NULL || bytes==NULL || length!=STN_CHAIN_CURSOR_SIZE ||
+        cursor->version!=STN_CHAIN_CURSOR_VERSION)return STN_CURSOR_MALFORMED;
+    bytes[0]=cursor->version;stn_wire_write(bytes+1,8,cursor->height);
+    memcpy(bytes+9,cursor->block_id,32);stn_wire_write(bytes+41,4,cursor->transaction_position);
+    return STN_CURSOR_VALID;
+}
+stn_cursor_result stn_chain_cursor_decode(const uint8_t *bytes,size_t length,
+    stn_chain_cursor *cursor)
+{
+    stn_chain_cursor decoded={0};
+    if(bytes==NULL || cursor==NULL || length!=STN_CHAIN_CURSOR_SIZE ||
+        bytes[0]!=STN_CHAIN_CURSOR_VERSION)return STN_CURSOR_MALFORMED;
+    decoded.version=bytes[0];decoded.height=stn_wire_read(bytes+1,8);
+    memcpy(decoded.block_id,bytes+9,32);decoded.transaction_position=(uint32_t)stn_wire_read(bytes+41,4);
+    *cursor=decoded;return STN_CURSOR_VALID;
+}
+stn_cursor_result stn_chain_cursor_validate(const stn_chain_context *context,
+    const stn_block_span *blocks,size_t count,const stn_chain_cursor *cursor)
+{
+    stn_chain_state state,next;stn_chain_report report;stn_block block;
+    size_t i;stn_cursor_result result=STN_CURSOR_DETACHED;uint8_t id[32];
+    if(cursor==NULL || cursor->version!=STN_CHAIN_CURSOR_VERSION ||
+        (blocks==NULL && count!=0))return STN_CURSOR_MALFORMED;
+    if(context==NULL || context->pow_policy==NULL || count==0)return STN_CURSOR_UNAVAILABLE;
+    if(stn_chain_initialize(context,&state)!=STN_DATA_OK)return STN_CURSOR_PROVIDER;
+    for(i=0;i<count;++i){
+        report=stn_chain_validate_candidate(context,&state,blocks[i].bytes,blocks[i].length,&next);
+        if(report.acceptance==STN_ACCEPTANCE_UNRESOLVED)return STN_CURSOR_UNAVAILABLE;
+        if(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT)return STN_CURSOR_PROVIDER;
+        state=next;
+        if(stn_block_decode(blocks[i].bytes,blocks[i].length,&block)!=STN_DATA_OK)return STN_CURSOR_PROVIDER;
+        if(block.header.height==cursor->height){
+            if(stn_chain_block_id(blocks[i].bytes,blocks[i].length,&context->hash_provider,id)!=STN_DATA_OK)return STN_CURSOR_PROVIDER;
+            if(memcmp(id,cursor->block_id,32)==0 && cursor->transaction_position<block.header.transaction_count)result=STN_CURSOR_VALID;
+        }
+    }
+    return result;
+}

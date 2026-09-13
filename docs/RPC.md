@@ -445,7 +445,8 @@ framing, request association, fragmentation, concurrent-session and error behavi
 remain unchanged. No new result enum, successful empty record or timestamp exists.
 Consumers obtain accepted time through the containing canonical block's timestamp.
 
-The adapter validates the entire immutable accepted history, then traverses
+The adapter calls the transport-neutral Chain primitive stn_chain_lookup_record,
+which validates the entire immutable accepted history, then traverses
 ascending height and transaction order. It reconstructs historical authority,
 lineage and replay and reuses the Block 1 production validator. An accepted
 legacy publication is returned only if fully production-valid at its original

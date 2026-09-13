@@ -564,9 +564,10 @@ there is no extra ID index, trust cache, or record lookup service in this block.
 ## Phase 15 Block 2 — accepted-record read boundary
 
 Applications may query an accepted production record through STNC opcode 0x0004.
-The existing node snapshot adapter validates accepted history and locates the
+The transport-neutral Chain primitive stn_chain_lookup_record validates accepted history and locates the
 earliest production-eligible match, returning its exact canonical transaction and
-accepted block height/ID. Applications need no persistence path, lifecycle state
+accepted block height/ID. The STNC adapter encodes this result without owning lookup semantics.
+Applications need no persistence path, lifecycle state
 or consensus implementation to request that evidence.
 
 Historical eligibility reuses the Block 1 validator with reconstructed authority
@@ -576,3 +577,23 @@ cache, index or separate truth database exists. The runtime routes this read
 before pending cleanup; no accepted state or pending store is changed. Existing
 full-history snapshot validation costs and Phase 14 snapshot ownership limitations
 remain; this block does not implement Phase 16 storage evolution.
+
+### Phase 15 Micro-Chunk 3D — Chain consumer cursor
+
+The transport-neutral stn_chain_cursor identifies a canonical transaction
+position, independently of production-record eligibility. Its version-1 encoding
+is exactly 45 bytes: version[1], accepted height[8], block ID[32], transaction
+position[4]. Integers use unsigned big-endian encoding; position is zero-based.
+The codec accepts all representable unsigned heights and positions.
+
+stn_chain_cursor_validate revalidates the caller-held current accepted history.
+Matching height, block ID and an existing transaction position produce VALID.
+A missing height, different block ID or absent transaction position produces
+DETACHED. Invalid cursor syntax/argument shape produces MALFORMED; unavailable
+history and failed history/provider validation have separate failure results.
+A canonical position beyond a particular block's transaction count is detached,
+not malformed. The caller must supply the currently selected immutable history,
+not a detached historical snapshot.
+
+The cursor detects detachment without recovery or advancement. It adds no
+STNC wire fields, record eligibility rules, persistence format or cache.
