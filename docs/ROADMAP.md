@@ -486,9 +486,21 @@ Persistence, fork-choice replacement, reorganization, restart reconstruction,
 and peer candidate validation therefore follow accepted history. No Block 9 or
 Phase 15 work was started.
 
-## Phase 15 — Production Record Integration
+## Phase 15 — Production Record / Intelligence Integration
 
-### Block 1 — canonical record foundation COMPLETE (2026-09-12)
+**COMPLETE / QUALIFIED (2026-09-13).** Final review after checkpoint
+`5ec7970` establishes the minimum signed/authorized record → STNC submission →
+validated pending → accepted history → lookup/FIRST/NEXT → Cursor v1 →
+reorganization diagnosis → deterministic recovery-plan boundary.
+Blocks 1–4 are COMPLETE / QUALIFIED.
+
+Completion does not include detached-history persistence, automatic consumer
+rollback/replay, consumer databases, application-specific schemas, Threat API or
+Sentinel integration, filtering, pagination, P2P record queries, production
+credential provisioning, storage evolution, contracts, economics or additional
+platform qualification. Existing ownership/resource qualification limits remain.
+
+### Block 1 — canonical record foundation COMPLETE / QUALIFIED (2026-09-12)
 
 The existing publication transaction and STNR class 1 now use the approved stable
 record identifier and corrected versioned publication authority tokens. The
@@ -510,7 +522,7 @@ contract, economics, production credential provisioning or Stratum interface wor
 is introduced. Existing lifecycle snapshot ownership outside rejected-candidate
 cleanup is not redesigned or qualified for unbounded-duration operation here.
 
-### Block 2 — accepted production-record query COMPLETE (2026-09-12)
+### Block 2 — accepted production-record query COMPLETE / QUALIFIED (2026-09-12)
 
 STNC `GET_ACCEPTED_RECORD = 0x0004` provides the bounded 32-byte record-ID lookup.
 FOUND returns the earliest eligible accepted witness with canonical block height,
@@ -531,9 +543,22 @@ Filtering, pagination, application schemas, production credential provisioning,
 P2P query methods and Phase 16 storage/lifecycle ownership evolution remain outside
 this block. No commit or push is performed by this increment.
 
+### Block 3 — Consumer Query / Cursor Foundation COMPLETE / QUALIFIED (2026-09-13)
+
+Qualified stn_chain_lookup_record(), stn_chain_first_record() and
+stn_chain_next_record() own deterministic accepted-history lookup and traversal.
+Pending state is excluded. Cursor v1 is exactly 45 bytes: version[1]=0x01,
+accepted height[8] BE, block ID[32], transaction position[4] BE.
+STNC 0x0004 GET_ACCEPTED_RECORD, 0x0005 GET_FIRST_ACCEPTED_RECORD and
+0x0006 GET_NEXT_ACCEPTED_RECORD expose that boundary. Historical eligibility,
+restart and branch-sensitive reorganization behavior are qualified; detailed
+evidence remains in CHANGELOG.md.
+
 ### Block 4 — consumer reorganization semantics COMPLETE / QUALIFIED (2026-09-13)
 
-4A–4D qualify common-ancestor resolution, observational rollback/resume plans,
+4A–4D qualify stn_chain_resolve_cursor_reorg() and
+stn_chain_build_consumer_recovery_plan(), reporting common-ancestor resolution
+and observational rollback/resume plans,
 and STNC 0x0007/0x0008. Integrated recovery feeds the actual returned cursor into
 NEXT (or invokes FIRST for FROM_START), including independent connections.
 Current/unknown/malformed results, exact Chain/STNC equivalence, retained-evidence
@@ -541,12 +566,20 @@ reconstruction, greater-work reorganization and existing 0x0004–0x0006 regress
 pass. Accepted-only persistence still does not retain detached branches.
 
 Windows Release/x64: 1,408 targeted consumer checks (including 261 TCP assertions),
-40 executable/TCP checks, 34 build probes; zero failures, warnings or errors.
+40 executable/TCP checks, 34 build probes: **1,482 total**, zero failures,
+warnings or errors. TCP assertions are included in the targeted count.
 No full Chain suite or additional platform qualification was performed.
 No production repair was required in 4D. Existing long-duration lifecycle ownership
 limitations are unchanged. Mining/Stratum interfaces and STNC frame version remain
 unchanged. No commit/push or subsequent block started.
 
-This closes Block 4 only. The current roadmap does not establish it as Phase 15's
-final required block or define a subsequent authorized block; Phase 15 is not
-marked complete and no additional work is inferred.
+Final Phase 15 closeout supersedes the earlier provisional non-closure statement.
+Consumer recovery is deterministic when the required validated historical
+evidence is retained. When available validated evidence cannot establish
+ancestry, recovery fails closed as unavailable; mandatory detached-history
+persistence was not introduced. Frame version and mining interfaces are unchanged.
+Stratum impact: NONE. Stratum requalification: NOT REQUIRED.
+
+## Phase 16 — Storage Evolution
+
+**NEXT — NOT STARTED.** No implementation scope is assigned by this closeout.

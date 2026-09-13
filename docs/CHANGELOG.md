@@ -5,6 +5,29 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 15 — final closeout COMPLETE / QUALIFIED — 2026-09-13
+
+- Documentation-only closure following review of checkpoint 5ec7970. Blocks
+  1–4 are COMPLETE / QUALIFIED: canonical record foundation, accepted query,
+  consumer query/cursor foundation and consumer reorganization semantics.
+  Signed/authorized STNC submission through pending and accepted history now
+  connects to lookup, FIRST/NEXT, Cursor v1, reorg diagnosis and recovery plans.
+- Added the missing Block 3 roadmap summary and confirmed Block 4 evidence:
+  1,408 targeted checks including 261 TCP assertions, 40 executable checks,
+  34 build probes; 1,482 total, zero failures. Qualified Windows Release/x64:
+  zero warnings/errors. These are prior qualification results, not new test runs.
+- This entry supersedes provisional Phase 15 non-closure statements below;
+  historical qualification entries are preserved. Recovery requires retained
+  validated historical evidence and otherwise fails closed as unavailable.
+  No mandatory detached-history persistence or automatic consumer action.
+- STNC frame version and mining interfaces unchanged; Stratum impact NONE,
+  requalification NOT REQUIRED. Completion excludes external integrations,
+  application schemas/state, provisioning, expanded queries, storage evolution,
+  contracts/economics and additional platforms, as listed in ROADMAP.md.
+- Phase 16 remains NEXT, not scoped or started. Production code/tests unchanged.
+  Controlled-policy title discrepancy remains an Operations documentation-control
+  issue; no policy document was renamed or reconciled. No commit or push.
+
 ### Phase 15 Block 4 / Micro-Chunk 4D — integration closeout — 2026-09-13
 
 - Qualified actual STNC recovery outputs as FIRST/NEXT continuation inputs,
