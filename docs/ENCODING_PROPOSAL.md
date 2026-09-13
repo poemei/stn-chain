@@ -52,12 +52,17 @@ quotes, newline, or trailing NUL. The explicit 00 is a single zero byte.
 
     signing_message = ASCII("STN-CHAIN:RECORD:SIGN:1") || 00 || U
     signature       = Ed25519.Sign(private_key, signing_message)
-    record_id       = SHA256(ASCII("STN-CHAIN:RECORD:ID:1") || 00 || U)
+    record_id       = SHA256(ASCII("STN-CHAIN:RECORD:ID:1") || U)
 
-The signing domain is 24 bytes including 00; the ID domain is 22 bytes
-including 00. A different domain distinguishes hashing from signing.
+The signing domain is 24 bytes including 00; the Operations-approved Phase 15
+ID domain is exactly 21 ASCII bytes, excluding the terminal C NUL. This replaces
+the earlier proposed ID derivation. A different domain distinguishes hashing from signing.
 All payload bytes and the network, type, signer, nonce, lengths, and times
 are bound. Never trust a separately supplied ID instead of recomputing it.
+
+The ID and production validation stages are implemented for Phase 15 Block 1;
+see DECISIONS.md for authority token derivation and deterministic activation.
+Codec success continues to establish structure only.
 
 The record ID excludes the signature so a second signature representation
 cannot create a different logical record. Signature validation is always

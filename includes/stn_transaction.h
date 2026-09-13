@@ -57,5 +57,10 @@ stn_data_status stn_transaction_id(const uint8_t *bytes, size_t length,
  * (without the C-string terminator) and canonical unsigned record bytes. */
 stn_data_status stn_record_id(const uint8_t *record_bytes, size_t record_length,
     const stn_hash_provider *provider, uint8_t digest[32]);
+/* Phase 15 versioned authority tokens derived from canonical record class.
+ * Output spans must be disjoint; both remain unchanged on failure. */
+stn_data_status stn_record_publication_tokens(const uint8_t *record_bytes,
+    size_t record_length, const stn_hash_provider *provider,
+    uint8_t action[32], uint8_t context[32]);
 #endif
 

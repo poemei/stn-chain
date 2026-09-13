@@ -207,3 +207,19 @@ clone becomes accepted state only with the block; failed validation leaves the
 prior state unchanged. The Genesis Initial Identity Set is carried by Chain
 context as a separate sorted, duplicate-free set of at most 16 canonical
 32-byte identities and is used only for rotation-lineage origin validation.
+
+## Phase 15 Block 1 — publication semantics
+
+Type 1, its 12-byte STNT header, and the embedded STNR bytes are unchanged.
+The class is the existing u16 big-endian field at STNR offset 6; only class 1 is
+supported. Record ID hashes the exact unsigned STNR bytes under the approved
+21-byte domain without a NUL (ENCODING_PROPOSAL.md). Transaction and block
+commitments still include the full signature witness; record ID is not a replay ID.
+
+Production publication validation activates by exact genesis lineage and block
+height as specified in DECISIONS.md. A successful codec call alone does not
+establish signature, authority or acceptance. Production requires the Phase 14
+signature and exact matching accepted, unrevoked publication grant, active
+identity lineage and fresh signer-plus-nonce replay identity. Pending contents
+cannot establish authority. Existing preactivation development bytes remain
+subject to their historical structural and active PoW rules.

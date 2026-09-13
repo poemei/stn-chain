@@ -394,3 +394,20 @@ existing protocol permits continuation; response identifiers remain tied to
 the decoded request. Malformed framing and transport failure remain separate:
 they do not become application status values and still terminate only the
 affected session when required. No status codes or wire fields were added.
+
+## Phase 15 Block 1 — production publication admission
+
+At the next candidate's activated height, SUBMIT_TRANSACTION publication payloads,
+SUBMIT_INTELLIGENCE and CHECK_INTELLIGENCE use the accepted Phase 14 lifecycle
+projection and corrected versioned publication tokens. The old development hooks
+cannot authorize a production record or supply a freshness window. Invalid
+signature/authority uses existing unauthorized submission status; malformed data,
+replay and local provider failure use their existing result categories.
+Admission and read-only checks do not consume accepted replay state. Pending
+assembly rechecks production eligibility before constructing candidate evidence.
+
+There are no STNC field, version, method, work-ID, nonce-range or Stratum changes.
+Existing block queries continue to expose accepted canonical evidence. Dedicated
+record lookup/cursor services remain unavailable. The default development lineage
+retains its approved unsigned prefix through height 129; this does not provision
+production publishing keys or grants for the executable.

@@ -1,6 +1,8 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_lifecycle.h"
 #include "stn_wire_internal.h"
+#include "stn_intelligence.h"
+#include <stdlib.h>
 #include <string.h>
 
 static stn_lifecycle_result map_grant(stn_authority_grant_result r)
@@ -51,6 +53,57 @@ static int find_grant(const stn_lifecycle_state *s,const uint8_t id[32],const st
 }
 static int initial_contains(const stn_lifecycle_state *s,const uint8_t id[32])
 { size_t i;for(i=0;i<s->initial_identity_count;++i)if(memcmp(s->initial_identities[i],id,32)==0)return 1;return 0; }
+
+stn_lifecycle_result stn_lifecycle_check_publication(const stn_lifecycle_state *s,
+    const uint8_t *bytes, size_t length,
+    const stn_hash_provider *provider)
+{
+    stn_record record;
+    stn_intelligence payload;
+    uint8_t action[32], context[32], record_id[32], replay_id[64];
+    uint8_t evidence[STN_AUTHORITY_EVIDENCE_SIZE], grant_id[32];
+    uint8_t *statement;
+    size_t statement_length, i, unsigned_length;
+    int authorized=0;
+    stn_identity_result signature;
+    if (s==NULL || bytes==NULL) return STN_LIFECYCLE_ARGUMENT;
+    if (stn_record_decode(bytes,length,&record)!=STN_RECORD_OK ||
+        stn_intelligence_decode(record.payload,record.payload_length,&payload)!=STN_INTELLIGENCE_OK)
+        return STN_LIFECYCLE_MALFORMED;
+    if (stn_record_publication_tokens(bytes,length,provider,action,context)!=STN_DATA_OK ||
+        stn_record_id(bytes,length,provider,record_id)!=STN_DATA_OK) return STN_LIFECYCLE_PROVIDER;
+    unsigned_length=STN_RECORD_HEADER_SIZE+(size_t)record.payload_length;
+    statement=malloc(STN_IDENTITY_DOMAIN_SIZE+unsigned_length);
+    if (statement==NULL) return STN_LIFECYCLE_CAPACITY;
+    if (stn_identity_statement(bytes,unsigned_length,statement,
+        STN_IDENTITY_DOMAIN_SIZE+unsigned_length,&statement_length)!=STN_IDENTITY_VALID) {
+        free(statement);return STN_LIFECYCLE_MALFORMED;
+    }
+    signature=stn_identity_verify(record.signer_public_key,statement,statement_length,
+        record.signature,STN_RECORD_SIGNATURE_SIZE);
+    free(statement);
+    if (signature!=STN_IDENTITY_VALID) return STN_LIFECYCLE_INVALID;
+    for (i=0;i<s->rotation.rotation_count;++i) {
+        if (memcmp(record.signer_public_key,s->rotation.old_identities[i],32)==0)
+            return STN_LIFECYCLE_INVALID;
+    }
+    for (i=0;i<s->grant_count;++i) {
+        const uint8_t *grant=s->grant_bytes+i*STN_AUTHORITY_GRANT_SIZE;
+        /* Grants enter this projection only through accepted lifecycle validation. */
+        memcpy(evidence,grant+33,sizeof(evidence));
+        if (stn_authority_evidence_validate(evidence,sizeof(evidence))!=STN_AUTHORITY_AUTHORIZED)
+            return STN_LIFECYCLE_INVALID;
+        if (stn_authority_grant_id(grant,STN_AUTHORITY_GRANT_SIZE,provider,grant_id)!=STN_DATA_OK)
+            return STN_LIFECYCLE_PROVIDER;
+        if (!stn_authority_state_is_revoked(&s->authority,grant_id) &&
+            stn_authority_evaluate(record.signer_public_key,action,context,evidence,sizeof(evidence))==STN_AUTHORITY_AUTHORIZED)
+            authorized=1;
+    }
+    if (!authorized) return STN_LIFECYCLE_INVALID;
+    if (stn_replay_id_from_signer_nonce(record.signer_public_key,record.nonce,replay_id)!=STN_REPLAY_FRESH)
+        return STN_LIFECYCLE_MALFORMED;
+    return stn_replay_state_check(&s->replay,replay_id)==STN_REPLAY_FRESH ? STN_LIFECYCLE_OK : STN_LIFECYCLE_REPLAY;
+}
 
 static stn_lifecycle_result consume_publication(stn_lifecycle_state *s,const stn_record *record,const stn_hash_provider *p)
 {

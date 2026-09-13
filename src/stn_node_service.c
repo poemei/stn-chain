@@ -25,8 +25,19 @@ stn_rpc_code stn_node_service_handle(void *user,const stn_rpc_message *q,uint8_t
         q->method==STN_RPC_INTELLIGENCE_CURSOR || q->method==STN_RPC_MINING_TEMPLATE){return STN_RPC_UNAVAILABLE;}
     if(q->method==STN_RPC_CHECK_INTELLIGENCE || q->method==STN_RPC_SUBMIT_INTELLIGENCE){
         stn_validation_report r;uint16_t fields[10];size_t i;
-        if(s->intelligence==NULL || s->chain==NULL || memcmp(s->intelligence->expected_network,s->chain->network_id,32)!=0){return STN_RPC_UNAVAILABLE;}
-        r=stn_validate_intelligence_record(q->payload,q->length,s->intelligence);
+        code=snapshot(s,&state);if(code!=STN_RPC_OK){return code;}
+        if(state.height==UINT64_MAX || state.height+1>=state.publication_activation_height){
+            stn_record record;stn_lifecycle_result checked=stn_lifecycle_check_publication(state.lifecycle,q->payload,q->length,&s->chain->hash_provider);
+            memset(&r,0,sizeof(r));
+            r.acceptance=checked==STN_LIFECYCLE_OK ? STN_ACCEPTANCE_UNDER_CONTEXT :
+                checked==STN_LIFECYCLE_PROVIDER || checked==STN_LIFECYCLE_CAPACITY ? STN_ACCEPTANCE_ERROR : STN_ACCEPTANCE_REJECTED;
+            if(checked==STN_LIFECYCLE_OK && (stn_record_decode(q->payload,q->length,&record)!=STN_RECORD_OK || memcmp(record.network_id,state.network_id,32)!=0)){
+                r.acceptance=STN_ACCEPTANCE_REJECTED;r.network=STN_STAGE_REJECT;
+            }
+        }else{
+            if(s->intelligence==NULL || memcmp(s->intelligence->expected_network,s->chain->network_id,32)!=0){return STN_RPC_UNAVAILABLE;}
+            r=stn_validate_intelligence_record(q->payload,q->length,s->intelligence);
+        }
         if(q->method==STN_RPC_SUBMIT_INTELLIGENCE){
             return r.acceptance==STN_ACCEPTANCE_ERROR ? STN_RPC_PROVIDER :
                 r.acceptance==STN_ACCEPTANCE_REJECTED ? STN_RPC_REJECTED : STN_RPC_UNAVAILABLE;

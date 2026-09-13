@@ -1,5 +1,5 @@
 # Copyright (c) 2026 STN-Labz. See docs/LICENSE.md.
-# Real executable / TCP / CNG / NTFS integration. No mining search loop.
+# Real executable / TCP / CNG / NTFS integration with bounded test-fixture solving.
 param([string]$Executable = "$PSScriptRoot\..\build\x64\Release\stn-chain.exe", [switch]$PendingRpcOnly, [switch]$LibraryOnly, [switch]$OutboundOnly, [switch]$DiscoveryOnly, [switch]$FramingOnly, [switch]$LifecycleOnly, [switch]$ConcurrencyOnly)
 $ErrorActionPreference = 'Stop'
 $script:checks = 0
@@ -326,17 +326,20 @@ try {
         $r = Request $node.Stream 1 @()
         Check ($r.Code -eq 0) 'session survives 64 requests'
     }
-    # Independently precomputed real-SHA256 fixture solutions, no search loop.
+    # Fixed-target known answers remain valid before the height-60 adjustment.
+    # Thereafter use the existing bounded solver against the issued target.
     $nonces = @(0,0,0,2,1,3,3,6,2,0,0,0,0,1,0,2,2,1,0,0,0,0,0,5,0,1,1,3,0,0,3,0,0,4,2,2,1,0,1,0,0,1,0,0,1,4,0,0,3,1,0,0,0,1,1,1,5,0,0,0,2,3,0,0,0,0,0,1,0,1)
-    for ($height = 2; $height -le 70; $height++) {
+    $sha=[Security.Cryptography.SHA256]::Create()
+    try { for ($height = 2; $height -le 70; $height++) {
         $r = Request $node.Stream 0x2002 @()
         Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[140..147]) -eq $height) 'next-height work'
         [byte[]]$solution = $r.Payload
         Check ((ReadNumber $solution[220..227]) -eq 0) 'fresh zero nonce'
-        $solution[227] = $nonces[$height - 1]
+        if($height -lt 60){$solution[227] = $nonces[$height - 1]}
+        else {$solution=Solve $solution $true}
         $r = Request $others[0].GetStream() 0x2003 $solution
         Check ($r.Code -eq 0 -and (ReadNumber $r.Payload[32..39]) -eq $height) 'real mined extension'
-    }
+    } } finally {$sha.Dispose()}
     $r = Request $node.Stream 0x2003 $solution
     Check ($r.Code -eq 10) 'cross-client stale work'
     foreach ($client in $others) { $client.Dispose() }

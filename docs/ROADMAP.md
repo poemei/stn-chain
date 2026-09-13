@@ -485,3 +485,27 @@ published only after the complete block passes semantic lifecycle validation.
 Persistence, fork-choice replacement, reorganization, restart reconstruction,
 and peer candidate validation therefore follow accepted history. No Block 9 or
 Phase 15 work was started.
+
+## Phase 15 — Production Record Integration
+
+### Block 1 — canonical record foundation COMPLETE (2026-09-12)
+
+The existing publication transaction and STNR class 1 now use the approved stable
+record identifier and corrected versioned publication authority tokens. The
+genesis-lineage activation map in DECISIONS.md preserves qualified unsigned
+development prefixes and activates fail-closed Phase 14 signature, scoped
+authority, revocation, rotation and replay validation. The optional development
+validation pointer is not a production consensus switch.
+
+Candidate-local publication transitions, pending isolation/revalidation, accepted
+history reconstruction, branch replacement and source-independent validation are
+implemented. The 610 targeted C checks are included in the 1,135,591 full C checks;
+see BUILD.md for process qualification and platform limits. Class 1 remains the
+existing bounded development payload, not the future Sentinel data model.
+Windows Release/x64 finishes with zero warnings, errors and failures. The
+additional process/Stratum suites pass 5,215 checks; build probes pass 34.
+
+No Block 2, additional record class, external artifact fetch, record index/API,
+contract, economics, production credential provisioning or Stratum interface work
+is introduced. Existing lifecycle snapshot ownership outside rejected-candidate
+cleanup is not redesigned or qualified for unbounded-duration operation here.

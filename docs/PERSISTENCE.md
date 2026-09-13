@@ -181,3 +181,20 @@ action rejects the candidate without mutating the prior state. Canonical block
 persistence remains the source of truth. Restart, branch replacement, and peer
 candidate validation reconstruct the same lifecycle projection from accepted
 history; pending lifecycle evidence remains non-authoritative.
+
+## Phase 15 Block 1 — record reconstruction
+
+STNS remains unchanged: canonical blocks and the existing checksum, without a
+serialized record-ID, authority, replay or activation cache. Decode/load and
+branch adoption run Chain validation from genesis and reproduce the frozen
+activation boundary and production lifecycle projection. Record IDs are derived
+from canonical unsigned bytes when needed; signature witnesses remain in blocks.
+No on-disk history rewrite or silent migration is performed.
+
+Qualification includes a signed class-1 publication, snapshot restart, a
+strictly greater-work competing branch without that publication, storage adoption
+and restart of the replacement history. The abandoned publication's replay entry
+disappears, making it eligible again under retained authority. Pending re-addition
+is not automatic. Storage publication failure retains the existing accepted-state
+atomicity. The low-level lifecycle apply/rebuild helpers are not substitutes for
+Chain revalidation and do not independently select the legacy activation profile.

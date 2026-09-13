@@ -4,6 +4,35 @@ All meaningful project changes are recorded here. Entries under Unreleased
 are not claims of a published or deployed release.
 
 ## Unreleased
+### Phase 15 Block 1 — canonical production record foundation — 2026-09-12
+
+- Reused STNT publication type 1 / STNR class 1, its canonical payload bounds and
+  approved signature-independent SHA-256 record ID. Added corrected 32-byte
+  publication action/context tokens with byte-zero version 01 and exact domain
+  bytes excluding NUL. Phase 14 malformed-token/grant validation is unchanged.
+- Froze publication activation by audited canonical genesis lineage, preserving
+  approved legacy prefixes. Production candidate validation now requires Phase 14
+  signatures, exact accepted unrevoked authority, active identity and fresh replay;
+  local hooks cannot bypass consensus or introduce a production freshness window.
+- Integrated read-only production checks into pending admission, assembly and
+  RPC checking. Corrected stale pending eligibility, network rejection reports,
+  local resource-failure classification, rejected-clone cleanup and the fixed
+  16-entry grant/replay clone ceiling. Canonical transaction, block, STNC, STNP
+  and mining/Stratum wire formats are unchanged.
+- Qualified 610 new targeted checks within 1,135,591 full Chain C checks, including
+  real signed work submission, restart and greater-work reorganization. Existing
+  Phase 9–14 process/protocol checks and 34 build probes remain the regression
+  gate; detailed counts and limitations are in BUILD.md. Repaired obsolete
+  fixed-target nonce vectors in the unfiltered runtime test by reusing its
+  existing bounded target-aware solver from height 60.
+- Final qualification: 926 unfiltered runtime checks; 5,215 total process/Stratum
+  checks; 1,140,840 checks including full C and 34 probes, zero failures. Windows
+  Release/x64 solution and Phase 9 fixture builds: zero warnings and errors.
+- Updated roadmap, decisions, architecture, record/transaction encoding, RPC,
+  peer, persistence and build documentation. No additional record class, Block 2,
+  credential provisioning or long-duration lifecycle-ownership redesign. Local
+  test sources remain excluded by the existing Git policy. No commit or push.
+
 ### Phase 14 Block 6 — deterministic signed-action replay protection — 2026-09-11
 
 - Added the portable replay primitive using the existing canonical signer plus

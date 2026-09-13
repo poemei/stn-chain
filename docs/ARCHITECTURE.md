@@ -530,3 +530,33 @@ transactions atomically, and publishes it only after block acceptance. The
 Genesis Initial Identity Set is a distinct context input, limited to 16 sorted
 unique canonical identities; it does not confer authority. Persistence, peer
 validation, fork choice, restart, and reorganization remain history-derived.
+
+## Phase 15 Block 1 — production record validation
+
+STNT publication type 1 embeds the existing STNR envelope. Its canonical class
+field selects the existing class-1 payload codec (52–1,390 bytes); the outer
+envelope cap remains 65,536 payload bytes. A valid evidence digest is a commitment,
+not proof that an external artifact exists or has application-specific meaning.
+
+At the genesis-specific activation height in DECISIONS.md, Chain uses
+`stn_lifecycle_check_publication` to verify exact canonical signed bytes, the
+Phase 14 Ed25519 identity, exact versioned publication authority tokens, accepted
+revocation/rotation and replay. It also derives the approved signature-independent
+record ID. Transport origin and the old optional publication-validation pointer
+cannot change these rules. There is no record freshness window.
+
+Validation applies transaction order to a candidate-local lifecycle clone after
+structural, linkage, commitment, target and PoW checks. A failure discards the
+clone; success publishes its projection. Grant/replay clone storage grows from
+the validated history counts with checked allocation arithmetic instead of the
+former 16-entry lifetime ceiling. This does not change the separately authorized
+genesis sets or existing revocation/rotation bounds. Snapshot lifetime/reclamation
+outside rejected-candidate cleanup retains the existing Phase 14 ownership model;
+unbounded-duration production resource qualification is not claimed here.
+
+Pending admission and assembly observe accepted lifecycle state without consuming
+it. Assembly rechecks production eligibility so an accepted replay, revocation
+or rotation can invalidate an older pending entry. Full candidate validation
+remains authoritative, including interactions between transactions in one block.
+Accepted record existence is membership in accepted canonical block history;
+there is no extra ID index, trust cache, or record lookup service in this block.

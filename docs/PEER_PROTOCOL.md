@@ -305,3 +305,13 @@ wrong evidence, partial cleanup/deadline, retry pacing, independent inbound P2P
 connections and established RPC/pending isolation. The executable test serves
 canonical genesis evidence and deliberately partial replies; ordinary C network
 checks additionally exercise valid adoption. Windows Release/x64 only.
+
+## Phase 15 Block 1 — production record evidence
+
+STNP block payloads and framing are unchanged. Decoded blocks still enter the
+common Chain candidate validator; peer origin adds no authority and cannot bypass
+the genesis-specific publication activation boundary. Record identity, signature,
+authority and replay depend on canonical bytes and the accepted branch projection.
+The targeted fixture round-trips a real signed production-publication block through
+STNP framing and confirms identical local acceptance/replay state; existing sync,
+adoption, failure and convergence regressions exercise the unchanged transport.

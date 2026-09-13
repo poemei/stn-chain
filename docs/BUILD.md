@@ -389,3 +389,42 @@ rejected candidates cannot consume replay state or alter authority/identity
 state. The Release/x64 lifecycle qualification covers production candidate
 integration, initial-set validation, and accepted-state propagation. No Block 9
 or Phase 15 work is included.
+
+## Phase 15 Block 1 — canonical production records (2026-09-12)
+
+Use the existing Visual Studio Release | x64 solution and test startup project.
+No new executable, CMake dependency, platform target or production signing tool is
+introduced. The local tests use deterministic test-only Ed25519 keys; none are
+written to a key file or installed as production credentials. The repository's
+existing policy excludes `tests/` from Git; local qualification additions retain
+that policy and are not silently force-added.
+
+The full C executable passes **1,135,591 checks**. Phase 15 adds **610** checks:
+17 record-ID/token known-answer and boundary checks, 264 activation-history
+checks, and 329 signed-publication integration checks. These targeted counts are
+already included in the full count; nested pending/difficulty/peer subgroup
+summaries must not be counted twice.
+
+The signed fixture covers exact authority action/context matching, invalid
+signature, revocation, retired identity, replay, rejected-candidate isolation,
+pending selection, 20 successive publications beyond the old 16-entry limit,
+storage restart, greater-work branch replacement and replacement restart. It
+also passes through real STNC encode/dispatch/admission, work-template generation,
+nonce-only solved-work submission and persistence, plus STNP block framing into
+the common validator. Network mismatch and provider failure fail closed.
+
+Process qualification retains the existing commands above: Phase 9 (1,544), all
+five Phase 10 modes (562), Phase 11 `-DifficultyOnly` (834), pending RPC (27),
+Phase 12 outbound/discovery (30 + 40), RPC framing/lifecycle/concurrency
+(33 + 153 + 1,037), and Stratum parser/session checks (27 + 2). Build boundary
+probes remain 34. These are Windows Release/x64 results; simulated compile probes
+do not qualify another platform. The unfiltered node test now uses the existing
+bounded target-aware fixture solver from height 60 instead of obsolete
+fixed-target nonce vectors; no production mining interface changes are involved.
+
+Final unfiltered executable/TCP/NTFS qualification: **926 checks, zero failures**.
+Process/Stratum total: **5,215**; C plus process/Stratum: **1,140,806**;
+including 34 build probes: **1,140,840**. Release/x64 solution and the separate
+Phase 9 fixture build finish with **0 warnings, 0 errors, 0 failures**. The
+production lifecycle checks use real Ed25519/SHA-256; old development-hook and
+high-work hash-fixture tests retain their documented narrower interpretation.

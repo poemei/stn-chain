@@ -1,8 +1,8 @@
 # Signed Intelligence Record Proposal
 
-Status: payload schema and explicit validation orchestration implemented for
-development; production identity, signature, and replay providers remain
-unimplemented. Addresses parts of O-003, O-006, and
+Status: the development payload schema and validation-hook API remain available.
+Phase 15 Block 1 integrates Phase 14 production signature, authority and replay
+primitives at the activation boundary in DECISIONS.md. Addresses parts of O-003, O-006, and
 O-007. Uses [ENCODING_PROPOSAL.md](ENCODING_PROPOSAL.md). All initial data is
 synthetic. This is not the final Sentinel schema or company identity model.
 
@@ -12,6 +12,13 @@ schema and exact encoding, not signatures, source ownership, evidence contents,
 network identity, authorization, or replay state. A nonzero evidence_digest
 is a structurally admissible commitment; its referenced evidence is not read
 or hashed by this codec.
+
+At Phase 15 production activation, accepted Chain history supplies authority,
+rotation, revocation and replay state. The hook-based time/context API below
+remains a development interface; its local clock and optional callbacks do not
+control production consensus. Issued and observed times remain signed assertions;
+the containing accepted block supplies accepted time. No new Sentinel schema or
+external evidence retrieval is implemented.
 
 ## Record type 1 payload
 

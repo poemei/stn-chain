@@ -18,8 +18,8 @@ typedef struct stn_chain_context {
     size_t genesis_authority_root_count;
     const uint8_t *genesis_initial_identities;
     size_t genesis_initial_identity_count;
-    /* Optional production publication semantics; NULL preserves the
-     * structural development-anchor profile. */
+    /* Retained source compatibility only; not a consensus switch. Production
+     * publication rules are selected by canonical genesis and candidate height. */
     const stn_validation_context *publication_validation;
     stn_hash_provider hash_provider;
     /* NULL selects legacy v1 development-only profile (no PoW/work).
@@ -41,6 +41,7 @@ typedef struct stn_chain_state {
     stn_block_header target_history[60];
     size_t target_history_count;
     stn_lifecycle_state *lifecycle;
+    uint64_t publication_activation_height;
 } stn_chain_state;
 
 typedef enum stn_chain_reason {
@@ -72,6 +73,8 @@ typedef struct stn_block_span { const uint8_t *bytes; size_t length; } stn_block
  * Output unchanged on failure. Existing accepted state must originate from
  * this validation path; never deserialize metadata and assume it is trusted. */
 stn_data_status stn_chain_initialize(const stn_chain_context *context, stn_chain_state *out);
+stn_data_status stn_chain_publication_activation(const stn_chain_context *context,
+    uint64_t *height);
 /* Same branch-derived rule for validation and mining. Unchanged on failure. */
 stn_data_status stn_chain_required_target(const stn_chain_context *context,
     const stn_chain_state *prior,uint8_t target[32]);

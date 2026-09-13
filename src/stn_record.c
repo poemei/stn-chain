@@ -130,6 +130,30 @@ stn_record_status stn_record_encode(const stn_record *record, uint8_t *output,
     return STN_RECORD_OK;
 }
 
+stn_data_status stn_record_publication_tokens(const uint8_t *bytes, size_t length,
+    const stn_hash_provider *provider, uint8_t action[32], uint8_t context[32])
+{
+    static const uint8_t action_domain[] = "STN-CHAIN:AUTHORITY:ACTION:PUBLISH_RECORD:1";
+    static const uint8_t context_domain[] = "STN-CHAIN:AUTHORITY:CONTEXT:RECORD_CLASS:1";
+    uint8_t action_hash[32], context_hash[32];
+    stn_record record;
+    stn_data_status status;
+    if (bytes == NULL || action == NULL || context == NULL) return STN_DATA_ARGUMENT;
+    if (stn_record_decode(bytes, length, &record) != STN_RECORD_OK) return STN_DATA_CONTENT;
+    if (provider == NULL || provider->hash == NULL) return STN_DATA_UNRESOLVED;
+    status = provider->hash(provider->user, action_domain, sizeof(action_domain)-1u,
+        NULL, 0, action_hash);
+    if (status == STN_DATA_OK) {
+        status = provider->hash(provider->user, context_domain, sizeof(context_domain)-1u,
+            bytes+6, 2, context_hash);
+    }
+    if (status != STN_DATA_OK) return status == STN_DATA_UNRESOLVED ? status : STN_DATA_PROVIDER_ERROR;
+    action[0] = 1; context[0] = 1;
+    memcpy(action+1, action_hash, 31);
+    memcpy(context+1, context_hash, 31);
+    return STN_DATA_OK;
+}
+
 stn_data_status stn_record_id(const uint8_t *record_bytes, size_t record_length,
     const stn_hash_provider *provider, uint8_t digest[32])
 {

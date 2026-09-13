@@ -298,3 +298,71 @@ when the candidate is otherwise accepted. Rejected candidates leave accepted
 lifecycle state unchanged. Persistence, restart, fork choice, reorganization,
 and peer validation use the accepted Chain state and reconstruct lifecycle state
 from accepted history. Pending or transport evidence is never authoritative.
+
+## Phase 15 Block 1 — canonical production publication (2026-09-12)
+
+Operations retained STNT publication type 1 and the existing STNR version 1,
+two-byte big-endian record class 1. No additional class or payload format is
+assigned. The class-1 payload remains the bounded development intelligence schema;
+its evidence digest does not cause Chain to fetch or interpret an external artifact.
+
+The authorized record ID is SHA-256 over the exact 21 ASCII bytes
+`STN-CHAIN:RECORD:ID:1` followed by canonical record bytes `[0,116+N)`.
+The terminal domain NUL and the 64-byte signature are excluded. This is distinct
+from the transaction ID (which commits to the witness), replay identity, block
+ID and mining work ID. No second uniqueness database or retrieval endpoint is added.
+
+The corrected Operations authority derivation preserves Phase 14 token parsing:
+
+```
+action  = 01 || first31(SHA256(ASCII("STN-CHAIN:AUTHORITY:ACTION:PUBLISH_RECORD:1")))
+context = 01 || first31(SHA256(ASCII("STN-CHAIN:AUTHORITY:CONTEXT:RECORD_CLASS:1") || 00 01))
+```
+
+The action/context domains are respectively 43/42 bytes without a terminal NUL.
+`00 01` is the existing canonical class field, not a native integer. Both tokens
+are exactly 32 bytes. Fixed class-1 known answers are:
+
+```
+action:  0161acce20d0ac843a1b7a18c96b4378fa7a397d78db791413fe33b6e756fbd8
+context: 01ca21dc7e4978aad83d9c934800e796e13dfa04a4d7e300476eab72c1838452
+```
+
+Raw unversioned digests beginning 61 or CA remain MALFORMED. There is no
+publication exception, alternate grant parser or implicit authority inheritance.
+A valid record signature is insufficient: an accepted, unrevoked grant must
+match the exact producer, action and context. A retired rotation identity cannot
+publish after its accepted rotation. Initial-identity or root membership alone
+does not confer publication authority.
+
+Operations authorized a frozen activation height equal to the highest qualified
+unsigned-publication height plus one for each legacy genesis lineage. The offline
+qualification audit of existing histories produced the following immutable map.
+The key is SHA256 of the complete exact genesis block bytes, without a domain;
+it identifies the fixture lineage and is not a new block-ID scheme.
+
+| Genesis-byte fingerprint | Last legacy height | Production activation |
+| --- | ---: | ---: |
+| 24bc219fb3f716a82792aa47c008cbe70580a68033bdda29572584b9dfc90480 | 63 | 64 |
+| 28cbfdf9c3db7af69379082165b0c50c7de9306c0488ec7eeb1f17be34e1f127 | 121 | 122 |
+| 501dfde985d3da8a56c932054ec00525390c44cff2d8370118339f72c7bcd80d | 129 | 130 |
+| 5a1c873c0ee5a10e92b73f008548384ea7d92a079cb1928dd48a28fa317a105e | 60 | 61 |
+| 79a2730e6bb26cbfb1b27ea5ca8ebd99111ae6d3cfe1333844a6e9d408105ec3 | 60 | 61 |
+| 93d7a897f614255625371590900c218146c9d6e1ebb7ea2490302a47d32f7127 | 60 | 61 |
+| ae8c12ac05afa8de043f9a529968c694ad53330d50bb1499edbdb3c8fa4eb04d | 60 | 61 |
+
+All other genesis lineages activate at height 1; genesis is height 0. The map is
+compiled protocol data, never calculated from a running node's current history,
+clock, configuration, peer, or validation-hook pointer. Existing qualified
+preactivation publication rules remain; later unsigned publications fail closed.
+No historical bytes, targets or signatures are rewritten. The default development
+genesis is the 501d… lineage; its old unsigned body cannot extend through 130.
+Deployment identity/root provisioning is not added by this block.
+
+At activation, candidates validate canonical payload, identity/signature, scoped
+authority, accepted revocation/rotation and signer-plus-nonce replay. The existing
+Phase 14 signature domain (including its NUL) is unchanged. `issued_at` remains
+a signed producer assertion without a freshness window; accepted time is the
+containing canonical block timestamp. Local validation hooks cannot disable or
+strengthen production consensus. Replay is consumed in a candidate clone and
+published only on success; persistence publication retains its existing atomicity.

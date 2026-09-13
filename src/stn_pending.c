@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_pending.h"
 #include "stn_lifecycle.h"
+#include "stn_sha256.h"
 #include "stn_wire_internal.h"
 #include <stdlib.h>
 #include <string.h>
@@ -131,6 +132,11 @@ static stn_pending_result disposition(const stn_validation_report *r)
     if(r->replay==STN_STAGE_REJECT){return STN_PENDING_REPLAY;}
     return STN_PENDING_INVALID;
 }
+static int production_next(const stn_storage_view *active)
+{
+    return active!=NULL && active->state.publication_activation_height!=0 &&
+        (active->state.height==UINT64_MAX || active->state.height+1>=active->state.publication_activation_height);
+}
 stn_pending_result stn_pending_admit(stn_pending *p,const uint8_t *record,size_t length,
     const stn_validation_context *c,const stn_storage_view *active,const stn_hash_provider *hash,
     stn_validation_report *report,uint8_t id[32])
@@ -141,11 +147,19 @@ stn_pending_result stn_pending_admit(stn_pending *p,const uint8_t *record,size_t
     if(report==NULL || id==NULL){return STN_PENDING_PROVIDER;}
     memset(report,0,sizeof(*report));memset(id,0,32);
     if(p==NULL || active==NULL || hash==NULL){report->acceptance=STN_ACCEPTANCE_ERROR;return STN_PENDING_PROVIDER;}
-    if(c==NULL){report->acceptance=STN_ACCEPTANCE_UNRESOLVED;return STN_PENDING_UNAVAILABLE;}
-    if(memcmp(c->expected_network,active->state.network_id,32)!=0){report->acceptance=STN_ACCEPTANCE_UNRESOLVED;return STN_PENDING_UNAVAILABLE;}
-    *report=stn_validate_intelligence_record(record,length,c);result=disposition(report);
-    if(result!=STN_PENDING_ACCEPTED){return result;}
+    if(production_next(active)) {
+        stn_lifecycle_result checked=stn_lifecycle_check_publication(active->state.lifecycle,record,length,hash);
+        if(checked==STN_LIFECYCLE_PROVIDER || checked==STN_LIFECYCLE_CAPACITY){report->acceptance=STN_ACCEPTANCE_ERROR;return STN_PENDING_PROVIDER;}
+        if(checked!=STN_LIFECYCLE_OK){report->acceptance=STN_ACCEPTANCE_REJECTED;return checked==STN_LIFECYCLE_REPLAY ? STN_PENDING_REPLAY : checked==STN_LIFECYCLE_INVALID ? STN_PENDING_AUTHORITY : STN_PENDING_INVALID;}
+        report->acceptance=STN_ACCEPTANCE_UNDER_CONTEXT;
+    } else {
+        if(c==NULL){report->acceptance=STN_ACCEPTANCE_UNRESOLVED;return STN_PENDING_UNAVAILABLE;}
+        if(memcmp(c->expected_network,active->state.network_id,32)!=0){report->acceptance=STN_ACCEPTANCE_UNRESOLVED;return STN_PENDING_UNAVAILABLE;}
+        *report=stn_validate_intelligence_record(record,length,c);result=disposition(report);
+        if(result!=STN_PENDING_ACCEPTED){return result;}
+    }
     if(stn_record_decode(record,length,&r)!=STN_RECORD_OK){return STN_PENDING_INVALID;}
+    if(memcmp(r.network_id,active->state.network_id,32)!=0){report->acceptance=STN_ACCEPTANCE_REJECTED;report->network=STN_STAGE_REJECT;return STN_PENDING_NETWORK;}
     tx.version=1;tx.type=STN_TX_PUBLICATION;tx.record_bytes=record;tx.record_length=(uint32_t)length;
     if(stn_transaction_encode(&tx,encoded,sizeof(encoded),&n)!=STN_DATA_OK ||
        stn_transaction_id(encoded,n,hash,e.id)!=STN_DATA_OK){return STN_PENDING_PROVIDER;}
@@ -196,8 +210,10 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
     stn_transaction_span selected[STN_BLOCK_MAX_TRANSACTIONS];uint32_t n=0;size_t i,total=0,available;
     if(written!=NULL){*written=0;}if(count!=NULL){*count=0;}
     if(p==NULL || body==NULL || written==NULL || count==NULL){return STN_DATA_ARGUMENT;}
-    if(c==NULL){return STN_DATA_UNRESOLVED;}
-    if(active==NULL || memcmp(c->expected_network,active->state.network_id,32)!=0){return STN_DATA_UNRESOLVED;}
+    if(!production_next(active)) {
+        if(c==NULL){return STN_DATA_UNRESOLVED;}
+        if(active==NULL || memcmp(c->expected_network,active->state.network_id,32)!=0){return STN_DATA_UNRESOLVED;}
+    }
     if(scan(p,active,replay,1,NULL)!=STN_DATA_OK){return STN_DATA_CONTENT;}
     if(stn_pending_enumerate(p,0,ids,STN_PENDING_MAX_ENTRIES,&available)!=STN_PENDING_ACCEPTED){return STN_DATA_CONTENT;}
     for(i=0;i<available && n<STN_BLOCK_MAX_TRANSACTIONS;++i){
@@ -205,7 +221,15 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
         const stn_pending_entry *e=&p->entries[at];stn_transaction tx;stn_validation_report r;
         if(replay[at]){continue;}
         if(stn_transaction_decode(e->transaction,e->length,&tx)!=STN_DATA_OK){return STN_DATA_CONTENT;}
-        if(tx.type==STN_TX_PUBLICATION){r=stn_validate_intelligence_record(tx.record_bytes,tx.record_length,c);if(r.acceptance==STN_ACCEPTANCE_ERROR){return STN_DATA_PROVIDER_ERROR;}if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){continue;}}
+        if(tx.type==STN_TX_PUBLICATION && production_next(active)){
+            stn_hash_provider hash={stn_sha256,NULL};stn_record record;
+            stn_lifecycle_result checked=stn_lifecycle_check_publication(active->state.lifecycle,tx.record_bytes,tx.record_length,&hash);
+            if(checked==STN_LIFECYCLE_PROVIDER || checked==STN_LIFECYCLE_CAPACITY){return STN_DATA_PROVIDER_ERROR;}
+            if(checked!=STN_LIFECYCLE_OK){continue;}
+            if(stn_record_decode(tx.record_bytes,tx.record_length,&record)!=STN_RECORD_OK ||
+               memcmp(record.network_id,active->state.network_id,32)!=0){continue;}
+        }
+        if(tx.type==STN_TX_PUBLICATION && !production_next(active)){r=stn_validate_intelligence_record(tx.record_bytes,tx.record_length,c);if(r.acceptance==STN_ACCEPTANCE_ERROR){return STN_DATA_PROVIDER_ERROR;}if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){continue;}}
         if(e->length+4>STN_BLOCK_MAX_BODY-total){break;}
         /* A caller capacity failure must not silently change the chosen block. */
         if(e->length+4>capacity-total){return STN_DATA_CAPACITY;}

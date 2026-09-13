@@ -50,6 +50,12 @@ stn_lifecycle_result stn_lifecycle_apply_transaction(stn_lifecycle_state *state,
 stn_lifecycle_result stn_lifecycle_apply_block(stn_lifecycle_state *state,
     const uint8_t *block, size_t block_length, const uint8_t *genesis_roots,
     size_t root_count, const stn_hash_provider *provider);
+/* Read-only production publication check against a validated history/candidate
+ * projection. Caller separately enforces the Chain network and activation.
+ * No wall-clock policy, transport authority, or replay consumption. */
+stn_lifecycle_result stn_lifecycle_check_publication(const stn_lifecycle_state *state,
+    const uint8_t *record, size_t length,
+    const stn_hash_provider *provider);
 
 /* Rebuild from blocks already selected as accepted history, in block order and
  * existing transaction order. Output becomes usable only on success. */
