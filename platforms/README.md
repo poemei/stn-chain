@@ -10,7 +10,6 @@ needed: files, sockets, entropy, clocks, synchronization, and device access.
 | --- | --- | --- |
 | Linux | x86, x64, arm32, arm64 | Reserved; no adapters or qualified builds |
 | Windows | x86, x64, arm32, arm64 | x64 Release builds and CNG SHA-256 adapter tested; other targets reserved |
-| macOS (OSX) | x64, arm64 | Reserved; no adapters or qualified builds |
 
 x86 means 32-bit Intel-compatible; x64 means 64-bit Intel-compatible.
 ARM32 and ARM64 are separate targets. Exact ARM ISA/ABI, minimum OS versions,
