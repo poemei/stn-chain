@@ -38,6 +38,8 @@ typedef struct stn_peer_report {
     int recovery;
     stn_chain_state verified; /* Valid only on OK/RETAINED; never advertisement. */
 } stn_peer_report;
+/* Successful/retained sync report owns verified state. */
+void stn_peer_report_release(stn_peer_report *report);
 typedef struct stn_peer_workspace {
     stn_storage_workspace storage;
     uint8_t *candidate;size_t candidate_capacity;

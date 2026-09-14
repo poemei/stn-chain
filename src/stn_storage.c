@@ -14,20 +14,15 @@ static stn_storage_status digest(const stn_chain_context *c,const uint8_t *p,siz
 }
 static stn_storage_status validate(const stn_chain_context *c,const stn_block_span *b,size_t n,stn_chain_state *out)
 {
-    stn_chain_state state,next;size_t i;stn_chain_report r;
+    stn_chain_report r;
     if(c==NULL || b==NULL || n==0 || c->pow_policy==NULL || out==NULL) { return STN_STORAGE_ARGUMENT; }
-    if(stn_chain_initialize(c,&state)!=STN_DATA_OK) { return STN_STORAGE_VALIDATION; }
-    for(i=0;i<n;++i) {
-        r=stn_chain_validate_candidate(c,&state,b[i].bytes,b[i].length,&next);
-        if(r.acceptance==STN_ACCEPTANCE_UNRESOLVED) { return STN_STORAGE_UNRESOLVED; }
-        if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT) { return STN_STORAGE_VALIDATION; }
-        state=next;
-    }
-    *out=state;return STN_STORAGE_OK;
+    r=stn_chain_reconstruct_history(c,b,n,out);
+    if(r.acceptance==STN_ACCEPTANCE_UNRESOLVED)return STN_STORAGE_UNRESOLVED;
+    return r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT ? STN_STORAGE_OK : STN_STORAGE_VALIDATION;
 }
 void stn_storage_view_release(stn_storage_view *v)
 {
-    if(v!=NULL){free(v->blocks);memset(v,0,sizeof(*v));}
+    if(v!=NULL){free(v->blocks);stn_chain_state_release(&v->state);memset(v,0,sizeof(*v));}
 }
 stn_storage_status stn_storage_decode(const stn_chain_context *c,const uint8_t *p,size_t n,stn_storage_view *out)
 {
@@ -68,6 +63,7 @@ stn_storage_status stn_storage_encode(const stn_chain_context *c,const stn_block
     if(p==NULL || written==NULL) { return STN_STORAGE_ARGUMENT; }
     if(n>UINT32_MAX){return STN_STORAGE_CAPACITY;}
     s=validate(c,b,n,&state);if(s!=STN_STORAGE_OK) { return s; }
+    stn_chain_state_release(&state);
     for(i=0;i<n;++i) {
         if(total>SIZE_MAX-4u || b[i].length>SIZE_MAX-total-4u){return STN_STORAGE_CAPACITY;}
         total+=4u+b[i].length;
@@ -136,18 +132,18 @@ stn_storage_status stn_storage_create(const stn_chain_context *c,const stn_stora
     stn_storage_status s;stn_chain_state state;size_t length=0;
     if(c==NULL || !provider_valid(p) || scratch==NULL || active==NULL) { return STN_STORAGE_ARGUMENT; }
     s=validate(c,b,n,&state);if(s!=STN_STORAGE_OK) { return s; }
-    s=io_status(p->acquire(p->user));if(s!=STN_STORAGE_OK) { return s; }
+    s=io_status(p->acquire(p->user));if(s!=STN_STORAGE_OK) { stn_chain_state_release(&state);return s; }
     s=io_status(p->read(p->user,scratch,0,&length));
-    if(s!=STN_STORAGE_NOT_FOUND) { p->release(p->user);return s==STN_STORAGE_OK || s==STN_STORAGE_CAPACITY ? STN_STORAGE_EXISTS : s; }
+    if(s!=STN_STORAGE_NOT_FOUND) { stn_chain_state_release(&state);p->release(p->user);return s==STN_STORAGE_OK || s==STN_STORAGE_CAPACITY ? STN_STORAGE_EXISTS : s; }
     s=stn_storage_encode(c,b,n,scratch,capacity,&length);
     if(s==STN_STORAGE_OK) { s=io_status(p->replace(p->user,scratch,length)); }
-    if(s==STN_STORAGE_OK) { *active=state; }
-    p->release(p->user);return s;
+    if(s==STN_STORAGE_OK) { stn_chain_state_move(active,&state); }
+    stn_chain_state_release(&state);p->release(p->user);return s;
 }
 stn_storage_status stn_storage_apply(const stn_chain_context *c,const stn_storage_provider *p,
     const stn_block_span *b,size_t n,const stn_reorg_plan *plan,stn_storage_workspace *w,stn_chain_state *active)
 {
-    stn_storage_status s;stn_storage_view current={0};stn_reorg_plan fresh;stn_fork_report r;size_t length;
+    stn_storage_status s;stn_storage_view current={0};stn_reorg_plan fresh={0};stn_fork_report r;size_t length;
     if(c==NULL || !provider_valid(p) || b==NULL || plan==NULL || w==NULL || active==NULL ||
         w->current_bytes==NULL || w->next_bytes==NULL) { return STN_STORAGE_ARGUMENT; }
     s=io_status(p->acquire(p->user));if(s!=STN_STORAGE_OK) { return s; }
@@ -163,15 +159,15 @@ stn_storage_status stn_storage_apply(const stn_chain_context *c,const stn_storag
     if(!plan_equal(plan,&fresh)) { s=STN_STORAGE_STALE;goto done; }
     s=stn_storage_encode(c,b,n,w->next_bytes,w->next_capacity,&length);
     if(s==STN_STORAGE_OK) { s=io_status(p->replace(p->user,w->next_bytes,length)); }
-    if(s==STN_STORAGE_OK) { *active=fresh.candidate; }
+    if(s==STN_STORAGE_OK) { stn_chain_state_move(active,&fresh.candidate); }
 done:
-    stn_storage_view_release(&current);p->release(p->user);return s;
+    stn_reorg_plan_release(&fresh);stn_storage_view_release(&current);p->release(p->user);return s;
 }
 
 stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_storage_provider *p,
     const uint8_t *block,size_t block_length,stn_storage_workspace *w,stn_chain_state *active)
 {
-    stn_storage_status s;stn_storage_view current={0};stn_chain_state next;stn_chain_report r;
+    stn_storage_status s;stn_storage_view current={0};stn_chain_state next={0};stn_chain_report r;
     size_t encoded=0,offset,i;uint8_t hash[32];
     if(c==NULL || !provider_valid(p) || block==NULL || w==NULL || active==NULL ||
        w->current_bytes==NULL || w->next_bytes==NULL){return STN_STORAGE_ARGUMENT;}
@@ -200,9 +196,9 @@ stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_stora
     s=digest(c,w->next_bytes,encoded-32,hash);
     if(s==STN_STORAGE_OK){memcpy(w->next_bytes+encoded-32,hash,32);}
     if(s==STN_STORAGE_OK){s=io_status(p->replace(p->user,w->next_bytes,encoded));}
-    if(s==STN_STORAGE_OK){*active=next;}
+    if(s==STN_STORAGE_OK){stn_chain_state_move(active,&next);}
 done:
-    stn_storage_view_release(&current);p->release(p->user);return s;
+    stn_chain_state_release(&next);stn_storage_view_release(&current);p->release(p->user);return s;
 }
 
 static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_storage_provider *p,
@@ -212,11 +208,13 @@ static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_s
     if(c->pow_policy==NULL || stn_chain_initialize(c,&v.state)!=STN_DATA_OK) { return STN_STORAGE_VALIDATION; }
     s=io_status(p->read(p->user,scratch,capacity,&n));
     if(s==STN_STORAGE_NOT_FOUND) { *out=v;*recovery=1;return STN_STORAGE_OK; }
-    if(s!=STN_STORAGE_OK) { return s; }
-    if(n>capacity) { return STN_STORAGE_IO; }
+    if(s!=STN_STORAGE_OK) { stn_storage_view_release(&v);return s; }
+    if(n>capacity) { stn_storage_view_release(&v);return STN_STORAGE_IO; }
+    stn_chain_state_release(&v.state);
     s=stn_storage_decode(c,scratch,n,&v);
     if(s==STN_STORAGE_OK) { *out=v;*recovery=0;return STN_STORAGE_OK; }
     if(s!=STN_STORAGE_FORMAT && s!=STN_STORAGE_VALIDATION) { return s; }
+    if(stn_chain_initialize(c,&v.state)!=STN_DATA_OK)return STN_STORAGE_VALIDATION;
     /* Wrong/unknown framing is not guessed. Do not interpret unsupported versions. */
     if(n>=12 && memcmp(scratch,"STNS",4)==0 && stn_wire_read(scratch+4,2)==1 && stn_wire_read(scratch+6,2)==0) {
         count=(size_t)stn_wire_read(scratch+8,4);
@@ -226,7 +224,7 @@ static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_s
              * what the available bytes could possibly contain. */
             if(count>(n-12)/(4u+STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY)){count=(n-12)/(4u+STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY);}
             v.blocks=count ? (stn_block_span*)calloc(count,sizeof(*v.blocks)) : NULL;
-            if(count!=0 && v.blocks==NULL){return STN_STORAGE_CAPACITY;}
+            if(count!=0 && v.blocks==NULL){stn_storage_view_release(&v);return STN_STORAGE_CAPACITY;}
         } else { count=0; }
     }
     for(i=0;i<count;++i) {
@@ -253,11 +251,11 @@ stn_storage_status stn_storage_recovery_read(const stn_chain_context *c,const st
 stn_storage_status stn_storage_adopt(const stn_chain_context *c,const stn_storage_provider *p,
     const stn_block_span *b,size_t n,stn_storage_workspace *w,stn_chain_state *active)
 {
-    stn_storage_status s;stn_storage_view local={0};stn_chain_state candidate;int recovery;
-    stn_reorg_plan plan;stn_fork_report r;size_t length;
+    stn_storage_status s;stn_storage_view local={0};stn_chain_state candidate={0};int recovery;
+    stn_reorg_plan plan={0};stn_fork_report r;size_t length;
     if(c==NULL || !provider_valid(p) || w==NULL || active==NULL || w->current_bytes==NULL || w->next_bytes==NULL) { return STN_STORAGE_ARGUMENT; }
     s=validate(c,b,n,&candidate);if(s!=STN_STORAGE_OK) { return s; }
-    s=io_status(p->acquire(p->user));if(s!=STN_STORAGE_OK) { return s; }
+    s=io_status(p->acquire(p->user));if(s!=STN_STORAGE_OK) { stn_chain_state_release(&candidate);return s; }
     s=recovery_locked(c,p,w->current_bytes,w->current_capacity,&local,&recovery);
     if(s!=STN_STORAGE_OK) { goto finished; }
     if(local.count!=0) {
@@ -271,7 +269,7 @@ stn_storage_status stn_storage_adopt(const stn_chain_context *c,const stn_storag
     }
     s=stn_storage_encode(c,b,n,w->next_bytes,w->next_capacity,&length);
     if(s==STN_STORAGE_OK) { s=io_status(p->replace(p->user,w->next_bytes,length)); }
-    if(s==STN_STORAGE_OK) { *active=candidate; }
+    if(s==STN_STORAGE_OK) { stn_chain_state_move(active,&candidate); }
 finished:
-    stn_storage_view_release(&local);p->release(p->user);return s;
+    stn_chain_state_release(&candidate);stn_reorg_plan_release(&plan);stn_storage_view_release(&local);p->release(p->user);return s;
 }

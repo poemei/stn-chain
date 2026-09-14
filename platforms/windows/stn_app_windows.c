@@ -236,7 +236,7 @@ int stn_windows_app(int argc,char **argv)
     status=stn_storage_load(&chain,&storage,mining.snapshot,mining.snapshot_capacity,&view);
     if(status==STN_STORAGE_NOT_FOUND){stn_block_span anchor={genesis,genesis_length};
         status=stn_storage_create(&chain,&storage,&anchor,1,mining.snapshot,mining.snapshot_capacity,&mining.active);
-    }else if(status==STN_STORAGE_OK){mining.active=view.state;stn_storage_view_release(&view);}
+    }else if(status==STN_STORAGE_OK){stn_chain_state_move(&mining.active,&view.state);stn_storage_view_release(&view);}
     if(status!=STN_STORAGE_OK){fprintf(stderr,"Storage startup failed: %d (no automatic repair).\n",(int)status);goto cleanup;}
     if(stn_windows_peer_listen((uint16_t)port,&listener,&bound)!=STN_PEER_OK){fprintf(stderr,"Cannot bind loopback RPC port.\n");goto cleanup;}
     if(!SetConsoleCtrlHandler(stop,TRUE)){goto cleanup;}
@@ -290,7 +290,7 @@ cleanup:
 #endif
     stn_windows_peer_close(&listener);if(lock_ready){DeleteCriticalSection(&dispatch_lock);}
     free(outbound.workspace.storage.current_bytes);free(outbound.workspace.storage.next_bytes);free(outbound.workspace.candidate);free(outbound.workspace.frame);
-    stn_pending_clear(&pending);free(genesis);free(body);free(mining.snapshot);free(mining.workspace.current_bytes);free(mining.workspace.next_bytes);free(mining.template_bytes);
+    stn_chain_state_release(&mining.active);stn_pending_clear(&pending);free(genesis);free(body);free(mining.snapshot);free(mining.workspace.current_bytes);free(mining.workspace.next_bytes);free(mining.template_bytes);
     return result;
 usage:
     puts("Usage: stn-chain --dev [--data PATH] [--rpc-port 18473]\n"

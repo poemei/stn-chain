@@ -43,6 +43,26 @@ typedef struct stn_chain_state {
     stn_lifecycle_state *lifecycle;
     uint64_t publication_activation_height;
 } stn_chain_state;
+/* One local reference per owning state. Plain structure copies are BORROWS,
+ * never independent owners. share writes a fresh output; move replaces a
+ * zero-initialized/owned destination and clears source. release clears state.
+ * Borrowed states must not be released or replaced in place; they cannot outlive
+ * the owner. Lifecycle pointers originate only from Chain initialization/
+ * validation and must not be assigned independently. move requires non-NULL
+ * arguments; self-share/self-move are no-ops. Ownership calls on the same
+ * snapshot require external serialization.
+ * initialize/validation outputs must be fresh (released first); validation also
+ * supports replacing its owning prior in place, only after success. */
+stn_data_status stn_chain_state_share(const stn_chain_state *source,stn_chain_state *out);
+void stn_chain_state_move(stn_chain_state *out,stn_chain_state *source);
+void stn_chain_state_release(stn_chain_state *state);
+#ifdef STN_LIFECYCLE_TEST
+size_t stn_chain_test_live_snapshots(void);
+size_t stn_chain_test_clone_count(void);
+void stn_chain_test_fail_after(size_t budget);
+/* Test-only counter boundary injection; restore the true count before release. */
+size_t stn_chain_test_references(stn_chain_state *state,size_t references);
+#endif
 
 typedef enum stn_chain_reason {
     STN_CHAIN_NONE = 0, STN_CHAIN_ARGUMENT, STN_CHAIN_CONTEXT,
@@ -137,7 +157,7 @@ stn_first_result stn_chain_first_record(const stn_chain_context *context,
     const stn_block_span *blocks,size_t count,stn_chain_record_match *out,
     stn_chain_cursor *position);
 /* Context/input spans and provider state must stay immutable during calls.
- * No allocation, persistence, global state, ambient time, or replay database.
+ * Lifecycle snapshots are locally allocated; no persistence or ambient time.
  * The initial state is EMPTY, not an accepted genesis. Anchor validity beyond
  * structure is checked when the exact genesis is submitted as a candidate.
  * Output unchanged on failure. Existing accepted state must originate from
@@ -162,6 +182,14 @@ stn_data_status stn_chain_block_id(const uint8_t *bytes, size_t length,
  * signature/authority acceptance, or global transaction replay safety. */
 stn_chain_report stn_chain_validate_candidate(const stn_chain_context *context,
     const stn_chain_state *prior, const uint8_t *bytes, size_t length, stn_chain_state *out);
+
+/* Full-history reconstruction owns its private evolving state. It can reuse
+ * exclusive lifecycle storage internally; any failure destroys the entire
+ * temporary reconstruction and leaves out unchanged. No trusted state input.
+ * Successful out must be fresh, with the same ownership rule as validation.
+ * No STN_CHAIN_MAX_BATCH limit: callers bound the supplied history resources. */
+stn_chain_report stn_chain_reconstruct_history(const stn_chain_context *context,
+    const stn_block_span *blocks,size_t count,stn_chain_state *out);
 
 /* Validate a suffix from a previously validated prefix. To validate an entire
  * untrusted chain, initialize EMPTY then supply all blocks including genesis.

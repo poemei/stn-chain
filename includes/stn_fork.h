@@ -26,6 +26,8 @@ typedef struct stn_reorg_plan {
     stn_chain_state current, candidate; /* Calculated, never caller claims. */
     uint64_t resulting_height; /* Current height if no change is actionable. */
 } stn_reorg_plan;
+/* Successful evaluate transfers two references to a fresh plan. */
+void stn_reorg_plan_release(stn_reorg_plan *plan);
 
 /* Arithmetic only; NOT chain eligibility or authorization. Ignores height,
  * timestamps and identity. Output unchanged for invalid arguments. */

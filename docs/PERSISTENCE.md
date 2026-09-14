@@ -207,3 +207,45 @@ historical production eligibility, so restart and greater-work adoption require
 no record cache repair. A detached-only record becomes NOT_FOUND; an independently
 eligible witness on the replacement branch returns that branch's location.
 The query neither writes persistence nor consumes accepted replay state.
+
+## Phase 16 Micro-Chunk 1A — view and active-state lifetime
+
+A decoded/loaded/recovery view owns its block-span array and one reconstructed
+lifecycle reference. Block bytes still borrow the caller's input/scratch buffer.
+stn_storage_view_release releases both owned resources and clears the view.
+A state surviving view release must first use stn_chain_state_share, or take
+the view's reference with stn_chain_state_move. Plain copies are borrows only.
+Successful view outputs must be fresh; release an earlier view before reuse.
+
+Storage create/apply/extend/adopt accept zero-initialized or owning active state.
+They publish the complete accepted history before moving the validated candidate
+into active state and releasing superseded ownership. Failed validation, stale
+plans, rejected forks, allocation failure and failed publication release
+temporary references while preserving accepted state. Encode releases its
+validation projection; decode, recovery and restart release abandoned
+reconstructions. Caller-owned fork plans retain their own references until
+stn_reorg_plan_release; storage does not consume the supplied plan.
+
+These rules implement the architecture ownership contract only. STNS v1 magic,
+version, header, block count, block bytes, length prefixes, checksum and atomic
+publication format remain unchanged. No snapshot metadata or reference count
+is persisted. Canonical accepted history remains authoritative; consensus,
+record eligibility, cursor and STNC semantics remain unchanged.
+
+## Phase 16 Micro-Chunk 1B — complete-history reconstruction
+
+The existing complete-history validation helper now delegates to an owning
+reconstruction that may reuse its exclusive lifecycle buffers between blocks.
+This applies where storage already requests full validation (including decode
+and load); it does not trust cached state, skip validation or alter validation
+order. Existing partial-prefix recovery remains on its 1A path because it can
+retain a successfully validated prefix after a later block is rejected.
+
+The reconstruction result is transferred only on complete success. Failed
+allocation or semantic validation releases private state, preserving active
+state and caller output. Capacity exhaustion uses the existing clone policy.
+STNS v1 encoding/checksum/publication and restart evidence requirements remain
+identical; no lifecycle projection is serialized. Repeated load/release,
+all-prefix state equivalence and allocation-failure accounting are qualified
+alongside the existing 1A ownership assertions. Consensus, record eligibility
+and protocol behavior remain unchanged.

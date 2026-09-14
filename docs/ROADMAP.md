@@ -582,4 +582,10 @@ Stratum impact: NONE. Stratum requalification: NOT REQUIRED.
 
 ## Phase 16 — Storage Evolution
 
-**NEXT — NOT STARTED.** No implementation scope is assigned by this closeout.
+**Micro-Chunk 1A COMPLETE / QUALIFIED — 2026-09-14.**
+Reconstructed lifecycle ownership/reclamation only; 6,951 targeted C checks,
+40 executable/restart checks and 34 probes, zero failures; Windows Release/x64
+build has zero warnings/errors. No other-platform qualification.
+Explicit local share/move/release semantics cover active state, views, candidate
+and query temporaries, fork plans and peer reports. STNS v1, consensus and wire
+formats are unchanged. Micro-Chunk 1B and storage scaling have not started.

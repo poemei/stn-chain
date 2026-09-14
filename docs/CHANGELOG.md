@@ -5,6 +5,77 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 16 Micro-Chunk 1B — reconstruction copy reduction COMPLETE / QUALIFIED — 2026-09-14
+
+- Complete storage-history validation now uses one private evolving owning
+  Chain state. Candidate validation reuses that exclusive lifecycle allocation
+  when its existing grant/replay capacities cover the next block's transactions.
+  Otherwise the existing clone/allocation policy supplies capacity. No sizing
+  pre-scan, validation-order change, trusted state input or new lifecycle bound.
+- Corrected unnecessary full lifecycle clones between accepted-history blocks.
+  Ordinary candidate/sequence validation still creates independent snapshots;
+  query, fork, peer and prefix-recovery algorithms are unchanged. The optimized
+  complete-history result transfers only after every block passes. Any failure,
+  including a later transaction after private mutation, releases the entire
+  temporary state and preserves all independently surviving accepted owners.
+- Changed stn_chain.c, stn_chain.h and the storage validation helper. Extended
+  the existing ignored test_record_query.c and the existing test-only counters.
+  Documented the reconstruction behavior in ARCHITECTURE.md and PERSISTENCE.md.
+  Existing 1A working-tree changes were preserved.
+- Deterministic 23-block grant/publication/revocation/rotation history requires
+  2 full lifecycle clones instead of 23; initialization is not counted as a
+  clone. Qualified all 23 prefixes, capacity replenishment, exact derived state,
+  authority/rotation/replay and record results, byte-identical STNS re-encoding,
+  repeated reconstruction/release, allocation failures, corrupt evidence and
+  semantic rejection after a successful transaction in reused storage.
+- Windows Release/x64: 915 new reconstruction checks included in 2,678 query/
+  ownership checks; additionally Chain 1,182, publication 331, fork 786,
+  storage 2,751 and peer ownership/recovery 138. C subtotal 7,866, executable
+  restart/STNC 40, build probes 34: 7,940 total, zero failures. Build has zero
+  warnings/errors. 1A lifetime assertions pass with zero live snapshots after
+  isolated teardown. No full million-check suite, benchmark framework,
+  sanitizer run, or other-platform qualification.
+- STNS v1, accepted-history format, consensus, STNC and mining interfaces
+  unchanged. Mining interface impact NONE; STN-Stratum impact NONE;
+  requalification NOT REQUIRED. No persistent snapshots, indexes, pruning,
+  migration, checkpointing or broader storage scaling. No commit or push.
+  Micro-Chunk 1C not started.
+
+### Phase 16 Micro-Chunk 1A — lifecycle ownership COMPLETE / QUALIFIED — 2026-09-14
+
+- Added explicit local lifecycle reference ownership: create/clone, share,
+  move and release. Simultaneously surviving states require explicit sharing;
+  plain state copies are borrows. Final release reclaims once, superseded
+  active ownership is released after successful publication, and failed
+  reconstruction/validation leaves accepted state intact.
+- Audited production state copies in Chain, storage, fork/reorg, node RPC,
+  mining-service internals, peer synchronization and startup/shutdown. Views
+  release span arrays and lifecycle ownership; fork plans and peer reports
+  have explicit release operations. Query, cursor and recovery temporaries,
+  failed candidates and abandoned storage projections now reclaim ownership.
+  Adapted local fixture callers, including surviving view-to-state transfers.
+- Added lightweight test-only live allocation accounting, injected allocation
+  failures and reference-count overflow/invalid-state checks. Repeated
+  initialization, reconstruction/load/release, accepted replacement, failed
+  publication, rejected validation/fork, survivor use, restart/corruption and
+  query/reorganization cleanup return live snapshots to their entry count.
+  Known accepted-state, authority/replay, record ID/eligibility/traversal and
+  canonical STNS byte assertions remain passing.
+- Windows Release/x64: 6,951 targeted C checks, 40 executable restart/TCP
+  checks, 34 build probes; 7,025 total, zero failures, zero build warnings/errors.
+  Detailed non-overlapping counts and commands are in BUILD.md. No full
+  million-check regression, sanitizer, long-duration soak or other-platform
+  qualification was run. Test sources remain locally ignored.
+- Updated architecture/persistence ownership contracts, public API lifetime
+  comments, build instructions and roadmap. Production counts are local,
+  externally serialized and not persisted; concurrent test accounting alone
+  uses C11 atomics with the MSVC test-only compiler flag.
+- STNS v1, accepted-history bytes, consensus/lifecycle meaning and STNC unchanged.
+  Mining RPC/work identity/target/nonce/solved-work interfaces unchanged.
+  Mining interface impact NONE; STN-Stratum impact NONE; requalification
+  NOT REQUIRED. No storage scaling, migration, checkpoints or indexes.
+  Micro-Chunk 1B not started. No commit or push.
+
 ### Phase 15 — final closeout COMPLETE / QUALIFIED — 2026-09-13
 
 - Documentation-only closure following review of checkpoint 5ec7970. Blocks

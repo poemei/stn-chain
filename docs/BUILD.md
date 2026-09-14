@@ -482,3 +482,41 @@ accepted-record qualification with
 `build\x64\Release\stn-chain-tests.exe --record-query`, followed by
 `tools/test-node.ps1 -AcceptedRecordOnly`. These reuse Block 2 vectors;
 the test sources remain locally ignored under the existing repository policy.
+## Phase 16 Micro-Chunk 1A — targeted ownership qualification
+
+Build the solution in Visual Studio with Release/x64 selected. In the test
+project's debugging arguments, select one focused run at a time:
+--chain, --record-query, --publication, --fork, --storage, --peer-ownership.
+The same switches are accepted by build/x64/Release/stn-chain-tests.exe.
+Run tools/test-node.ps1 -AcceptedRecordOnly for the actual executable restart
+and concurrent fragmented STNC query checks. Do not run the full C suite for 1A.
+
+The test target defines STN_LIFECYCLE_TEST for deterministic live-snapshot
+accounting, allocation-failure injection and reference-count boundary tests.
+MSVC's /experimental:c11atomics enables only the test accounting needed by
+concurrent independent TCP query reconstructions. Production ownership uses
+portable local size_t reference counts under existing external serialization;
+the production executable has no instrumentation or additional compiler flag.
+
+| Focused qualification | Checks | Failures |
+| --- | ---: | ---: |
+| Chain state/sequence ownership | 1,182 | 0 |
+| Lifecycle ownership and Phase 15 query/recovery (includes TCP) | 1,763 | 0 |
+| Production publication/reorganization ownership | 331 | 0 |
+| Fork validation/planning ownership | 786 | 0 |
+| Storage/application/reconstruction/corruption | 2,751 | 0 |
+| Peer ownership, recovery and local disk/TCP | 138 | 0 |
+| Executable restart/STNC | 40 | 0 |
+| Build boundary probes | 34 | 0 |
+| Total | 7,025 | 0 |
+
+The C subtotal is 6,951. Publication's 330 and storage's 264 activation checks
+are included in their parent counts, not additional runs. Focused C owners
+return to their entry live-snapshot count; isolated runs start at zero. Repeated
+share/release, final reclamation, surviving owners, replacement/failure cleanup
+and reconstruction use deterministic accounting and explicit assertions.
+No sanitizer run, full million-check suite or long-duration soak is claimed.
+Windows Release/x64 alone is qualified, with zero build warnings/errors.
+STNS v1 bytes and STNC behavior remain unchanged. Mining interface impact NONE;
+STN-Stratum impact NONE; Stratum requalification NOT REQUIRED.
+Local test sources remain ignored under the established repository policy.

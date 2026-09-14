@@ -94,7 +94,7 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
 }
 stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t cap,size_t *written)
 {
-    stn_mining_service *s=user;stn_storage_view v={0};stn_rpc_code code;size_t n=0,required=0;stn_chain_state accepted;
+    stn_mining_service *s=user;stn_storage_view v={0};stn_rpc_code code;size_t n=0,required=0;stn_chain_state accepted={0};
     uint8_t id[32],remove[STN_PENDING_MAX_ENTRIES]={0};stn_node_service query={0};
     if(written!=NULL){*written=0;}
     if(s==NULL || q==NULL || p==NULL || written==NULL || s->chain==NULL || s->storage==NULL ||
@@ -186,13 +186,13 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         if(stn_pending_inclusions(s->pending,&inclusion,&s->chain->hash_provider,remove)!=STN_DATA_OK){code=STN_RPC_PROVIDER;goto done;}
     }
     if(!storage_bytes_required(&v,n,&required) || !ensure_storage_capacity(s,required)){code=STN_RPC_CAPACITY;goto done;}
-    accepted=v.state;
+    if(stn_chain_state_share(&v.state,&accepted)!=STN_DATA_OK){code=STN_RPC_CAPACITY;goto done;}
     code=storage_code(stn_storage_extend(s->chain,s->storage,q->payload+68,n,&s->workspace,&accepted));
     if(code!=STN_RPC_OK){goto done;}
-    s->active=accepted;
+    stn_chain_state_move(&s->active,&accepted);
     if(s->pending!=NULL){stn_pending_prune(s->pending,remove);}
     memcpy(p,s->active.tip_id,32);stn_wire_write(p+32,8,s->active.height);
     memcpy(p+40,s->active.cumulative_work.bytes,STN_WORK_SIZE);*written=80;
 done:
-    stn_storage_view_release(&v);return code;
+    stn_chain_state_release(&accepted);stn_storage_view_release(&v);return code;
 }

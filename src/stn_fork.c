@@ -51,6 +51,11 @@ static stn_fork_report history(const stn_chain_context *c,const stn_block_span *
     return r;
 }
 
+void stn_reorg_plan_release(stn_reorg_plan *plan)
+{
+    if(plan!=NULL){stn_chain_state_release(&plan->current);stn_chain_state_release(&plan->candidate);memset(plan,0,sizeof(*plan));}
+}
+
 stn_fork_report stn_fork_evaluate_history(const stn_chain_context *context,
     const stn_block_span *current,size_t current_count,
     const stn_block_span *candidate,size_t candidate_count,stn_reorg_plan *out)
@@ -62,35 +67,37 @@ stn_fork_report stn_fork_evaluate_history(const stn_chain_context *context,
     r.validation.failing_index=SIZE_MAX;
     if(context==NULL || out==NULL) {
         r.validation.detail=STN_DATA_ARGUMENT;
-        return failure(r,0,STN_DATA_ARGUMENT);
+        r=failure(r,0,STN_DATA_ARGUMENT);goto done;
     }
-    if(context->pow_policy==NULL) { r.result=STN_FORK_UNSUPPORTED; return r; }
+    if(context->pow_policy==NULL) { r.result=STN_FORK_UNSUPPORTED; goto done; }
     r=history(context,current,current_count,1,&plan.current);
-    if(r.result!=STN_FORK_TIE) { return r; }
+    if(r.result!=STN_FORK_TIE) { goto done; }
     r=history(context,candidate,candidate_count,2,&plan.candidate);
-    if(r.result!=STN_FORK_TIE) { return r; }
+    if(r.result!=STN_FORK_TIE) { goto done; }
     limit=current_count<candidate_count ? current_count : candidate_count;
     while(common<limit) {
         uint8_t left[32],right[32];
         if(stn_chain_block_id(current[common].bytes,current[common].length,&context->hash_provider,left)!=STN_DATA_OK ||
-           stn_chain_block_id(candidate[common].bytes,candidate[common].length,&context->hash_provider,right)!=STN_DATA_OK){return failure(r,0,STN_DATA_PROVIDER_ERROR);}
+           stn_chain_block_id(candidate[common].bytes,candidate[common].length,&context->hash_provider,right)!=STN_DATA_OK){r=failure(r,0,STN_DATA_PROVIDER_ERROR);goto done;}
         if(memcmp(left,right,32)!=0){break;}++common;
     }
     if(common==0) {
         r.validation.reason=STN_CHAIN_GENESIS; r.validation.detail=STN_DATA_CONTENT;
-        return failure(r,2,STN_DATA_CONTENT);
+        r=failure(r,2,STN_DATA_CONTENT);goto done;
     }
     plan.ancestor_index=common-1;
-    if(stn_chain_block_id(current[common-1].bytes,current[common-1].length,&context->hash_provider,plan.ancestor_id)!=STN_DATA_OK){return failure(r,0,STN_DATA_PROVIDER_ERROR);}
+    if(stn_chain_block_id(current[common-1].bytes,current[common-1].length,&context->hash_provider,plan.ancestor_id)!=STN_DATA_OK){r=failure(r,0,STN_DATA_PROVIDER_ERROR);goto done;}
     plan.detach_begin=common; plan.detach_end=current_count;
     plan.attach_begin=common; plan.attach_end=candidate_count;
     plan.detached_count=current_count-common; plan.attached_count=candidate_count-common;
     (void)stn_work_order(&plan.current.cumulative_work,&plan.candidate.cumulative_work,&r.result);
     plan.actionable=r.result==STN_FORK_CANDIDATE;
     plan.resulting_height=plan.actionable ? plan.candidate.height : plan.current.height;
-    *out=plan;
-    return r;
+    *out=plan;memset(&plan,0,sizeof(plan));
+done:
+    stn_reorg_plan_release(&plan);return r;
 }
+
 
 stn_fork_report stn_fork_evaluate(const stn_chain_context *context,
     const stn_block_span *current,size_t current_count,
@@ -109,7 +116,7 @@ stn_cursor_reorg_result stn_chain_resolve_cursor_reorg(const stn_chain_context *
     const stn_block_span *retained,size_t retained_count,
     const stn_chain_cursor *cursor,stn_cursor_ancestor *out)
 {
-    stn_cursor_result valid;stn_reorg_plan plan;stn_fork_report report;
+    stn_cursor_result valid;stn_reorg_plan plan={0};stn_fork_report report;
     if(out==NULL || (retained==NULL && retained_count!=0))return STN_CURSOR_REORG_MALFORMED;
     valid=stn_chain_cursor_validate(context,current,current_count,cursor);
     if(valid==STN_CURSOR_MALFORMED)return STN_CURSOR_REORG_MALFORMED;
@@ -125,7 +132,7 @@ stn_cursor_reorg_result stn_chain_resolve_cursor_reorg(const stn_chain_context *
     if(report.result!=STN_FORK_CURRENT && report.result!=STN_FORK_CANDIDATE && report.result!=STN_FORK_TIE)
         return STN_CURSOR_REORG_NO_COMMON_ANCESTOR;
     out->height=(uint64_t)plan.ancestor_index;memcpy(out->block_id,plan.ancestor_id,32);
-    return STN_CURSOR_REORG_COMMON_ANCESTOR;
+    stn_reorg_plan_release(&plan);return STN_CURSOR_REORG_COMMON_ANCESTOR;
 }
 stn_consumer_recovery_result stn_chain_build_consumer_recovery_plan(
     const stn_chain_context *context,const stn_block_span *current,size_t current_count,

@@ -27,8 +27,11 @@ typedef struct stn_storage_provider {
 } stn_storage_provider;
 
 /* blocks is allocated by storage decode/load and borrows block bytes from the
- * caller-owned input/scratch buffer. Release the span array with
- * stn_storage_view_release(); block bytes remain caller-owned. */
+ * caller-owned input/scratch buffer. state owns a lifecycle reference. Release
+ * both the span array and that reference with
+ * stn_storage_view_release(); block bytes remain caller-owned. A surviving
+ * state must share or move that reference before view release. Successful
+ * decode/load/recovery outputs must be fresh (release before reusing). */
 typedef struct stn_storage_view {
     stn_block_span *blocks;
     size_t count;
@@ -54,6 +57,9 @@ void stn_storage_view_release(stn_storage_view *view);
 
 stn_storage_status stn_storage_load(const stn_chain_context *context,
     const stn_storage_provider *provider,uint8_t *scratch,size_t capacity,stn_storage_view *out);
+/* All active-state destinations below must be zero-initialized or own their
+ * reference. Successful publication moves the new state and releases the old;
+ * failure preserves active state. Never pass a borrowed state as active. */
 stn_storage_status stn_storage_create(const stn_chain_context *context,
     const stn_storage_provider *provider,const stn_block_span *blocks,size_t count,
     uint8_t *scratch,size_t capacity,stn_chain_state *active);

@@ -664,3 +664,65 @@ node snapshot may include optional caller-retained immutable branch spans,
 revalidated by Chain. The accepted-only executable adapter leaves them absent.
 RPC encodes the qualified boundary/resume outputs; it performs no recovery,
 record selection, ancestry algorithm or retention. Results are session-independent.
+## Phase 16 Micro-Chunk 1A — reconstructed lifecycle ownership
+
+Accepted canonical history remains the authoritative evidence. Each owning
+stn_chain_state holds one local reference to its reconstructed lifecycle
+snapshot. Reference counting is the smallest correct model because accepted
+states, storage views and validation outputs can survive independently while
+sharing an unchanged projection. Deep copies are needed only for candidate
+lifecycle transitions, where grant/replay buffers are copied and rebound.
+
+Initialization creates one reference. stn_chain_state_share explicitly adds a
+reference into a fresh output, leaving both inputs unchanged on failure.
+stn_chain_state_move releases a zero-initialized or owning destination,
+transfers the source reference, and clears the source. Release clears the state;
+the final reference frees the snapshot exactly once. Releasing a cleared state
+is harmless. A plain structure copy is only a borrow, cannot outlive its owner,
+and cannot be released or used as an owning in-place output.
+
+Initialization and distinct validation outputs must be fresh: release previous
+ownership before reuse. Validation supports an owning input/output alias and
+replaces it only on success. References are checked against overflow; invalid
+zero counts are rejected by share and fail fast on release rather than wrapping.
+Counts are neither serialized nor consensus-visible. Snapshot contents are
+immutable after publication. Ownership operations on the same snapshot require
+external serialization; the existing node dispatch/orchestration lock supplies
+that boundary. Independent request reconstructions own separate snapshots.
+
+Candidate/sequence failures, historical lookup/traversal/cursor reconstruction,
+fork/reorg evaluation, storage reconstruction and RPC/P2P temporary state now
+release their references. Successful fork plans own both calculated states and
+use stn_reorg_plan_release; successful/retained peer reports own their verified
+state and use stn_peer_report_release. Active replacement transfers the new
+reference after accepted publication and releases the superseded reference.
+Shutdown releases active ownership after workers are joined.
+
+This supersedes the earlier snapshot-reclamation limitation, without changing
+full-history reconstruction cost or qualifying unlimited-duration resource use.
+STNS v1, canonical history, consensus/lifecycle semantics, STNC, and mining
+interfaces are unchanged. No independently authoritative lifecycle database,
+checkpoint, index, migration, or Micro-Chunk 1B is introduced.
+
+## Phase 16 Micro-Chunk 1B — private reconstruction reuse
+
+Complete storage-history validation uses stn_chain_reconstruct_history. It
+initializes a fresh owning state, runs the existing block/transaction checks in
+their original order, and transfers a result only when the entire history
+passes. A lifecycle copy between reconstruction blocks is unnecessary when
+there is one owner and the existing grant/replay capacity can accommodate the
+next block's transactions. This private state can then evolve in place.
+Capacity replenishment uses the existing clone policy and checked arithmetic.
+
+The reconstruction owns no externally observable intermediate projection.
+If any block or transaction fails, including after private mutation, the whole
+temporary reconstruction is released and output remains unchanged. Ordinary
+candidate and sequence validation retain 1A's independent-snapshot and
+unchanged-on-failure rules. No query, fork, peer or partial-prefix recovery
+algorithm is optimized by this change.
+
+A deterministic 23-block lifecycle history reduced full clones from 23 to 2.
+This is copy reduction within one reconstruction, not a persistent cache or a
+general storage-scaling claim. All accepted tip/work, authority, rotation,
+replay and production-record semantics remain unchanged. Reference counts and
+capacities remain local runtime data; STNS v1 and STNC are unchanged.
