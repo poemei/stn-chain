@@ -5,6 +5,22 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 16 Micro-Chunk 1C — storage span ownership — 2026-09-19
+
+- Made the existing view's sole span-table ownership explicit. Successful
+  decode/recovery transfers ownership into fresh output and clears the local
+  owner. Centralized span release clears pointer/count; existing failure paths
+  retain complete view cleanup. Empty-prefix recovery now releases its unused
+  table before returning. Nonempty views retain spans for their consumers.
+- Documented borrowed-copy and release lifetime rules in the storage header
+  and persistence documentation. 1A lifecycle ownership and 1B reconstruction
+  reuse are preserved. STNS v1, STNC, consensus and mining/Stratum interfaces
+  are unchanged; no storage redesign or future storage work.
+- Normal Windows Release/x64 solution build succeeded with zero warnings/errors;
+  34 existing build probes passed. Ran only the existing storage test:
+  2,751 checks, zero failures (includes 264 activation checks). No added test
+  infrastructure or broad regression run. No commit or push.
+
 ### Phase 16 Micro-Chunk 1B — reconstruction copy reduction COMPLETE / QUALIFIED — 2026-09-14
 
 - Complete storage-history validation now uses one private evolving owning

@@ -892,7 +892,7 @@ unresolved Phase 16 work.
 
 Additional platform execution qualification has not started. Existing
 portable architecture remains required; Windows Release/x64
-qualification does not constitute Linux, macOS, ARM64 or constrained-ARM
+qualification does not constitute Linux, ARM64 or constrained-ARM
 qualification. This phase is qualification of additional platform
 implementations, not authorization to change consensus-visible behavior.
 

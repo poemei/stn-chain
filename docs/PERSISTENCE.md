@@ -249,3 +249,18 @@ identical; no lifecycle projection is serialized. Repeated load/release,
 all-prefix state equivalence and allocation-failure accounting are qualified
 alongside the existing 1A ownership assertions. Consensus, record eligibility
 and protocol behavior remain unchanged.
+
+## Phase 16 Micro-Chunk 1C — span-table lifetime
+
+The reconstruction/storage view is the sole owner of its allocated block-span
+table. Successful decode/recovery explicitly transfers ownership to the fresh
+output view and clears the local owner. Plain view copies only borrow the table
+and must neither release it nor outlive its owner. Block bytes remain separately
+caller-owned and must stay valid while spans are used.
+
+View release frees the table, clears its pointer/count and releases its lifecycle
+reference. Existing failure paths use that same cleanup. Recovery releases an
+unused table immediately if no block survived validation; nonempty tables remain
+available until the consuming view is released. Lifecycle survivors retain the
+1A sharing/transfer rules, and complete reconstruction retains 1B storage reuse.
+STNS v1, STNC, consensus and mining/Stratum interfaces are unchanged.
