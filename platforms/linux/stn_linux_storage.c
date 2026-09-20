@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. Linux-only adapter. */
 #include "../stn_backend.h"
 #include "stn_linux_storage.h"
