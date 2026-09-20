@@ -100,10 +100,9 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
                                                            recovery-plan boundary
                                                            qualified.
 
-                     16 Storage Evolution **ACTIVE**       Micro-Chunks 1A and 1B
+                     16 Storage Evolution **ACTIVE**       Micro-Chunks 1A through 1C
                                                            COMPLETE / QUALIFIED at
-                                                           checkpoint `249e643`; 1C NOT
-                                                           STARTED.
+                                                           checkpoint `8a1264a`.
 
                      17 Additional        **NOT STARTED**  Additional target-platform
                         Platform                           execution qualification
@@ -137,13 +136,13 @@ Phases 1–15     COMPLETE / QUALIFIED
 Phase 16        ACTIVE
   Micro-Chunk 1A  COMPLETE / QUALIFIED
   Micro-Chunk 1B  COMPLETE / QUALIFIED
-  Micro-Chunk 1C  NOT STARTED
+  Micro-Chunk 1C  COMPLETE / QUALIFIED
 Phase 17        NOT STARTED
 Phase 18        NOT STARTED
 Phase 19        NOT STARTED
 Phase 20        NOT STARTED
 
-Current qualified Phase 16 checkpoint: 249e643
+Current qualified Phase 16 checkpoint: 8a1264a
 ```
 
 ## Phase 9 --- Pending Submissions and Deterministic Block Assembly
@@ -827,7 +826,7 @@ Stratum requalification: NOT REQUIRED.
 
 ## Phase 16 --- Storage Evolution --- ACTIVE
 
-**Current checkpoint: `249e643` (2026-09-14).**
+**Current checkpoint: `8a1264a`.**
 
 Phase 16 is active. Work remains deliberately divided into micro-chunks;
 completion of a micro-chunk does not authorize the remainder of the
@@ -877,16 +876,24 @@ REQUIRED.
 
 Checkpoint containing qualified Micro-Chunks 1A--1B: **`249e643`**.
 
-### Micro-Chunk 1C --- storage reconstruction span ownership --- NOT STARTED
+### Micro-Chunk 1C --- storage reconstruction span ownership --- COMPLETE / QUALIFIED
 
-1C is the next identified micro-boundary but has not started. Its
-authorization, implementation and qualification remain separate from
-1A--1B. No 1C completion, storage-format change or broader Phase 16
-completion is claimed.
+Checkpoint: **8a1264a**.
 
-Phase 16 remains **ACTIVE**. STNS v1 remains the qualified storage
-format. Storage scaling beyond the qualified 1A--1B boundaries remains
-unresolved Phase 16 work.
+Explicit reconstruction span ownership, lifetime and reclamation are
+established. Source ownership is cleared on transfer; release clears
+the table pointer/count. Empty-prefix recovery immediately frees its
+unused table. Failure cleanup and qualified 1A/1B behavior are preserved.
+
+Windows Release/x64: **0 warnings, 0 errors**. All **34 build probes**
+passed. The existing storage test passed **2,751 checks, 0 failures**.
+
+STNS/STNC/consensus/mining/Stratum interfaces are unchanged.
+Stratum requalification: **NOT REQUIRED**.
+
+Phase 16 remains **ACTIVE**, with Micro-Chunks 1A through 1C complete.
+STNS v1 remains the qualified storage format. This records 1C completion
+only and does not define or authorize further Phase 16 implementation.
 
 ## Phase 17 --- Additional Platform Qualification --- NOT STARTED
 

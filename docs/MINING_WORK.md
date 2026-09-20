@@ -662,10 +662,10 @@ The established successful payload is:
 ```text
 32-byte block ID
 8-byte accepted height
-32-byte cumulative-work field in the qualified mining RPC response
+40-byte cumulative-work field in the qualified mining RPC response
 ```
 
-The mining RPC response contract is distinct from the canonical 40-byte cumulative-work representation used by consensus state where applicable.
+The successful STNC v2 solved-work response is exactly 80 bytes and carries the canonical 40-byte unsigned big-endian cumulative-work representation.
 
 Do not infer permission to change the qualified mining response from internal cumulative-work representation changes.
 

@@ -20,9 +20,22 @@ static stn_storage_status validate(const stn_chain_context *c,const stn_block_sp
     if(r.acceptance==STN_ACCEPTANCE_UNRESOLVED)return STN_STORAGE_UNRESOLVED;
     return r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT ? STN_STORAGE_OK : STN_STORAGE_VALIDATION;
 }
+/* Transfer the sole span-table owner and its lifecycle reference into fresh
+ * output storage. The source no longer owns or exposes either allocation. */
+static void view_transfer(stn_storage_view *out,stn_storage_view *source)
+{
+    *out=*source;
+    memset(source,0,sizeof(*source));
+}
+static void view_release_spans(stn_storage_view *view)
+{
+    free(view->blocks);
+    view->blocks=NULL;
+    view->count=0;
+}
 void stn_storage_view_release(stn_storage_view *v)
 {
-    if(v!=NULL){free(v->blocks);stn_chain_state_release(&v->state);memset(v,0,sizeof(*v));}
+    if(v!=NULL){view_release_spans(v);stn_chain_state_release(&v->state);memset(v,0,sizeof(*v));}
 }
 stn_storage_status stn_storage_decode(const stn_chain_context *c,const uint8_t *p,size_t n,stn_storage_view *out)
 {
@@ -48,7 +61,7 @@ stn_storage_status stn_storage_decode(const stn_chain_context *c,const uint8_t *
     s=digest(c,p,offset,hash);if(s!=STN_STORAGE_OK) { goto fail; }
     if(memcmp(hash,p+offset,32)!=0) { s=STN_STORAGE_FORMAT;goto fail; }
     s=validate(c,v.blocks,v.count,&v.state);if(s!=STN_STORAGE_OK) { goto fail; }
-    *out=v;return STN_STORAGE_OK;
+    view_transfer(out,&v);return STN_STORAGE_OK;
 fail:
     stn_storage_view_release(&v);return s;
 }
@@ -207,12 +220,12 @@ static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_s
     stn_storage_view v={0};size_t n=0,count=0,offset=12,i;stn_storage_status s;
     if(c->pow_policy==NULL || stn_chain_initialize(c,&v.state)!=STN_DATA_OK) { return STN_STORAGE_VALIDATION; }
     s=io_status(p->read(p->user,scratch,capacity,&n));
-    if(s==STN_STORAGE_NOT_FOUND) { *out=v;*recovery=1;return STN_STORAGE_OK; }
+    if(s==STN_STORAGE_NOT_FOUND) { view_transfer(out,&v);*recovery=1;return STN_STORAGE_OK; }
     if(s!=STN_STORAGE_OK) { stn_storage_view_release(&v);return s; }
     if(n>capacity) { stn_storage_view_release(&v);return STN_STORAGE_IO; }
     stn_chain_state_release(&v.state);
     s=stn_storage_decode(c,scratch,n,&v);
-    if(s==STN_STORAGE_OK) { *out=v;*recovery=0;return STN_STORAGE_OK; }
+    if(s==STN_STORAGE_OK) { view_transfer(out,&v);*recovery=0;return STN_STORAGE_OK; }
     if(s!=STN_STORAGE_FORMAT && s!=STN_STORAGE_VALIDATION) { return s; }
     if(stn_chain_initialize(c,&v.state)!=STN_DATA_OK)return STN_STORAGE_VALIDATION;
     /* Wrong/unknown framing is not guessed. Do not interpret unsupported versions. */
@@ -238,7 +251,9 @@ static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_s
         if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT) { break; }
         v.blocks[v.count].bytes=scratch+offset;v.blocks[v.count].length=length;++v.count;offset+=length;
     }
-    *out=v;*recovery=1;return STN_STORAGE_OK;
+    /* No accepted spans survive: the unused table has no remaining reader. */
+    if(v.count==0)view_release_spans(&v);
+    view_transfer(out,&v);*recovery=1;return STN_STORAGE_OK;
 }
 stn_storage_status stn_storage_recovery_read(const stn_chain_context *c,const stn_storage_provider *p,
     uint8_t *scratch,size_t capacity,stn_storage_view *out,int *recovery)

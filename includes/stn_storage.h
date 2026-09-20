@@ -31,7 +31,11 @@ typedef struct stn_storage_provider {
  * both the span array and that reference with
  * stn_storage_view_release(); block bytes remain caller-owned. A surviving
  * state must share or move that reference before view release. Successful
- * decode/load/recovery outputs must be fresh (release before reusing). */
+ * decode/load/recovery outputs must be fresh (release before reusing).
+ * The returned view is the sole owner of the span table. Plain view copies
+ * only borrow it: never release them or retain them beyond the owning view.
+ * Consumers may use spans until owner release; block bytes must remain valid
+ * separately. Release clears the owner and is safe to repeat on that owner. */
 typedef struct stn_storage_view {
     stn_block_span *blocks;
     size_t count;
