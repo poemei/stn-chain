@@ -23,6 +23,9 @@ CFLAGS += -Isrc/crypto/ed25519_donna
 CFLAGS += -Iplatforms/linux
 CFLAGS += -pthread
 
+# Linux/POSIX feature exposure is restricted to the Linux platform backend.
+PLATFORM_CFLAGS := -D_GNU_SOURCE
+
 LDLIBS += -lcrypto
 LDLIBS += -pthread
 
@@ -103,6 +106,10 @@ $(TARGET_PATH): $(OBJECTS)
 	$(CC) $(CFLAGS) $(OBJECTS) -o $@ $(LDLIBS)
 	@echo
 	@echo "Built: $(TARGET_PATH)"
+
+$(BUILD_DIR)/platforms/linux/%.o: platforms/linux/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(PLATFORM_CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
