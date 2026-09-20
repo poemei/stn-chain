@@ -68,8 +68,8 @@ CRYPTO_SOURCES := \
 
 PLATFORM_SOURCES := \
 	platforms/linux/stn_sha256.c \
-	platforms/linux/stn_storage_linux.c \
-	platforms/linux/stn_peer_linux.c \
+	platforms/linux/stn_linux_storage.c \
+	platforms/linux/stn_linux_peer.c \
 	platforms/linux/stn_app_linux.c
 
 SOURCES := \
