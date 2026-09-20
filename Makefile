@@ -66,7 +66,6 @@ CORE_SOURCES := \
 	src/stn_validation.c
 
 CRYPTO_SOURCES := \
-	src/crypto/ed25519_donna/ed25519.c \
 	src/crypto/ed25519_donna/ed25519_provider.c
 
 PLATFORM_SOURCES := \
