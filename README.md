@@ -26,8 +26,9 @@ operators is not a Phase 17 completion gate. These observations do not constitut
 qualification of all hardware or final production readiness. See the
 [current roadmap](docs/ROADMAP.md) for scope and historical test evidence.
 
-The old Go prototype is not a compatibility requirement. Contracts and native
-coin economics remain separate later phases.
+Phase 18 Chunk 1 adds the standalone [typed address foundation](docs/ADDRESSES.md).
+Contract execution and native coin economics are not part of this increment.
+The old Go prototype is not a compatibility requirement.
 
 ## Build
 

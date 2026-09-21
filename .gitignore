@@ -10,7 +10,9 @@
 [Rr]elease/
 
 # Test output
-/tests/
+/tests/*
+!/tests/test_address.c
+!/tests/test_record.c
 
 # Visual Studio per-user state and caches
 .vs/

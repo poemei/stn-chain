@@ -5,6 +5,24 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 18 Chunk 1 - native address foundation - 2026-09-21
+
+- Added portable ISO C17 typed address derivation, full encode/decode/validation,
+  32-byte identifier access and display-only abbreviation for stn0_, stnc0_ and
+  stnw0_. Derivation hashes exact canonical input using existing SHA-256.
+- Windows Release/x64: 5,057 focused checks, zero failures; normal solution build
+  passed with zero warnings/errors and all 34 platform/boundary probes passed.
+  Fixed vectors cover abc, abd, empty and explicit-NUL input in all namespaces,
+  malformed input, exact round trips, capacity and unchanged failure outputs.
+- Added existing Visual Studio project and Linux Makefile integration, including
+  make test-address. Exempted the address test and existing test entry source
+  from the broad tests-directory ignore rule so the test integration is retained.
+- Corrected a stale platform-probe expectation for the existing Linux x64 backend.
+  Simulated platform selection is not Linux runtime qualification. Linux execution
+  parity and ARM qualification remain unclaimed; no broad runtime regression run.
+- Existing consensus, identity, authority, mining, storage and STNC code paths
+  are unchanged. No contract state machine, wallet or economics implemented.
+
 ### Phase 17 Operations closeout — 2026-09-21
 
 - Recorded Phase 17 COMPLETE / QUALIFIED for demonstrated Linux operation,

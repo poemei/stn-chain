@@ -46,6 +46,7 @@ endif
 
 CORE_SOURCES := \
 	src/main.c \
+	src/stn_address.c \
 	src/stn_authority.c \
 	src/stn_block.c \
 	src/stn_chain.c \
@@ -142,3 +143,12 @@ install-service: install
 clean:
 	rm -rf $(BUILD_DIR)
 	@echo "Build files removed."
+
+# Same fixed address vectors as the Visual Studio test suite.
+.PHONY: test-address
+test-address: $(BUILD_DIR)/test-address
+	$(BUILD_DIR)/test-address
+
+$(BUILD_DIR)/test-address: tests/test_address.c src/stn_address.c platforms/linux/stn_sha256.c includes/stn_address.h includes/stn_sha256.h includes/stn_transaction.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_ADDRESS_TEST_MAIN tests/test_address.c src/stn_address.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)

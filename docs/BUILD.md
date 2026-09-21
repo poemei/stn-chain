@@ -1,5 +1,18 @@
 # Visual Studio Build
 
+## Phase 18 address foundation
+
+Build the existing solution in Release/x64, then run
+`build\x64\Release\stn-chain-tests.exe --address` for the focused vectors.
+The normal C test entry point includes the same address checks. On Linux,
+`make test-address` builds and runs those vectors with the existing Linux SHA-256
+provider; `make` includes the component in the node. No new test project or
+cryptographic dependency is required. See [ADDRESSES.md](ADDRESSES.md).
+
+Windows qualification: 5,057 address checks and 34 platform/boundary probes,
+zero failures; normal Release/x64 build zero warnings/errors. Linux execution
+for this component has not been performed on the editing host.
+
 ## Phase 9 test-only runtime
 
 The normal Release/x64 build excludes scripted providers. For the authorized

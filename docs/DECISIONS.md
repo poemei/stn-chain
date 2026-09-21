@@ -2,6 +2,20 @@
 
 Status: initial register. Open choices are not implementation defaults.
 
+## Phase 18 Chunk 1 - native address foundation (2026-09-21)
+
+Operations authorizes `stn0_` for identity/person, `stnc0_` for contracts and
+`stnw0_` for the wallet namespace only. Derivation uses SHA-256 of the exact
+canonical source byte span, with no added domain, prefix or implicit NUL.
+Type is carried by the prefix; future entity source schemas remain separate.
+Full text contains exactly 64 lowercase hex digits. Abbreviation is prefix,
+five dots and the last six digits, and is not an authoritative address.
+
+Addresses confer no ownership or authority and contain no executable behavior.
+No VM, arbitrary code, economics or existing protocol/consensus change is added.
+The portable implementation uses existing SHA-256 providers. See
+[address format and API](ADDRESSES.md) for exact spans and fixed vectors.
+
 ## Established direction
 
 | ID | Direction | Basis |

@@ -111,7 +111,7 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
 														   Additional hardware/backend qualification
 														   may continue independently.
 
-                     18 Contract Engine   **NOT STARTED**  Locked deterministic
+                     18 Contract Engine   **ACTIVE**       Locked deterministic
                                                            addressed-agreement engine
                                                            remains future work; no VM,
                                                            EVM, arbitrary bytecode,
@@ -139,7 +139,7 @@ Phase 16        COMPLETE (Operations status, 2026-09-21)
   Micro-Chunk 1B  COMPLETE / QUALIFIED
   Micro-Chunk 1C  COMPLETE / QUALIFIED
 Phase 17        COMPLETE / QUALIFIED (Operations closeout, 2026-09-21)
-Phase 18        NOT STARTED
+Phase 18        ACTIVE
 Phase 19        NOT STARTED
 Phase 20        NOT STARTED
 
@@ -922,11 +922,19 @@ will be recorded when operators provide them; their absence does not block
 development, reopen Phase 17, or postpone its completion. Untested hardware is
 not represented as tested or qualified. Phase 20 retains its separate scope.
 
-## Phase 18 --- Contract Engine --- NOT STARTED
+## Phase 18 --- Contract Engine --- ACTIVE
 
-The deterministic contract engine has not started. The established
-design remains addressed agreements with deterministic participants,
-fields, authority, sequence, signatures and state transitions.
+Chunk 1 (Address Foundation) is implemented: portable typed identity (`stn0_`),
+contract (`stnc0_`) and wallet-namespace (`stnw0_`) derivation, full text codec,
+structural validation, 32-byte identifier access and display-only abbreviation.
+Windows Release/x64 passes 5,057 focused checks and 34 platform/boundary probes.
+The same vectors are wired into the Linux Makefile; Linux execution parity has
+not yet been exercised for this component. See [Addresses](ADDRESSES.md).
+
+Contract state machines and contract storage have not started. The established
+design remains addressed agreements with deterministic participants, fields,
+authority, sequence, signatures and state transitions. Wallet behavior and all
+economics remain Phase 19. This component does not change existing Chain behavior.
 
 No VM, EVM, arbitrary bytecode, arbitrary scripts or gas is authorized.
 

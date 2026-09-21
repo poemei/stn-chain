@@ -20,7 +20,7 @@ for($os=0;$os -lt 3;$os++) {
     for($arch=0;$arch -lt 4;$arch++) {
         $definitions=@($systems[$os])+@($architectures[$arch])
         Invoke-Probe "detect-$os-$arch" $definitions $null
-        $expected=if($os -eq 1){'STN_BACKEND_LINUX_NOT_IMPLEMENTED'}elseif($os -eq 2){'STN_BACKEND_MACOS_NOT_IMPLEMENTED'}elseif($arch -ne 1){'STN_BACKEND_WINDOWS_ARCH_NOT_QUALIFIED'}else{$null}
+        $expected=if($os -eq 1 -and $arch -ne 1){'STN_BACKEND_LINUX_ARCH_NOT_IMPLEMENTED'}elseif($os -eq 2){'STN_BACKEND_MACOS_NOT_IMPLEMENTED'}elseif($os -eq 0 -and $arch -ne 1){'STN_BACKEND_WINDOWS_ARCH_NOT_QUALIFIED'}else{$null}
         Invoke-Probe "backend-$os-$arch" ($definitions+@('/DSTN_PROBE_BACKEND')) $expected
     }
 }
