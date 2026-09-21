@@ -1,7 +1,7 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_lifecycle.h"
 #include "stn_wire_internal.h"
-#include "stn_intelligence.h"
+#include "stn_sentinel_intelligence.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -59,7 +59,7 @@ stn_lifecycle_result stn_lifecycle_check_publication(const stn_lifecycle_state *
     const stn_hash_provider *provider)
 {
     stn_record record;
-    stn_intelligence payload;
+    stn_sentinel_intelligence payload;
     uint8_t action[32], context[32], record_id[32], replay_id[64];
     uint8_t evidence[STN_AUTHORITY_EVIDENCE_SIZE], grant_id[32];
     uint8_t *statement;
@@ -68,7 +68,7 @@ stn_lifecycle_result stn_lifecycle_check_publication(const stn_lifecycle_state *
     stn_identity_result signature;
     if (s==NULL || bytes==NULL) return STN_LIFECYCLE_ARGUMENT;
     if (stn_record_decode(bytes,length,&record)!=STN_RECORD_OK ||
-        stn_intelligence_decode(record.payload,record.payload_length,&payload)!=STN_INTELLIGENCE_OK)
+        stn_sentinel_intelligence_decode(record.payload,record.payload_length,&payload)!=STN_SENTINEL_INTELLIGENCE_OK)
         return STN_LIFECYCLE_MALFORMED;
     if (stn_record_publication_tokens(bytes,length,provider,action,context)!=STN_DATA_OK ||
         stn_record_id(bytes,length,provider,record_id)!=STN_DATA_OK) return STN_LIFECYCLE_PROVIDER;

@@ -33,7 +33,7 @@ stn_validation_report stn_validate_intelligence_record(const uint8_t *bytes,
 {
     stn_validation_report r = {0};
     stn_record record;
-    stn_intelligence intelligence;
+    stn_sentinel_intelligence intelligence;
     r.acceptance = STN_ACCEPTANCE_ERROR;
     if (bytes == NULL || context == NULL) {
         return r;
@@ -42,8 +42,8 @@ stn_validation_report stn_validate_intelligence_record(const uint8_t *bytes,
     r.structure = r.envelope_error == STN_RECORD_OK ? STN_STAGE_PASS : STN_STAGE_REJECT;
     if (r.structure != STN_STAGE_PASS) { return stopped(r, r.structure); }
 
-    r.payload_error = stn_intelligence_decode(record.payload, record.payload_length, &intelligence);
-    r.payload = r.payload_error == STN_INTELLIGENCE_OK ? STN_STAGE_PASS : STN_STAGE_REJECT;
+    r.payload_error = stn_sentinel_intelligence_decode(record.payload, record.payload_length, &intelligence);
+    r.payload = r.payload_error == STN_SENTINEL_INTELLIGENCE_OK ? STN_STAGE_PASS : STN_STAGE_REJECT;
     if (r.payload != STN_STAGE_PASS) { return stopped(r, r.payload); }
 
     r.network = memcmp(record.network_id, context->expected_network, 32) == 0 ?

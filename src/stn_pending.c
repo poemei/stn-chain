@@ -137,7 +137,7 @@ static stn_pending_result disposition(const stn_validation_report *r)
     if(r->acceptance==STN_ACCEPTANCE_ERROR){return STN_PENDING_PROVIDER;}
     if(r->acceptance==STN_ACCEPTANCE_UNDER_CONTEXT){return STN_PENDING_ACCEPTED;}
     if(r->envelope_error==STN_RECORD_UNSUPPORTED){return STN_PENDING_UNSUPPORTED;}
-    if(r->payload_error==STN_INTELLIGENCE_VERSION_ERROR){return STN_PENDING_UNSUPPORTED;}
+    if(r->payload_error==STN_SENTINEL_INTELLIGENCE_VERSION_ERROR){return STN_PENDING_UNSUPPORTED;}
     if(r->network==STN_STAGE_REJECT){return STN_PENDING_NETWORK;}
     if(r->time==STN_STAGE_REJECT){return STN_PENDING_TIME;}
     if(r->signature==STN_STAGE_REJECT){return STN_PENDING_SIGNATURE;}

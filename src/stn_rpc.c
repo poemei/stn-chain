@@ -2,7 +2,7 @@
 #include "stn_rpc.h"
 #include "stn_wire_internal.h"
 #include "stn_sha256.h"
-#include "stn_intelligence.h"
+#include "stn_sentinel_intelligence.h"
 #include "stn_address.h"
 #include <string.h>
 
@@ -58,7 +58,7 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
 {
     switch(method){
     case STN_RPC_GET_FIRST_ACCEPTED_RECORD:case STN_RPC_GET_NEXT_ACCEPTED_RECORD:{
-        stn_transaction tx;stn_record record;stn_intelligence payload;stn_chain_cursor cursor;
+        stn_transaction tx;stn_record record;stn_sentinel_intelligence payload;stn_chain_cursor cursor;
         stn_hash_provider hash={stn_sha256,NULL};uint8_t id[32];
         if(n<125 || n-125>STN_TX_MAX_SIZE || stn_wire_read(p+121,4)!=n-125)return 0;
         if(stn_chain_cursor_decode(p+76,45,&cursor)!=STN_CURSOR_VALID ||
@@ -66,18 +66,18 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
             cursor.transaction_position!=stn_wire_read(p+72,4))return 0;
         return stn_transaction_decode(p+125,n-125,&tx)==STN_DATA_OK && tx.type==STN_TX_PUBLICATION &&
             stn_record_decode(tx.record_bytes,tx.record_length,&record)==STN_RECORD_OK &&
-            stn_intelligence_decode(record.payload,record.payload_length,&payload)==STN_INTELLIGENCE_OK &&
+            stn_sentinel_intelligence_decode(record.payload,record.payload_length,&payload)==STN_SENTINEL_INTELLIGENCE_OK &&
             stn_record_id(tx.record_bytes,tx.record_length,&hash,id)==STN_DATA_OK && memcmp(id,p,32)==0;
     }
 
     case STN_RPC_GET_ACCEPTED_RECORD:{
-        stn_transaction tx;stn_record record;stn_intelligence payload;uint8_t id[32];
+        stn_transaction tx;stn_record record;stn_sentinel_intelligence payload;uint8_t id[32];
         stn_hash_provider hash={stn_sha256,NULL};
         if(n<STN_RPC_ACCEPTED_RECORD_PREFIX || n-STN_RPC_ACCEPTED_RECORD_PREFIX>STN_TX_MAX_SIZE ||
             stn_wire_read(p+72,4)!=n-STN_RPC_ACCEPTED_RECORD_PREFIX)return 0;
         return stn_transaction_decode(p+76,n-76,&tx)==STN_DATA_OK && tx.type==STN_TX_PUBLICATION &&
             stn_record_decode(tx.record_bytes,tx.record_length,&record)==STN_RECORD_OK &&
-            stn_intelligence_decode(record.payload,record.payload_length,&payload)==STN_INTELLIGENCE_OK &&
+            stn_sentinel_intelligence_decode(record.payload,record.payload_length,&payload)==STN_SENTINEL_INTELLIGENCE_OK &&
             stn_record_id(tx.record_bytes,tx.record_length,&hash,id)==STN_DATA_OK && memcmp(id,p,32)==0;
     }
 

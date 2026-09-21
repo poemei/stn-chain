@@ -3,7 +3,7 @@
 #define STN_VALIDATION_H
 
 #include "stn_record.h"
-#include "stn_intelligence.h"
+#include "stn_sentinel_intelligence.h"
 
 typedef enum stn_stage_status {
     STN_STAGE_NOT_RUN = 0,
@@ -31,7 +31,7 @@ typedef stn_stage_status (*stn_signature_hook)(void *user,
     const uint8_t *unsigned_bytes, size_t unsigned_length,
     const uint8_t public_key[32], const uint8_t signature[64]);
 typedef stn_stage_status (*stn_authority_hook)(void *user,
-    const stn_record *record, const stn_intelligence *intelligence);
+    const stn_record *record, const stn_sentinel_intelligence *intelligence);
 typedef stn_stage_status (*stn_replay_hook)(void *user,
     const stn_record *record);
 
@@ -63,7 +63,7 @@ typedef struct stn_validation_report {
     stn_stage_status replay;
     stn_acceptance acceptance;
     stn_record_status envelope_error;
-    stn_intelligence_status payload_error;
+    stn_sentinel_intelligence_status payload_error;
 } stn_validation_report;
 
 /* Stages stop at the first failure/unresolved/error. Later stages are NOT_RUN.
