@@ -134,6 +134,7 @@ This classification is not authentication. No remote policy is configured.
 | 0x0002 BLOCK_HEIGHT | READ | height u64 | Canonical full block or NOT_FOUND |
 | 0x0003 BLOCK_ID | READ | ID 32 | Bounded scan by calculated block ID or NOT_FOUND |
 | 0x0004 GET_ACCEPTED_RECORD | READ | Production record ID, exactly 32 bytes | Earliest eligible accepted publication and canonical block location, or NOT_FOUND |
+| 0x0009 DERIVE_ADDRESS | READ | Address type u16, source length u32, exact source bytes | Canonical 69-byte `stn0_` identity address; identity type only |
 | 0x1000 CHECK_INTELLIGENCE | READ | Whole STNR record, 180..65,716 bytes | 20-byte existing validation report; no admission |
 | 0x1001 SUBMIT_INTELLIGENCE | SUBMISSION | Whole STNR record | Preserved legacy record-admission/report path in the configured pending service; snapshot-only adapter cannot admit |
 | 0x1002 INTELLIGENCE_ID | READ | Identifier 32 | UNAVAILABLE; standalone record ID/index is not implemented |
@@ -150,6 +151,59 @@ SUBMIT_WORK requires the nested block length to match the remaining payload
 and the current canonical block size bounds. Template identity and nonce mutation are defined in [MINING_WORK.md](MINING_WORK.md).
 Reserved methods never return successful empty placeholders. Production identity
 providers and administrative actions remain unimplemented.
+
+## Canonical identity-address derivation
+
+`DERIVE_ADDRESS = 0x0009` is a READ operation using the existing STNC version 2
+frame. It exposes the Phase 18 native address foundation through the supported
+application-to-node boundary; it does not create a separate HTTP/JSON protocol
+and does not give the caller consensus or authority.
+
+The request payload is:
+
+| Offset | Bytes | Value |
+| --- | --- | --- |
+| 0 | 2 | Address type, unsigned big-endian |
+| 2 | 4 | Exact source length, unsigned big-endian |
+| 6 | source length | Exact source bytes |
+
+The complete request body is therefore exactly `6 + source length` bytes.
+The declared source length must equal the remaining payload. The current
+operation accepts only `STN_ADDRESS_IDENTITY`; other address types are invalid
+for this RPC operation even though the native address foundation also defines
+contract and wallet namespaces.
+
+No source transformation is performed by RPC. The supplied byte span is passed
+unchanged to `stn_address_derive()`. RPC does not trim whitespace, alter case,
+add a namespace/domain/salt, append an implicit NUL, convert spaces, or perform
+an application-side hash. The existing Chain address implementation owns the
+derivation and canonical text encoding.
+
+On success, Chain calls the existing address derivation and encoder and returns
+exactly 69 payload bytes:
+
+```text
+stn0_<64 lowercase hexadecimal characters>
+```
+
+The address encoder's terminating NUL is local C string storage and is not part
+of the STNC payload. Successful responses are checked against the existing
+canonical address decoder and must decode as `STN_ADDRESS_IDENTITY`.
+
+Malformed request shape or a non-identity address type uses INVALID. Insufficient
+response capacity uses CAPACITY. Internal address/provider failure uses PROVIDER.
+Unknown methods retain METHOD. All such error responses remain empty under the
+existing STNC error contract.
+
+Address derivation is handled before accepted-history snapshot reconstruction.
+It reads no Chain persistence, pending pool or mining template and performs no
+accepted-state mutation. Determinism comes from the existing address foundation;
+the RPC operation merely transports exact source bytes to Chain and returns the
+canonical Chain-produced identity address.
+
+This operation does not establish ownership, authentication, signature authority,
+wallet state, balance, contract state or economic rights. Contract-address and
+wallet-namespace generation are not exposed by this method.
 
 ## Canonical pending submission
 

@@ -5,6 +5,35 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+
+### Phase 18 Chunk 1 - STNC identity address derivation - 2026-09-21
+
+- Added STNC v2 `DERIVE_ADDRESS = 0x0009` as a READ-only application-to-Chain
+  operation for canonical identity-address derivation.
+- The request carries address type `u16`, exact source length `u32`, and the exact
+  source bytes. The current RPC operation accepts only `STN_ADDRESS_IDENTITY`;
+  contract and wallet namespace generation are not exposed by this interface.
+- Chain performs derivation and canonical text encoding through the existing
+  `stn_address_derive()` and `stn_address_encode()` address foundation. Successful
+  responses contain exactly 69 wire bytes: `stn0_` followed by 64 lowercase
+  hexadecimal characters. The encoder's terminating NUL is not transmitted.
+- The RPC boundary does not trim, case-fold, salt, prefix, append a NUL to, or
+  otherwise canonicalize the supplied source. Address derivation remains a Chain
+  operation rather than an application-side reimplementation.
+- Address derivation is handled before accepted-history snapshot reconstruction;
+  it does not require or mutate Chain history, pending state, mining state,
+  consensus state or persistence.
+- Existing STNC framing, version 2, capability policy and global payload bound are
+  unchanged. Malformed requests use existing INVALID semantics; unsupported
+  methods, insufficient capacity and internal/provider failures retain the
+  existing METHOD, CAPACITY and PROVIDER result categories.
+- This entry records implementation only. No new STNC address-path qualification
+  results are claimed here. Existing Phase 18 Chunk 1 Windows/Linux address
+  foundation qualification remains unchanged.
+- No contract state machine, contract storage, wallet behavior, economics, VM,
+  EVM, arbitrary bytecode, scripts or gas was introduced.
+
+
 ### Phase 18 Chunk 1 - Linux qualification closeout - 2026-09-21
 
 - Operations confirmed successful Linux build/update and supplied two address
