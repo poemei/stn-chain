@@ -74,6 +74,10 @@ includes the address checks. Linux: `make test-address` compiles the same fixed
 vectors against the existing OpenSSL SHA-256 backend; `make` includes the component
 in the node. Neither command requires a running Chain or stored history.
 
-Windows results are recorded in CHANGELOG. Linux execution was not available on
-the editing host; cross-platform execution parity is not claimed until that run
-occurs. ARM qualification remains deferred. No additional phase behavior is added.
+Chunk 1 is COMPLETE / QUALIFIED on Windows and Linux. Windows Release/x64 passed
+5,057 checks with zero failures. On 2026-09-21, Operations supplied Linux output
+from `make test-address` and a subsequent `./test-address` run: each passed 5,057
+checks with zero failures. Both platforms passed the same fixed expected vectors,
+establishing address derivation and codec parity for the tested inputs. Linux
+evidence is Operations-supplied, not execution on the Windows editing host.
+ARM qualification remains deferred. No additional phase behavior is added.

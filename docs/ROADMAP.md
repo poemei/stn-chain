@@ -924,12 +924,15 @@ not represented as tested or qualified. Phase 20 retains its separate scope.
 
 ## Phase 18 --- Contract Engine --- ACTIVE
 
-Chunk 1 (Address Foundation) is implemented: portable typed identity (`stn0_`),
+Chunk 1 (Address Foundation) is COMPLETE / QUALIFIED on Windows and Linux:
+portable typed identity (`stn0_`),
 contract (`stnc0_`) and wallet-namespace (`stnw0_`) derivation, full text codec,
 structural validation, 32-byte identifier access and display-only abbreviation.
 Windows Release/x64 passes 5,057 focused checks and 34 platform/boundary probes.
-The same vectors are wired into the Linux Makefile; Linux execution parity has
-not yet been exercised for this component. See [Addresses](ADDRESSES.md).
+Operations supplied Linux qualification on 2026-09-21: `make test-address` and a
+subsequent `./test-address` run each passed 5,057 checks with zero failures. Both
+platforms pass the same fixed vectors. ARM remains untested; Phase 18 as a whole
+remains ACTIVE. See [Addresses](ADDRESSES.md).
 
 Contract state machines and contract storage have not started. The established
 design remains addressed agreements with deterministic participants, fields,

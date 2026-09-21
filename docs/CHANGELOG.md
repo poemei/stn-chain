@@ -5,6 +5,16 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 18 Chunk 1 - Linux qualification closeout - 2026-09-21
+
+- Operations confirmed successful Linux build/update and supplied two address
+  test runs: make test-address and ./test-address, each 5,057 checks, zero failures.
+- Together with the recorded Windows results, identical fixed vectors now pass
+  on both platforms. Chunk 1 is COMPLETE / QUALIFIED; Phase 18 remains ACTIVE.
+- Updated address specification, build instructions and roadmap. Linux evidence
+  is Operations-supplied. ARM remains untested; no new runtime tests were run for
+  this documentation-only update.
+
 ### Phase 18 Chunk 1 - native address foundation - 2026-09-21
 
 - Added portable ISO C17 typed address derivation, full encode/decode/validation,

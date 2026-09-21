@@ -10,8 +10,11 @@ provider; `make` includes the component in the node. No new test project or
 cryptographic dependency is required. See [ADDRESSES.md](ADDRESSES.md).
 
 Windows qualification: 5,057 address checks and 34 platform/boundary probes,
-zero failures; normal Release/x64 build zero warnings/errors. Linux execution
-for this component has not been performed on the editing host.
+zero failures; normal Release/x64 build zero warnings/errors. Operations confirmed
+a successful Linux build/update and supplied `make test-address` output on
+2026-09-21: 5,057 checks, zero failures. A subsequent `./test-address` run repeated
+that result. The same expected vectors pass on both platforms. This is supplied
+Linux execution evidence, not a local Linux run by the editing agent.
 
 ## Phase 9 test-only runtime
 
