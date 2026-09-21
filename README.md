@@ -10,17 +10,21 @@ outcomes across local and remote systems.
 
 ## Project status
 
-The historical Go prototype has been removed. This repository currently
-contains design documentation, an ISO C17 Visual Studio scaffold, and a tested
-structural record encoder/decoder, intelligence payload codec, and explicit
-validation context, deterministic transaction/block containers, and local
-chain-state/link validation, Windows SHA-256, and development PoW verification
-with cumulative chain-work accounting, validated fork/reorganization planning,
-bounded Windows persistence with atomic chain application, and a bounded P2P
-exchange with validated synchronization and explicit recovery, plus a bounded
-RPC core, deterministic mining templates, atomic solved-work acceptance, and a runnable Windows development node with loopback RPC. There is no miner, contract runtime, or coin.
-The redesign has no compatibility requirement
-with the old Go implementation.
+The current ISO C17 Chain implements canonical records and blocks, identity and
+authority validation, PoW and cumulative work, fork/reorganization handling,
+STNS persistence, P2P synchronization, STNC RPC, pending submissions and mining
+work. Windows and Linux runtime implementations are present.
+
+As reported by Operations on 2026-09-21, Phase 16 (Storage Records) is complete
+and Phase 17 (Additional Platform Qualification) is active. stn-chain.org displays
+Chain API data, and Chain, Stratum and CPU miners are operating together.
+Empty-block mining and work delivery are reported resolved. GPU, USB-ASIC and
+ASIC platforms remain untested. These deployment observations do not constitute
+qualification of all hardware or final production readiness. See the
+[current roadmap](docs/ROADMAP.md) for scope and historical test evidence.
+
+The old Go prototype is not a compatibility requirement. Contracts and native
+coin economics remain separate later phases.
 
 ## Build
 
@@ -36,15 +40,16 @@ Planned OS/architecture boundaries are listed in [platforms](platforms/README.md
 ## Run for local stratumd integration
 
 After building Release | x64, double-click [run-dev.cmd](run-dev.cmd). The node
-listens on 127.0.0.1:18473 using binary STNC RPC v1. This explicit development
+listens on 127.0.0.1:18473 using binary STNC RPC v2. This explicit development
 fixture supplies mining work and accepts valid solutions to multiple concurrent
 loopback clients; it is not Stratum or Bitcoin JSON-RPC. See [running and mining work](docs/MINING_WORK.md) for
 configuration, client protocol, persistence, and limits.
 
 The runtime/history increment verifies real mining and restart beyond height 64,
 concurrent long-lived RPC sessions, and paged P2P/recovery through 130 blocks.
-Whole-snapshot storage and explicitly configured development transactions remain;
-streaming persistence and authenticated pending admission are not implemented.
+Whole-snapshot STNS storage remains. Pending admission and empty-block mining
+are implemented; streaming persistence is not claimed. The --dev launcher remains
+a development fixture, separate from normal deployed operation.
 
 ## Direction
 

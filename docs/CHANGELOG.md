@@ -5,6 +5,56 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Operations / Codex reconciliation and Linux qualification — 2026-09-21
+
+- Reconciled Codex/Operations status with the current source and runtime state.
+  Phase 16 Storage Evolution is COMPLETE / QUALIFIED: Micro-Chunks 1A through
+  1C are COMPLETE / QUALIFIED at checkpoint `8a1264a`, with no additional
+  Storage Evolution micro-chunk currently defined.
+- Advanced Phase 17 Additional Platform Qualification to ACTIVE. Linux x64 now
+  builds and runs the Chain as an operating node rather than a compile-only
+  target. Cross-platform testing is underway; this entry does not claim final
+  Linux qualification or qualification of additional architectures.
+- Corrected Linux startup/bootstrap behavior found during platform testing.
+  Existing history can resume through normal startup, first-run genesis behavior
+  works, and the Linux Chain runs as a persistent service without requiring the
+  former development-only startup path.
+- Corrected the idle-chain mining-work deadlock exposed during Linux testing.
+  Canonical zero-transaction / zero-body blocks are supported so an otherwise
+  idle Chain can continue producing deterministic mining work without inventing
+  application transactions. Mining-template/STNC framing and Stratum-side work
+  handling were reconciled with header-only candidate blocks.
+- Verified the live Chain -> STNC -> STN-Stratum work path on Linux. Stratum
+  connects to the Chain, receives canonical mining work and continues polling
+  the live service. CPU mining is operational; GPU, USB-ASIC and dedicated ASIC
+  qualification remain unclaimed.
+- Verified active Chain advancement on the Linux node. During live integration
+  testing the node reported height 711 with 712 stored blocks, a current tip,
+  cumulative work and current target, with state validated under current local
+  rules.
+- Changed the Linux STNC listener from loopback-only to all IPv4 interfaces for
+  the authorized remote application boundary. External TCP reachability to the
+  Chain service was verified independently before application integration.
+- Connected the stn-chain.org ChAoS MVC Explorer to the live Linux Chain through
+  the defined STNC application interface. The Explorer successfully reports
+  network ID, genesis ID, height, tip block ID, cumulative work, current target,
+  stored block count and validation status; it does not read STNS persistence or
+  reproduce Chain consensus.
+- Isolated GreenGeeks outbound-port restrictions during website integration.
+  Direct outbound connections to STN service ports were refused while standard
+  web ports were permitted. A VPS ingress compatibility mapping was proven with
+  TCP port 80 forwarding to Chain STNC port 18473; the Explorer then connected
+  successfully. TCP port 443 was separately proven reachable for the Stratum API
+  path, while TLS-vs-plain-HTTP handling remains an application transport concern.
+- Preserved the architecture boundary throughout reconciliation: Chain remains
+  authoritative for canonical state, validation and mining work; STNC exposes
+  Chain state to applications; STN-Stratum consumes Chain mining work; ChAoS MVC
+  displays authoritative state rather than reimplementing consensus.
+- This entry records work and runtime evidence performed on 2026-09-21 together
+  with the Codex/Operations reconciliation. Historical Phase 16 1A-1C evidence
+  and test counts are unchanged. No benchmark, GPU/USB-ASIC/ASIC qualification,
+  final Linux qualification, or additional-platform completion is claimed.
+
 ### Linux unattended startup
 
 - Removed mandatory Linux --dev/--genesis selection. Resume and fully revalidate

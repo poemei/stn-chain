@@ -100,15 +100,15 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
                                                            recovery-plan boundary
                                                            qualified.
 
-                     16 Storage Evolution **ACTIVE**       Micro-Chunks 1A through 1C
+                     16 Storage Records   **COMPLETE**       Micro-Chunks 1A through 1C
                                                            COMPLETE / QUALIFIED at
                                                            checkpoint `8a1264a`.
 
-                     17 Additional        **NOT STARTED**  Additional target-platform
-                        Platform                           execution qualification
-                        Qualification                      remains future work; no
-                                                           rewrite of consensus
-                                                           behavior authorized.
+                     17 Additional        **ACTIVE**       Linux operation, Chain API
+                        Platform                           integration and CPU mining
+                        Qualification                      reported working; GPU,
+                                                           USB-ASIC and ASIC testing
+                                                           remains outstanding.
 
                      18 Contract Engine   **NOT STARTED**  Locked deterministic
                                                            addressed-agreement engine
@@ -133,16 +133,17 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
 
 ``` text
 Phases 1–15     COMPLETE / QUALIFIED
-Phase 16        ACTIVE
+Phase 16        COMPLETE (Operations status, 2026-09-21)
   Micro-Chunk 1A  COMPLETE / QUALIFIED
   Micro-Chunk 1B  COMPLETE / QUALIFIED
   Micro-Chunk 1C  COMPLETE / QUALIFIED
-Phase 17        NOT STARTED
+Phase 17        ACTIVE
 Phase 18        NOT STARTED
 Phase 19        NOT STARTED
 Phase 20        NOT STARTED
 
-Current qualified Phase 16 checkpoint: 8a1264a
+Historical qualified Phase 16 1C checkpoint: 8a1264a
+Current source reviewed: a278c33
 ```
 
 ## Phase 9 --- Pending Submissions and Deterministic Block Assembly
@@ -824,13 +825,14 @@ unavailable; mandatory detached-history persistence was not introduced.
 Frame version and mining interfaces are unchanged. Stratum impact: NONE.
 Stratum requalification: NOT REQUIRED.
 
-## Phase 16 --- Storage Evolution --- ACTIVE
+## Phase 16 --- Storage Records / Storage Evolution --- COMPLETE
 
-**Current checkpoint: `8a1264a`.**
+**Historical qualified micro-chunk checkpoint: `8a1264a`.**
 
-Phase 16 is active. Work remains deliberately divided into micro-chunks;
-completion of a micro-chunk does not authorize the remainder of the
-phase.
+Operations reports the Storage Records scope complete and development advanced
+into Phase 17 (2026-09-21). The existing 1A-1C qualification evidence below is
+preserved; this status update does not invent additional test results or claim
+STNS v2, streaming, indexing, pruning or another storage redesign.
 
 ### Micro-Chunk 1A --- reconstructed lifecycle snapshot ownership and reclamation --- COMPLETE / QUALIFIED (2026-09-14)
 
@@ -891,17 +893,25 @@ passed. The existing storage test passed **2,751 checks, 0 failures**.
 STNS/STNC/consensus/mining/Stratum interfaces are unchanged.
 Stratum requalification: **NOT REQUIRED**.
 
-Phase 16 remains **ACTIVE**, with Micro-Chunks 1A through 1C complete.
-STNS v1 remains the qualified storage format. This records 1C completion
-only and does not define or authorize further Phase 16 implementation.
+Phase 16 is **COMPLETE** for the Storage Records scope reported by Operations.
+Micro-Chunks 1A through 1C retain their recorded qualification. STNS v1 remains
+the storage format; future storage redesign is not implied by this closeout.
 
-## Phase 17 --- Additional Platform Qualification --- NOT STARTED
+## Phase 17 --- Additional Platform Qualification --- ACTIVE
 
-Additional platform execution qualification has not started. Existing
-portable architecture remains required; Windows Release/x64
-qualification does not constitute Linux, ARM64 or constrained-ARM
-qualification. This phase is qualification of additional platform
-implementations, not authorization to change consensus-visible behavior.
+Operations reports the following deployment results on 2026-09-21:
+
+- Linux Chain operation is underway; Chain builds blocks and supplies mining work.
+- stn-chain.org displays Chain data through the Chain API.
+- Miners and Stratum work together; current mining uses CPU hardware.
+- The empty-block/work-delivery issue is resolved after the recent Chain fixes.
+- GPU, USB-ASIC and ASIC platform execution has not yet been tested.
+
+These are Operations-reported results, not newly executed agent qualification.
+No hardware benchmark, hashrate, additional platform pass count, or Phase 20
+production qualification is inferred. ARM and other unreported targets retain
+no new qualification claim. Existing Windows evidence remains scoped to its
+recorded checkpoints. Phase 17 is not marked complete.
 
 ## Phase 18 --- Contract Engine --- NOT STARTED
 
