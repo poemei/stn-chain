@@ -117,8 +117,24 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
         offset+=4+n;
     }
 
-    if(stn_chain_required_target(s->chain,&v->state,required_target)!=STN_DATA_OK){
-        return STN_RPC_UNAVAILABLE;
+    {
+        stn_data_status target_status=stn_chain_required_target(
+            s->chain,
+            &v->state,
+            required_target);
+
+        if(target_status!=STN_DATA_OK){
+            if(target_status==STN_DATA_UNRESOLVED){
+                return STN_RPC_UNAVAILABLE;
+            }
+            if(target_status==STN_DATA_CAPACITY || target_status==STN_DATA_OVERFLOW){
+                return STN_RPC_CAPACITY;
+            }
+            if(target_status==STN_DATA_PROVIDER_ERROR || target_status==STN_DATA_ARGUMENT){
+                return STN_RPC_PROVIDER;
+            }
+            return STN_RPC_REJECTED;
+        }
     }
 
     if(stn_target_work(required_target,&increment)!=STN_DATA_OK ||
