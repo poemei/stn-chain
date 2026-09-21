@@ -2,6 +2,7 @@
 #include "stn_node_service.h"
 #include "stn_fork.h"
 #include "stn_wire_internal.h"
+#include "stn_address.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -24,6 +25,51 @@ static stn_rpc_code handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t
     const stn_node_service *s=user;stn_rpc_code code;size_t index;
     if(written!=NULL){*written=0;}
     if(s==NULL || q==NULL || p==NULL || written==NULL){return STN_RPC_PROVIDER;}
+
+    if(q->method==STN_RPC_DERIVE_ADDRESS){
+        stn_address address;
+        stn_data_status status;
+        size_t source_length;
+        size_t encoded=0;
+        char text[STN_ADDRESS_TEXT_CAPACITY];
+
+        if(q->payload==NULL || q->length<6){return STN_RPC_INVALID;}
+        if(stn_wire_read(q->payload,2)!=STN_ADDRESS_IDENTITY){return STN_RPC_INVALID;}
+
+        source_length=(size_t)stn_wire_read(q->payload+2,4);
+        if(source_length!=q->length-6){return STN_RPC_INVALID;}
+
+        status=stn_address_derive(
+            STN_ADDRESS_IDENTITY,
+            q->payload+6,
+            source_length,
+            &address);
+
+        if(status!=STN_DATA_OK){
+            return status==STN_DATA_CAPACITY || status==STN_DATA_LENGTH
+                ? STN_RPC_CAPACITY
+                : STN_RPC_PROVIDER;
+        }
+
+        status=stn_address_encode(
+            &address,
+            text,
+            sizeof(text),
+            &encoded);
+
+        if(status!=STN_DATA_OK || encoded!=69){
+            return status==STN_DATA_CAPACITY
+                ? STN_RPC_CAPACITY
+                : STN_RPC_PROVIDER;
+        }
+
+        if(cap<encoded){return STN_RPC_CAPACITY;}
+
+        memcpy(p,text,encoded);
+        *written=encoded;
+        return STN_RPC_OK;
+    }
+
     if(q->method==STN_RPC_PENDING || q->method==STN_RPC_ADMIN_CONTROL || q->method==STN_RPC_INTELLIGENCE_ID ||
         q->method==STN_RPC_INTELLIGENCE_CURSOR || q->method==STN_RPC_MINING_TEMPLATE){return STN_RPC_UNAVAILABLE;}
     if(q->method==STN_RPC_CHECK_INTELLIGENCE || q->method==STN_RPC_SUBMIT_INTELLIGENCE){

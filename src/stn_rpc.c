@@ -3,6 +3,7 @@
 #include "stn_wire_internal.h"
 #include "stn_sha256.h"
 #include "stn_intelligence.h"
+#include "stn_address.h"
 #include <string.h>
 
 stn_rpc_code stn_rpc_payload_length(const uint8_t *p,size_t n,size_t *payload_length)
@@ -19,6 +20,7 @@ static uint32_t capability(uint16_t method)
     switch(method){
     case STN_RPC_GET_CURSOR_REORG_STATUS:case STN_RPC_GET_CONSUMER_RECOVERY_PLAN:
     case STN_RPC_GET_FIRST_ACCEPTED_RECORD:case STN_RPC_GET_NEXT_ACCEPTED_RECORD:
+    case STN_RPC_DERIVE_ADDRESS:
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:case STN_RPC_GET_ACCEPTED_RECORD:
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_INTELLIGENCE_CURSOR:
     case STN_RPC_MINING_CONTEXT:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_MINING_TEMPLATE:return STN_RPC_READ;
@@ -34,6 +36,10 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
     case STN_RPC_GET_FIRST_ACCEPTED_RECORD:return n==0;
     case STN_RPC_GET_CURSOR_REORG_STATUS:case STN_RPC_GET_CONSUMER_RECOVERY_PLAN:
     case STN_RPC_GET_NEXT_ACCEPTED_RECORD:return n==45;
+    case STN_RPC_DERIVE_ADDRESS:
+        return n>=6 &&
+            stn_wire_read(p,2)==STN_ADDRESS_IDENTITY &&
+            stn_wire_read(p+2,4)==n-6;
     case STN_RPC_SUBMIT_TRANSACTION:return n<=STN_TX_MAX_SIZE;
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_MINING_CONTEXT:case STN_RPC_MINING_TEMPLATE:case STN_RPC_ADMIN_CONTROL:return n==0;
     case STN_RPC_BLOCK_HEIGHT:return n==8;
@@ -73,6 +79,13 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
             stn_record_decode(tx.record_bytes,tx.record_length,&record)==STN_RECORD_OK &&
             stn_intelligence_decode(record.payload,record.payload_length,&payload)==STN_INTELLIGENCE_OK &&
             stn_record_id(tx.record_bytes,tx.record_length,&hash,id)==STN_DATA_OK && memcmp(id,p,32)==0;
+    }
+
+    case STN_RPC_DERIVE_ADDRESS:{
+        stn_address address;
+        return n==69 &&
+            stn_address_decode((const char *)p,n,&address)==STN_DATA_OK &&
+            address.type==STN_ADDRESS_IDENTITY;
     }
 
     case STN_RPC_SUBMIT_TRANSACTION:
