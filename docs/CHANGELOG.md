@@ -5,6 +5,18 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 17 Operations closeout — 2026-09-21
+
+- Recorded Phase 17 COMPLETE / QUALIFIED for demonstrated Linux operation,
+  third-party Chain API interoperability, authoritative public Explorer data,
+  Linux Stratum miner connections/work delivery and CPU mining.
+- GPU, USB-ASIC and ASIC testing remains external follow-up, to be recorded when
+  it occurs. Missing external participation does not block development or Phase
+  17 completion; no untested hardware qualification is claimed.
+- Reconciled README and remaining roadmap status sections with Operations'
+  existing roadmap closeout. Preserved historical evidence and later phase scope.
+  Documentation only; no new builds or runtime tests performed.
+
 ### Operations / Codex reconciliation and Linux qualification — 2026-09-21
 
 - Reconciled Codex/Operations status with the current source and runtime state.

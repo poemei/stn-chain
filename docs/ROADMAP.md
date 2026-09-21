@@ -104,11 +104,12 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
                                                            COMPLETE / QUALIFIED at
                                                            checkpoint `8a1264a`.
 
-                     17 Additional        **ACTIVE**       Linux operation, Chain API
-                        Platform                           integration and CPU mining
-                        Qualification                      reported working; GPU,
-                                                           USB-ASIC and ASIC testing
-                                                           remains outstanding.
+                     17  Additional      **COMPLETE**     Linux x64 operational qualification
+						Platform          QUALIFIED        established: Chain operation, STNC/
+						Qualification                      Chain API integration, Stratum work
+														   delivery and CPU mining demonstrated.
+														   Additional hardware/backend qualification
+														   may continue independently.
 
                      18 Contract Engine   **NOT STARTED**  Locked deterministic
                                                            addressed-agreement engine
@@ -137,7 +138,7 @@ Phase 16        COMPLETE (Operations status, 2026-09-21)
   Micro-Chunk 1A  COMPLETE / QUALIFIED
   Micro-Chunk 1B  COMPLETE / QUALIFIED
   Micro-Chunk 1C  COMPLETE / QUALIFIED
-Phase 17        ACTIVE
+Phase 17        COMPLETE / QUALIFIED (Operations closeout, 2026-09-21)
 Phase 18        NOT STARTED
 Phase 19        NOT STARTED
 Phase 20        NOT STARTED
@@ -897,13 +898,15 @@ Phase 16 is **COMPLETE** for the Storage Records scope reported by Operations.
 Micro-Chunks 1A through 1C retain their recorded qualification. STNS v1 remains
 the storage format; future storage redesign is not implied by this closeout.
 
-## Phase 17 --- Additional Platform Qualification --- ACTIVE
+## Phase 17 --- Additional Platform Qualification --- COMPLETE / QUALIFIED
 
 Operations reports the following deployment results on 2026-09-21:
 
 - Linux Chain operation is underway; Chain builds blocks and supplies mining work.
-- stn-chain.org displays Chain data through the Chain API.
-- Miners and Stratum work together; current mining uses CPU hardware.
+- Third-party external applications have demonstrated Chain API interoperability.
+  Authoritative Chain data is publicly displayed on the stn-chain.org explorer.
+- Linux Stratum operates as the miner endpoint. Miners connect and receive work;
+  current operational mining uses CPU hardware.
 - The empty-block/work-delivery issue is resolved after the recent Chain fixes.
 - GPU, USB-ASIC and ASIC platform execution has not yet been tested.
 
@@ -911,7 +914,13 @@ These are Operations-reported results, not newly executed agent qualification.
 No hardware benchmark, hashrate, additional platform pass count, or Phase 20
 production qualification is inferred. ARM and other unreported targets retain
 no new qualification claim. Existing Windows evidence remains scoped to its
-recorded checkpoints. Phase 17 is not marked complete.
+recorded checkpoints. Operations has closed Phase 17 as COMPLETE / QUALIFIED
+for the demonstrated operational scope.
+
+GPU, USB-ASIC and ASIC participation/testing is external follow-up work. Results
+will be recorded when operators provide them; their absence does not block
+development, reopen Phase 17, or postpone its completion. Untested hardware is
+not represented as tested or qualified. Phase 20 retains its separate scope.
 
 ## Phase 18 --- Contract Engine --- NOT STARTED
 

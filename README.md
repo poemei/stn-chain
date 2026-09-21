@@ -16,10 +16,13 @@ STNS persistence, P2P synchronization, STNC RPC, pending submissions and mining
 work. Windows and Linux runtime implementations are present.
 
 As reported by Operations on 2026-09-21, Phase 16 (Storage Records) is complete
-and Phase 17 (Additional Platform Qualification) is active. stn-chain.org displays
-Chain API data, and Chain, Stratum and CPU miners are operating together.
+and Phase 17 (Additional Platform Qualification) is complete for the demonstrated
+operational scope. Third-party applications work with the Chain API, with
+authoritative Chain data publicly displayed on the stn-chain.org explorer.
+Linux Stratum serves as the miner endpoint, and CPU miners connect and mine.
 Empty-block mining and work delivery are reported resolved. GPU, USB-ASIC and
-ASIC platforms remain untested. These deployment observations do not constitute
+ASIC platforms remain untested external follow-up work; participation from those
+operators is not a Phase 17 completion gate. These observations do not constitute
 qualification of all hardware or final production readiness. See the
 [current roadmap](docs/ROADMAP.md) for scope and historical test evidence.
 
