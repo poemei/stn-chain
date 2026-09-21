@@ -258,7 +258,9 @@ stn_data_status stn_chain_required_target(const stn_chain_context *context,
     if(prior->has_tip && prior->height==UINT64_MAX) { return STN_DATA_OVERFLOW; }
     height=prior->has_tip ? prior->height+1 : 0;
     count=prior->target_history_count;
-    if(count!=(prior->has_tip ? (size_t)(prior->height%60)+1 : 0)) { return STN_DATA_UNRESOLVED; }
+    if(count!=(prior->has_tip ? (size_t)(prior->height%60)+1 : 0)) {
+        return STN_DATA_CONTENT;
+    }
     for(i=0;i<count;++i) {
         const stn_block_header *h=&prior->target_history[i];
         if(h->height!=height-(uint64_t)count+(uint64_t)i || h->version!=3 ||
