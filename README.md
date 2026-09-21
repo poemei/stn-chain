@@ -24,6 +24,10 @@ with the old Go implementation.
 
 ## Build
 
+For unattended Linux startup and boot/reboot service installation, see
+[Linux startup](platforms/linux/README.md). Saved history resumes; missing
+history initializes the existing built-in genesis.
+
 Open [stn-chain.sln](stn-chain.sln) in Visual Studio 2026 and build
 Release | x64. Headers are in includes/ and C sources in src/.
 See [Visual Studio build instructions](docs/BUILD.md).

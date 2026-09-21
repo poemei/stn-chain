@@ -1,0 +1,20 @@
+[Unit]
+Description=STN Chain node
+After=network.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=stn-chain
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/stn-chain
+ExecStart=@BINDIR@/stn-chain --data /var/lib/stn-chain/chain.stns
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=90s
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

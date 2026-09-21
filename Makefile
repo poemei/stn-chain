@@ -81,7 +81,7 @@ SOURCES := \
 
 OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SOURCES))
 
-.PHONY: all configure clean install uninstall info
+.PHONY: all configure clean install install-service uninstall info
 
 all: configure $(TARGET_PATH)
 
@@ -131,6 +131,13 @@ uninstall:
 	@echo "Data and logs preserved:"
 	@echo "  $(DATADIR)"
 	@echo "  $(LOGDIR)"
+
+# Enable/start is deliberately separate from staging files under DESTDIR.
+install-service: install
+	install -d $(DESTDIR)/etc/systemd/system
+	sed 's|@BINDIR@|$(BINDIR)|g' platforms/linux/stn-chain.service.in > $(BUILD_DIR)/stn-chain.service
+	install -m 0644 $(BUILD_DIR)/stn-chain.service $(DESTDIR)/etc/systemd/system/stn-chain.service
+	@echo "Service installed. Run: systemctl daemon-reload && systemctl enable --now stn-chain"
 
 clean:
 	rm -rf $(BUILD_DIR)

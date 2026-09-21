@@ -7,12 +7,14 @@
 #include "../../src/stn_wire_internal.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -155,6 +157,37 @@ static void development_genesis(uint8_t *bytes)
     memcpy(bytes + 88, commitment, 32);
     memset(bytes + 120, 255, 32);
     bytes[120] = 127;
+}
+
+/* Recover the local anchor only; normal storage load still validates the full
+ * checksum, genesis, PoW and history before the node starts serving. */
+static int history_genesis(const char *path, uint8_t *bytes, size_t *length)
+{
+    uint8_t header[16];
+    struct stat info;
+    FILE *file;
+    int fd = open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
+    size_t size;
+    int ok;
+    if(fd < 0) { return errno == ENOENT ? 0 : -1; }
+    if(fstat(fd, &info) != 0 || !S_ISREG(info.st_mode)) {
+        close(fd); return -1;
+    }
+    file = fdopen(fd, "rb");
+    if(file == NULL) { close(fd); return -1; }
+    if(fread(header, 1, sizeof(header), file) != sizeof(header) ||
+       memcmp(header, "STNS\0\1\0\0", 8) != 0 ||
+       stn_wire_read(header + 8, 4) == 0) {
+        fclose(file); return -1;
+    }
+    size = (size_t)stn_wire_read(header + 12, 4);
+    ok = size >= STN_BLOCK_HEADER_SIZE + STN_BLOCK_MIN_BODY &&
+        size <= STN_BLOCK_MAX_SIZE;
+    if(ok) { ok = fread(bytes, 1, size, file) == size && !ferror(file); }
+    if(fclose(file) != 0) { ok = 0; }
+    if(!ok) { return -1; }
+    *length = size;
+    return 1;
 }
 
 static stn_peer_status transfer(
@@ -572,6 +605,8 @@ int stn_linux_app(int argc, char **argv)
     int i;
     int result = EXIT_FAILURE;
     int lock_ready = 0;
+    int instance_lock = -1;
+    char *instance_path = NULL;
 
     unsigned long port = 18473;
     char *end;
@@ -619,7 +654,10 @@ int stn_linux_app(int argc, char **argv)
     stopping = 0;
 
     for(i = 1; i < argc; ++i) {
-        if(strcmp(argv[i], "--dev") == 0) {
+        if(strcmp(argv[i], "--help") == 0) {
+            result = EXIT_SUCCESS;
+            goto usage;
+        } else if(strcmp(argv[i], "--dev") == 0) {
             dev = 1;
         } else if(strcmp(argv[i], "--peer") == 0 &&
                   i + 1 < argc) {
@@ -658,9 +696,7 @@ int stn_linux_app(int argc, char **argv)
     if((dev &&
         ((genesis_path == NULL) !=
          (transaction_path == NULL))) ||
-       (!dev &&
-        (genesis_path == NULL ||
-         transaction_path != NULL))) {
+       (!dev && transaction_path != NULL)) {
         goto usage;
     }
 
@@ -679,12 +715,39 @@ int stn_linux_app(int argc, char **argv)
         goto cleanup;
     }
 
-    if(dev && genesis_path == NULL) {
-        development_genesis(genesis);
-        genesis_length = 364;
+    /* One node owns this history for its entire lifetime, including bootstrap. */
+    if(strlen(data) > SIZE_MAX - sizeof(".node.lock")) { goto cleanup; }
+    instance_path = malloc(strlen(data) + sizeof(".node.lock"));
+    if(instance_path == NULL) { goto cleanup; }
+    strcpy(instance_path, data);
+    strcat(instance_path, ".node.lock");
+    instance_lock = open(instance_path, O_CREAT | O_RDWR | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0600);
+    if(instance_lock < 0 || flock(instance_lock, LOCK_EX | LOCK_NB) != 0) {
+        fprintf(stderr, "Cannot own data path: directory unavailable or node already running.\n");
+        goto cleanup;
+    }
 
-        memcpy(body, genesis + 168, 196);
-        transaction_length = 192;
+    {
+        struct stat info;
+        if(fstat(instance_lock, &info) != 0 || !S_ISREG(info.st_mode)) {
+            fprintf(stderr, "Node ownership lock is not a regular file.\n");
+            goto cleanup;
+        }
+    }
+    if(genesis_path == NULL) {
+        int existing = dev ? 0 : history_genesis(data, genesis, &genesis_length);
+        if(existing < 0) {
+            fprintf(stderr, "Cannot read existing history genesis; history was not replaced.\n");
+            goto cleanup;
+        }
+        if(existing == 0) {
+            development_genesis(genesis);
+            genesis_length = 364;
+        }
+        if(dev) {
+            memcpy(body, genesis + 168, 196);
+            transaction_length = 192;
+        }
     } else {
         if(!read_file(
                genesis_path,
@@ -880,7 +943,7 @@ int stn_linux_app(int argc, char **argv)
     lock_ready = 1;
 
     printf(
-        "STN Chain development node; RPC 127.0.0.1:%u; height %llu\n",
+        "STN Chain node; RPC 127.0.0.1:%u; height %llu\n",
         (unsigned)bound,
         (unsigned long long)mining.active.height);
 
@@ -891,7 +954,7 @@ int stn_linux_app(int argc, char **argv)
     }
 
     puts(
-        "RPC v1 binary STNC; concurrent loopback clients limited only by "
+        "RPC v2 binary STNC; concurrent loopback clients limited only by "
         "host resources; read + solved-work submission. Ctrl+C stops.");
 
     fflush(stdout);
@@ -1091,12 +1154,16 @@ cleanup:
     free(mining.workspace.current_bytes);
     free(mining.workspace.next_bytes);
     free(mining.template_bytes);
+    if(instance_lock >= 0) { close(instance_lock); }
+    free(instance_path);
 
     return result;
 
 usage:
     puts(
-        "Usage: stn-chain --dev [--data PATH] [--rpc-port 18473]\n"
+        "Usage: stn-chain [--data PATH] [--rpc-port 18473]\n"
+        "Resume saved history or initialize the built-in genesis if absent.\n"
+        "Optional --dev enables the repeated development transaction.\n"
         "   or: stn-chain --genesis BLOCK --data PATH [--rpc-port PORT]\n"
         "Explicit selected content: --dev --genesis BLOCK "
         "--transaction STNT.\n"
@@ -1105,7 +1172,5 @@ usage:
         "Loopback RPC only. --once serves one connection. "
         "Port 0 chooses a free port.");
 
-    return argc == 1
-        ? EXIT_SUCCESS
-        : EXIT_FAILURE;
+    return result;
 }

@@ -5,6 +5,18 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Linux unattended startup
+
+- Removed mandatory Linux --dev/--genesis selection. Resume and fully revalidate
+  saved history using its genesis; initialize the existing built-in genesis only
+  when history is absent. Explicit genesis pinning and --dev behavior remain.
+- Invalid history fails without replacement. Added lifetime same-path node
+  exclusion. No consensus, STNS/STNC or production authority changes.
+- Added systemd service and install-service target for persistent state, boot
+  startup, failure restart and SIGTERM shutdown; documented deployment.
+- Added focused Linux startup checks. Linux build/runtime/systemd qualification
+  is unavailable on this Windows host and is not claimed.
+
 ### Phase 16 Micro-Chunk 1C — storage span ownership — 2026-09-19
 
 - Made the existing view's sole span-table ownership explicit. Successful
