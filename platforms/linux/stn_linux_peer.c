@@ -332,7 +332,7 @@ stn_peer_status stn_linux_peer_listen(
     }
 
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
     address.sin_port = htons(port);
 
     if(bind(

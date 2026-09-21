@@ -926,7 +926,7 @@ int stn_linux_app(int argc, char **argv)
            &bound) != STN_PEER_OK) {
         fprintf(
             stderr,
-            "Cannot bind loopback RPC port.\n");
+            "Cannot bind RPC port.\n");
         goto cleanup;
     }
 
@@ -943,7 +943,7 @@ int stn_linux_app(int argc, char **argv)
     lock_ready = 1;
 
     printf(
-        "STN Chain node; RPC 127.0.0.1:%u; height %llu\n",
+        "STN Chain node; RPC 0.0.0.0:%u; height %llu\n",
         (unsigned)bound,
         (unsigned long long)mining.active.height);
 
@@ -954,7 +954,7 @@ int stn_linux_app(int argc, char **argv)
     }
 
     puts(
-        "RPC v2 binary STNC; concurrent loopback clients limited only by "
+        "RPC v2 binary STNC; concurrent clients limited only by "
         "host resources; read + solved-work submission. Ctrl+C stops.");
 
     fflush(stdout);
@@ -1169,7 +1169,7 @@ usage:
         "--transaction STNT.\n"
         "Repeat --peer IPv4:PORT for automatic outbound P2P "
         "(not with --once).\n"
-        "Loopback RPC only. --once serves one connection. "
+        "RPC listens on all IPv4 interfaces. --once serves one connection. "
         "Port 0 chooses a free port.");
 
     return result;
