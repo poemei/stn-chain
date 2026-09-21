@@ -52,7 +52,7 @@ CORE_SOURCES := \
 	src/stn_chain.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
-	src/stn_intelligence.c \
+	src/stn_sentinel_intelligence.c \
 	src/stn_lifecycle.c \
 	src/stn_mining.c \
 	src/stn_node_service.c \
