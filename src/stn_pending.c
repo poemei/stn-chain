@@ -5,20 +5,24 @@
 #include "stn_wire_internal.h"
 #include <stdlib.h>
 #include <string.h>
+
 void stn_pending_init(stn_pending *p)
 {
     if(p!=NULL){memset(p,0,sizeof(*p));}
 }
+
 size_t stn_pending_count(const stn_pending *p)
 {
     return p!=NULL ? p->count : 0;
 }
+
 static size_t find_id(const stn_pending *p,const uint8_t id[32])
 {
     size_t at=0;
     while(at<p->count && memcmp(p->entries[at].id,id,32)<0){++at;}
     return at;
 }
+
 stn_pending_result stn_pending_insert(stn_pending *p,const uint8_t *bytes,
     size_t length,const stn_hash_provider *hash,uint8_t id[32])
 {
@@ -42,6 +46,7 @@ stn_pending_result stn_pending_insert(stn_pending *p,const uint8_t *bytes,
     p->entries[at]=entry;++p->count;p->bytes+=length;
     memcpy(id,entry.id,32);return STN_PENDING_ACCEPTED;
 }
+
 stn_pending_result stn_pending_lookup(const stn_pending *p,const uint8_t id[32],
     uint8_t *output,size_t capacity,size_t *written)
 {
@@ -54,6 +59,7 @@ stn_pending_result stn_pending_lookup(const stn_pending *p,const uint8_t id[32],
     memcpy(output,p->entries[at].transaction,p->entries[at].length);
     *written=p->entries[at].length;return STN_PENDING_ACCEPTED;
 }
+
 stn_pending_result stn_pending_remove(stn_pending *p,const uint8_t id[32])
 {
     size_t at;
@@ -65,6 +71,7 @@ stn_pending_result stn_pending_remove(stn_pending *p,const uint8_t id[32])
     --p->count;memset(p->entries+p->count,0,sizeof(p->entries[0]));
     return STN_PENDING_ACCEPTED;
 }
+
 stn_pending_result stn_pending_enumerate(const stn_pending *p,size_t start,
     uint8_t (*ids)[32],size_t capacity,size_t *written)
 {
@@ -75,13 +82,16 @@ stn_pending_result stn_pending_enumerate(const stn_pending *p,size_t start,
     for(i=0;i<n;++i){memcpy(ids[i],p->entries[start+i].id,32);}
     *written=n;return STN_PENDING_ACCEPTED;
 }
+
 void stn_pending_clear(stn_pending *p)
 {
     size_t i;if(p==NULL){return;}
     for(i=0;i<p->count;++i){free(p->entries[i].transaction);}memset(p,0,sizeof(*p));
 }
+
 static int same_nonce(const stn_pending_entry *e,const uint8_t signer[32],const uint8_t nonce[32])
 {return memcmp(e->signer,signer,32)==0 && memcmp(e->nonce,nonce,32)==0;}
+
 static stn_data_status scan(const stn_pending *p,const stn_storage_view *v,uint8_t *mask,int replay,const stn_hash_provider *hash)
 {
     size_t i,j,k,offset;stn_block b;stn_transaction tx;stn_record r;uint8_t id[32],signer[32],nonce[32],statement[256];size_t written;int lifecycle;
@@ -103,12 +113,14 @@ static stn_data_status scan(const stn_pending *p,const stn_storage_view *v,uint8
     }
     return STN_DATA_OK;
 }
+
 stn_data_status stn_pending_inclusions(const stn_pending *p,const stn_storage_view *v,const stn_hash_provider *hash,uint8_t remove[STN_PENDING_MAX_ENTRIES])
 {
     uint8_t mask[STN_PENDING_MAX_ENTRIES];stn_data_status s;
     if(remove==NULL){return STN_DATA_ARGUMENT;}
     s=scan(p,v,mask,0,hash);if(s==STN_DATA_OK){memcpy(remove,mask,sizeof(mask));}return s;
 }
+
 void stn_pending_prune(stn_pending *p,const uint8_t remove[STN_PENDING_MAX_ENTRIES])
 {
     size_t i,n=0;
@@ -118,6 +130,7 @@ void stn_pending_prune(stn_pending *p,const uint8_t remove[STN_PENDING_MAX_ENTRI
     }
     memset(p->entries+n,0,(p->count-n)*sizeof(p->entries[0]));p->count=n;
 }
+
 static stn_pending_result disposition(const stn_validation_report *r)
 {
     if(r->acceptance==STN_ACCEPTANCE_UNRESOLVED){return STN_PENDING_UNAVAILABLE;}
@@ -132,11 +145,13 @@ static stn_pending_result disposition(const stn_validation_report *r)
     if(r->replay==STN_STAGE_REJECT){return STN_PENDING_REPLAY;}
     return STN_PENDING_INVALID;
 }
+
 static int production_next(const stn_storage_view *active)
 {
     return active!=NULL && active->state.publication_activation_height!=0 &&
         (active->state.height==UINT64_MAX || active->state.height+1>=active->state.publication_activation_height);
 }
+
 stn_pending_result stn_pending_admit(stn_pending *p,const uint8_t *record,size_t length,
     const stn_validation_context *c,const stn_storage_view *active,const stn_hash_provider *hash,
     stn_validation_report *report,uint8_t id[32])
@@ -174,6 +189,7 @@ stn_pending_result stn_pending_admit(stn_pending *p,const uint8_t *record,size_t
     if(mask[0]){return STN_PENDING_REPLAY;}
     return stn_pending_insert(p,encoded,n,hash,id);
 }
+
 stn_pending_result stn_pending_admit_transaction(stn_pending *p,const uint8_t *bytes,
     size_t length,const stn_validation_context *c,const stn_storage_view *active,
     const stn_hash_provider *hash,stn_validation_report *report,uint8_t id[32])
@@ -203,38 +219,107 @@ stn_pending_result stn_pending_admit_transaction(stn_pending *p,const uint8_t *b
     }
     return stn_pending_admit(p,tx.record_bytes,tx.record_length,c,active,hash,report,id);
 }
+
 stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_context *c,const stn_storage_view *active,
     uint8_t *body,size_t capacity,size_t *written,uint32_t *count)
 {
     uint8_t replay[STN_PENDING_MAX_ENTRIES],ids[STN_PENDING_MAX_ENTRIES][32];
     stn_transaction_span selected[STN_BLOCK_MAX_TRANSACTIONS];uint32_t n=0;size_t i,total=0,available;
-    if(written!=NULL){*written=0;}if(count!=NULL){*count=0;}
-    if(p==NULL || body==NULL || written==NULL || count==NULL){return STN_DATA_ARGUMENT;}
+
+    if(written!=NULL){*written=0;}
+    if(count!=NULL){*count=0;}
+
+    if(p==NULL || body==NULL || written==NULL || count==NULL){
+        return STN_DATA_ARGUMENT;
+    }
+
+    /*
+     * The canonical candidate for an empty pending set is an empty
+     * transaction body. No validation context is required because there
+     * are no transactions to validate.
+     */
+    if(p->count==0){
+        return STN_DATA_OK;
+    }
+
     if(!production_next(active)) {
         if(c==NULL){return STN_DATA_UNRESOLVED;}
         if(active==NULL || memcmp(c->expected_network,active->state.network_id,32)!=0){return STN_DATA_UNRESOLVED;}
     }
+
     if(scan(p,active,replay,1,NULL)!=STN_DATA_OK){return STN_DATA_CONTENT;}
-    if(stn_pending_enumerate(p,0,ids,STN_PENDING_MAX_ENTRIES,&available)!=STN_PENDING_ACCEPTED){return STN_DATA_CONTENT;}
+
+    if(stn_pending_enumerate(p,0,ids,STN_PENDING_MAX_ENTRIES,&available)!=STN_PENDING_ACCEPTED){
+        return STN_DATA_CONTENT;
+    }
+
     for(i=0;i<available && n<STN_BLOCK_MAX_TRANSACTIONS;++i){
         size_t at=find_id(p,ids[i]);
         const stn_pending_entry *e=&p->entries[at];stn_transaction tx;stn_validation_report r;
+
         if(replay[at]){continue;}
-        if(stn_transaction_decode(e->transaction,e->length,&tx)!=STN_DATA_OK){return STN_DATA_CONTENT;}
+
+        if(stn_transaction_decode(e->transaction,e->length,&tx)!=STN_DATA_OK){
+            return STN_DATA_CONTENT;
+        }
+
         if(tx.type==STN_TX_PUBLICATION && production_next(active)){
             stn_hash_provider hash={stn_sha256,NULL};stn_record record;
             stn_lifecycle_result checked=stn_lifecycle_check_publication(active->state.lifecycle,tx.record_bytes,tx.record_length,&hash);
-            if(checked==STN_LIFECYCLE_PROVIDER || checked==STN_LIFECYCLE_CAPACITY){return STN_DATA_PROVIDER_ERROR;}
-            if(checked!=STN_LIFECYCLE_OK){continue;}
+
+            if(checked==STN_LIFECYCLE_PROVIDER || checked==STN_LIFECYCLE_CAPACITY){
+                return STN_DATA_PROVIDER_ERROR;
+            }
+
+            if(checked!=STN_LIFECYCLE_OK){
+                continue;
+            }
+
             if(stn_record_decode(tx.record_bytes,tx.record_length,&record)!=STN_RECORD_OK ||
-               memcmp(record.network_id,active->state.network_id,32)!=0){continue;}
+               memcmp(record.network_id,active->state.network_id,32)!=0){
+                continue;
+            }
         }
-        if(tx.type==STN_TX_PUBLICATION && !production_next(active)){r=stn_validate_intelligence_record(tx.record_bytes,tx.record_length,c);if(r.acceptance==STN_ACCEPTANCE_ERROR){return STN_DATA_PROVIDER_ERROR;}if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){continue;}}
-        if(e->length+4>STN_BLOCK_MAX_BODY-total){break;}
+
+        if(tx.type==STN_TX_PUBLICATION && !production_next(active)){
+            r=stn_validate_intelligence_record(tx.record_bytes,tx.record_length,c);
+
+            if(r.acceptance==STN_ACCEPTANCE_ERROR){
+                return STN_DATA_PROVIDER_ERROR;
+            }
+
+            if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){
+                continue;
+            }
+        }
+
+        if(e->length+4>STN_BLOCK_MAX_BODY-total){
+            break;
+        }
+
         /* A caller capacity failure must not silently change the chosen block. */
-        if(e->length+4>capacity-total){return STN_DATA_CAPACITY;}
-        selected[n].bytes=e->transaction;selected[n].length=(uint32_t)e->length;++n;total+=4+e->length;
+        if(e->length+4>capacity-total){
+            return STN_DATA_CAPACITY;
+        }
+
+        selected[n].bytes=e->transaction;
+        selected[n].length=(uint32_t)e->length;
+        ++n;
+        total+=4+e->length;
     }
-    if(n==0){return STN_DATA_UNRESOLVED;}
-    {stn_data_status s=stn_block_body_encode(selected,n,body,capacity,written);if(s==STN_DATA_OK){*count=n;}return s;}
+
+    /*
+     * A pending set may contain entries which are no longer eligible for
+     * the next block. If none survive deterministic selection, the
+     * resulting candidate is the same canonical empty transaction body.
+     */
+    if(n==0){
+        return STN_DATA_OK;
+    }
+
+    {
+        stn_data_status s=stn_block_body_encode(selected,n,body,capacity,written);
+        if(s==STN_DATA_OK){*count=n;}
+        return s;
+    }
 }

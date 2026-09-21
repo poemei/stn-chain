@@ -4,6 +4,7 @@
 #include "stn_sha256.h"
 #include "stn_intelligence.h"
 #include <string.h>
+
 stn_rpc_code stn_rpc_payload_length(const uint8_t *p,size_t n,size_t *payload_length)
 {
     size_t declared;
@@ -12,6 +13,7 @@ stn_rpc_code stn_rpc_payload_length(const uint8_t *p,size_t n,size_t *payload_le
     if(declared>STN_RPC_MAX_PAYLOAD){return STN_RPC_CAPACITY;}
     *payload_length=declared;return STN_RPC_OK;
 }
+
 static uint32_t capability(uint16_t method)
 {
     switch(method){
@@ -25,6 +27,7 @@ static uint32_t capability(uint16_t method)
     default:return 0;
     }
 }
+
 static int shape(uint16_t method,const uint8_t *p,size_t n)
 {
     switch(method){
@@ -37,10 +40,14 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
     case STN_RPC_BLOCK_ID:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_GET_ACCEPTED_RECORD:return n==32;
     case STN_RPC_INTELLIGENCE_CURSOR:return n==40;
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_SUBMIT_INTELLIGENCE:return n>=STN_RECORD_OVERHEAD && n<=STN_RECORD_MAX_SIZE;
-    case STN_RPC_SUBMIT_WORK:return n>=68+STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY && n<=68+STN_BLOCK_MAX_SIZE && stn_wire_read(p+64,4)==n-68;
+    case STN_RPC_SUBMIT_WORK:
+        return n>=68+STN_BLOCK_HEADER_SIZE &&
+            n<=68+STN_BLOCK_MAX_SIZE &&
+            stn_wire_read(p+64,4)==n-68;
     default:return 1;
     }
 }
+
 static int response_shape(uint16_t method,const uint8_t *p,size_t n)
 {
     switch(method){
@@ -55,7 +62,9 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
             stn_record_decode(tx.record_bytes,tx.record_length,&record)==STN_RECORD_OK &&
             stn_intelligence_decode(record.payload,record.payload_length,&payload)==STN_INTELLIGENCE_OK &&
             stn_record_id(tx.record_bytes,tx.record_length,&hash,id)==STN_DATA_OK && memcmp(id,p,32)==0;
-    }    case STN_RPC_GET_ACCEPTED_RECORD:{
+    }
+
+    case STN_RPC_GET_ACCEPTED_RECORD:{
         stn_transaction tx;stn_record record;stn_intelligence payload;uint8_t id[32];
         stn_hash_provider hash={stn_sha256,NULL};
         if(n<STN_RPC_ACCEPTED_RECORD_PREFIX || n-STN_RPC_ACCEPTED_RECORD_PREFIX>STN_TX_MAX_SIZE ||
@@ -65,21 +74,61 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
             stn_intelligence_decode(record.payload,record.payload_length,&payload)==STN_INTELLIGENCE_OK &&
             stn_record_id(tx.record_bytes,tx.record_length,&hash,id)==STN_DATA_OK && memcmp(id,p,32)==0;
     }
-    case STN_RPC_SUBMIT_TRANSACTION:return n==36 && stn_wire_read(p,2)==1 && stn_wire_read(p+2,2)<=8;
-    case STN_RPC_MINING_TEMPLATE:return shape(STN_RPC_SUBMIT_WORK,p,n);
-    case STN_RPC_SUBMIT_WORK:return n==80;
-    case STN_RPC_SUBMIT_INTELLIGENCE:return n==56 && stn_wire_read(p,2)==1 && stn_wire_read(p+2,2)<=STN_PENDING_UNSUPPORTED;
-    case STN_RPC_PENDING:return n==16 &&
-        stn_wire_read(p,4)<=(uint64_t)STN_PENDING_MAX_ENTRIES &&
-        stn_wire_read(p+4,4)==STN_PENDING_MAX_ENTRIES && stn_wire_read(p+8,4)<=STN_PENDING_MAX_BYTES &&
-        stn_wire_read(p+n-4,4)==STN_PENDING_MAX_BYTES;
-    case STN_RPC_INFO:return n==184;
-    case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:return n>=STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY && n<=STN_BLOCK_MAX_SIZE;
-    case STN_RPC_CHECK_INTELLIGENCE:return n==20;
-    case STN_RPC_MINING_CONTEXT:case STN_RPC_CHECK_WORK_BASE:return n==76;
+
+    case STN_RPC_SUBMIT_TRANSACTION:
+        return n==36 &&
+            stn_wire_read(p,2)==1 &&
+            stn_wire_read(p+2,2)<=8;
+
+    /*
+     * A mining-template response uses the same envelope as SUBMIT_WORK:
+     * tip ID + work ID + encoded block length + canonical block.
+     *
+     * The canonical block may be header-only when its transaction count
+     * and body length are both zero.
+     */
+    case STN_RPC_MINING_TEMPLATE:
+        return shape(STN_RPC_SUBMIT_WORK,p,n);
+
+    case STN_RPC_SUBMIT_WORK:
+        return n==80;
+
+    case STN_RPC_SUBMIT_INTELLIGENCE:
+        return n==56 &&
+            stn_wire_read(p,2)==1 &&
+            stn_wire_read(p+2,2)<=STN_PENDING_UNSUPPORTED;
+
+    case STN_RPC_PENDING:
+        return n==16 &&
+            stn_wire_read(p,4)<=(uint64_t)STN_PENDING_MAX_ENTRIES &&
+            stn_wire_read(p+4,4)==STN_PENDING_MAX_ENTRIES &&
+            stn_wire_read(p+8,4)<=STN_PENDING_MAX_BYTES &&
+            stn_wire_read(p+n-4,4)==STN_PENDING_MAX_BYTES;
+
+    case STN_RPC_INFO:
+        return n==184;
+
+    /*
+     * Accepted blocks may be transaction-bearing or canonical empty
+     * blocks. Structural validity of the block itself remains the
+     * responsibility of the Chain/block validation layer.
+     */
+    case STN_RPC_BLOCK_HEIGHT:
+    case STN_RPC_BLOCK_ID:
+        return n>=STN_BLOCK_HEADER_SIZE &&
+            n<=STN_BLOCK_MAX_SIZE;
+
+    case STN_RPC_CHECK_INTELLIGENCE:
+        return n==20;
+
+    case STN_RPC_MINING_CONTEXT:
+    case STN_RPC_CHECK_WORK_BASE:
+        return n==76;
+
     default:return 0;
     }
 }
+
 static int recovery_response(uint16_t method,stn_rpc_code code,const uint8_t *p,size_t n)
 {
     stn_chain_cursor cursor;
@@ -91,7 +140,9 @@ static int recovery_response(uint16_t method,stn_rpc_code code,const uint8_t *p,
         stn_chain_cursor_decode(p+40,45,&cursor)==STN_CURSOR_VALID && cursor.height<=stn_wire_read(p,8) &&
         (cursor.height!=stn_wire_read(p,8) || memcmp(cursor.block_id,p+8,32)==0);
     return 0;
-}static int message_valid(const stn_rpc_message *m)
+}
+
+static int message_valid(const stn_rpc_message *m)
 {
     if(m->length>STN_RPC_MAX_PAYLOAD || (m->length!=0 && m->payload==NULL) || m->code<STN_RPC_OK || m->code>STN_RPC_RECOVER_FROM_START){return 0;}
     if((m->code==STN_RPC_END && m->method!=5 && m->method!=6) ||
@@ -100,6 +151,7 @@ static int recovery_response(uint16_t method,stn_rpc_code code,const uint8_t *p,
     if(m->kind==2 && m->code>=STN_RPC_CURRENT)return recovery_response(m->method,m->code,m->payload,m->length);
     return m->kind==2 && (m->code==STN_RPC_OK ? response_shape(m->method,m->payload,m->length) : m->length==0);
 }
+
 stn_rpc_code stn_rpc_decode(const uint8_t *p,size_t n,stn_rpc_message *out)
 {
     stn_rpc_message m;
@@ -112,6 +164,7 @@ stn_rpc_code stn_rpc_decode(const uint8_t *p,size_t n,stn_rpc_message *out)
     if(m.length!=n-24 || !message_valid(&m)){return STN_RPC_INVALID;}
     *out=m;return STN_RPC_OK;
 }
+
 stn_rpc_code stn_rpc_encode(const stn_rpc_message *m,uint8_t *p,size_t cap,size_t *written)
 {
     if(written!=NULL){*written=0;}
@@ -121,6 +174,7 @@ stn_rpc_code stn_rpc_encode(const stn_rpc_message *m,uint8_t *p,size_t cap,size_
     stn_wire_write(p+8,2,m->method);stn_wire_write(p+10,2,m->code);stn_wire_write(p+12,8,m->request_id);stn_wire_write(p+20,4,m->length);
     if(m->length!=0){memmove(p+24,m->payload,m->length);}*written=24+m->length;return STN_RPC_OK;
 }
+
 stn_rpc_code stn_rpc_dispatch(const uint8_t *request,size_t length,uint32_t allowed,
     const stn_rpc_service *service,uint8_t *response,size_t cap,size_t *written)
 {
