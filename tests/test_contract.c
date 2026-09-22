@@ -35,6 +35,9 @@ int test_contract(void)
     stn_contract contract;
     stn_contract decoded;
     stn_contract before_contract;
+    stn_contract transition_contract;
+    stn_contract transitioned;
+    stn_contract before_transitioned;
     stn_address address_a;
     stn_address address_b;
     uint8_t canonical[STN_CONTRACT_MAX_SIZE];
@@ -50,6 +53,8 @@ int test_contract(void)
     size_t address_written_again;
     size_t expected_size;
     size_t i;
+    uint16_t next_state;
+    uint16_t before_state;
 
     checks = 0;
     failures = 0;
@@ -429,6 +434,369 @@ int test_contract(void)
         output_before,
         sizeof(output_guard)) == 0);
     contract.terms = terms;
+
+    /*
+     * Contract Engine lifecycle policy.
+     *
+     * These checks qualify deterministic state transitions only. Identity,
+     * signatures, scoped authority, accepted history and consensus acceptance
+     * remain separate protocol concerns.
+     */
+    next_state = 0u;
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_DRAFT,
+        STN_CONTRACT_ACTION_CREATE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_ISSUED);
+
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_ISSUED,
+        STN_CONTRACT_ACTION_AMEND,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_REVIEW);
+
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_REVIEW,
+        STN_CONTRACT_ACTION_AMEND,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_REVIEW);
+
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_REVIEW,
+        STN_CONTRACT_ACTION_APPROVE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_APPROVALS);
+
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_APPROVALS,
+        STN_CONTRACT_ACTION_APPROVE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_ATTESTATION);
+
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_ATTESTATION,
+        STN_CONTRACT_ACTION_EXECUTE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_EXECUTED);
+
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_EXECUTED,
+        STN_CONTRACT_ACTION_CLOSE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_CLOSED);
+
+    /* Rejection is permitted while an agreement remains unresolved. */
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_ISSUED,
+        STN_CONTRACT_ACTION_REJECT,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_REJECTED);
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_REVIEW,
+        STN_CONTRACT_ACTION_REJECT,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_REJECTED);
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_APPROVALS,
+        STN_CONTRACT_ACTION_REJECT,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_REJECTED);
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_ATTESTATION,
+        STN_CONTRACT_ACTION_REJECT,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_REJECTED);
+
+    /* Revocation is permitted from issued through executed state. */
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_ISSUED,
+        STN_CONTRACT_ACTION_REVOKE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_REVOKED);
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_REVIEW,
+        STN_CONTRACT_ACTION_REVOKE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_REVOKED);
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_APPROVALS,
+        STN_CONTRACT_ACTION_REVOKE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_REVOKED);
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_ATTESTATION,
+        STN_CONTRACT_ACTION_REVOKE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_REVOKED);
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_EXECUTED,
+        STN_CONTRACT_ACTION_REVOKE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_REVOKED);
+
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_REJECTED,
+        STN_CONTRACT_ACTION_CLOSE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_CLOSED);
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_REVOKED,
+        STN_CONTRACT_ACTION_CLOSE,
+        &next_state) == STN_CONTRACT_OK);
+    CHECK(next_state == STN_CONTRACT_STATE_CLOSED);
+
+    /* Invalid action/state combinations leave output unchanged. */
+    before_state = UINT16_C(0xa5a5);
+    next_state = before_state;
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_ISSUED,
+        STN_CONTRACT_ACTION_CREATE,
+        &next_state) == STN_CONTRACT_TRANSITION_ERROR);
+    CHECK(next_state == before_state);
+
+    next_state = before_state;
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_DRAFT,
+        STN_CONTRACT_ACTION_APPROVE,
+        &next_state) == STN_CONTRACT_TRANSITION_ERROR);
+    CHECK(next_state == before_state);
+
+    next_state = before_state;
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_EXECUTED,
+        STN_CONTRACT_ACTION_EXECUTE,
+        &next_state) == STN_CONTRACT_TRANSITION_ERROR);
+    CHECK(next_state == before_state);
+
+    next_state = before_state;
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_CLOSED,
+        STN_CONTRACT_ACTION_AMEND,
+        &next_state) == STN_CONTRACT_TRANSITION_ERROR);
+    CHECK(next_state == before_state);
+
+    next_state = before_state;
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_CLOSED,
+        STN_CONTRACT_ACTION_REJECT,
+        &next_state) == STN_CONTRACT_TRANSITION_ERROR);
+    CHECK(next_state == before_state);
+
+    next_state = before_state;
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_CLOSED,
+        STN_CONTRACT_ACTION_REVOKE,
+        &next_state) == STN_CONTRACT_TRANSITION_ERROR);
+    CHECK(next_state == before_state);
+
+    next_state = before_state;
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_DRAFT,
+        STN_CONTRACT_ACTION_CLOSE,
+        &next_state) == STN_CONTRACT_TRANSITION_ERROR);
+    CHECK(next_state == before_state);
+
+    next_state = before_state;
+    CHECK(stn_contract_transition(
+        0xffffu,
+        STN_CONTRACT_ACTION_CREATE,
+        &next_state) == STN_CONTRACT_STATE_ERROR);
+    CHECK(next_state == before_state);
+
+    next_state = before_state;
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_DRAFT,
+        0xffffu,
+        &next_state) == STN_CONTRACT_ACTION_ERROR);
+    CHECK(next_state == before_state);
+
+    CHECK(stn_contract_transition(
+        STN_CONTRACT_STATE_DRAFT,
+        STN_CONTRACT_ACTION_CREATE,
+        NULL) == STN_CONTRACT_ARGUMENT);
+
+    /*
+     * Applying an action advances sequence exactly once and changes only the
+     * protocol state/sequence fields.
+     */
+    transition_contract = contract;
+    transition_contract.sequence = UINT64_C(40);
+    transition_contract.state = STN_CONTRACT_STATE_DRAFT;
+
+    memset(&transitioned, 0, sizeof(transitioned));
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_CREATE,
+        UINT64_C(41),
+        &transitioned) == STN_CONTRACT_OK);
+    CHECK(transitioned.version == transition_contract.version);
+    CHECK(transitioned.type == transition_contract.type);
+    CHECK(transitioned.sequence == UINT64_C(41));
+    CHECK(transitioned.created_at == transition_contract.created_at);
+    CHECK(transitioned.state == STN_CONTRACT_STATE_ISSUED);
+    CHECK(transitioned.participants == transition_contract.participants);
+    CHECK(transitioned.participant_count == transition_contract.participant_count);
+    CHECK(transitioned.participant_bytes == transition_contract.participant_bytes);
+    CHECK(transitioned.terms == transition_contract.terms);
+    CHECK(transitioned.terms_length == transition_contract.terms_length);
+
+    transition_contract = transitioned;
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_AMEND,
+        UINT64_C(42),
+        &transitioned) == STN_CONTRACT_OK);
+    CHECK(transitioned.sequence == UINT64_C(42));
+    CHECK(transitioned.state == STN_CONTRACT_STATE_REVIEW);
+
+    transition_contract = transitioned;
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        &transitioned) == STN_CONTRACT_OK);
+    CHECK(transitioned.sequence == UINT64_C(43));
+    CHECK(transitioned.state == STN_CONTRACT_STATE_APPROVALS);
+
+    transition_contract = transitioned;
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(44),
+        &transitioned) == STN_CONTRACT_OK);
+    CHECK(transitioned.sequence == UINT64_C(44));
+    CHECK(transitioned.state == STN_CONTRACT_STATE_ATTESTATION);
+
+    transition_contract = transitioned;
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_EXECUTE,
+        UINT64_C(45),
+        &transitioned) == STN_CONTRACT_OK);
+    CHECK(transitioned.sequence == UINT64_C(45));
+    CHECK(transitioned.state == STN_CONTRACT_STATE_EXECUTED);
+
+    transition_contract = transitioned;
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_CLOSE,
+        UINT64_C(46),
+        &transitioned) == STN_CONTRACT_OK);
+    CHECK(transitioned.sequence == UINT64_C(46));
+    CHECK(transitioned.state == STN_CONTRACT_STATE_CLOSED);
+
+    /* Apply failures preserve the destination object. */
+    memset(&before_transitioned, 0x5a, sizeof(before_transitioned));
+    transitioned = before_transitioned;
+    transition_contract = contract;
+    transition_contract.sequence = UINT64_C(100);
+    transition_contract.state = STN_CONTRACT_STATE_DRAFT;
+
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_CREATE,
+        UINT64_C(100),
+        &transitioned) == STN_CONTRACT_SEQUENCE_ERROR);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_CREATE,
+        UINT64_C(102),
+        &transitioned) == STN_CONTRACT_SEQUENCE_ERROR);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    transition_contract.sequence = UINT64_MAX;
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_CREATE,
+        0u,
+        &transitioned) == STN_CONTRACT_SEQUENCE_ERROR);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    transition_contract.sequence = UINT64_C(100);
+    transition_contract.state = STN_CONTRACT_STATE_CLOSED;
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_CREATE,
+        UINT64_C(101),
+        &transitioned) == STN_CONTRACT_TRANSITION_ERROR);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    transition_contract.state = STN_CONTRACT_STATE_DRAFT;
+    transition_contract.version = 2u;
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_CREATE,
+        UINT64_C(101),
+        &transitioned) == STN_CONTRACT_VERSION_ERROR);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    transition_contract.version = STN_CONTRACT_VERSION;
+    transition_contract.type = 0xffffu;
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_CREATE,
+        UINT64_C(101),
+        &transitioned) == STN_CONTRACT_TYPE_ERROR);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    transition_contract.type = STN_CONTRACT_CONTRIBUTOR_AGREEMENT;
+    transition_contract.state = 0xffffu;
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_CREATE,
+        UINT64_C(101),
+        &transitioned) == STN_CONTRACT_STATE_ERROR);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    transition_contract.state = STN_CONTRACT_STATE_DRAFT;
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        0xffffu,
+        UINT64_C(101),
+        &transitioned) == STN_CONTRACT_ACTION_ERROR);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    CHECK(stn_contract_apply_action(
+        NULL,
+        STN_CONTRACT_ACTION_CREATE,
+        UINT64_C(101),
+        &transitioned) == STN_CONTRACT_ARGUMENT);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_CREATE,
+        UINT64_C(101),
+        NULL) == STN_CONTRACT_ARGUMENT);
 
     /* Zero-participant / zero-terms contracts are valid structural objects. */
     contract.type = STN_CONTRACT_GENERIC;

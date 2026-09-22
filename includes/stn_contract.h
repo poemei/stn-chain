@@ -69,6 +69,24 @@ typedef enum stn_contract_role {
     STN_CONTRACT_ROLE_ATTESTOR = 5
 } stn_contract_role;
 
+/*
+ * Contract actions are protocol-defined requests to advance or terminate a
+ * contract lifecycle. They are not executable instructions.
+ *
+ * Action validity is evaluated against the current contract state and sequence.
+ * Identity, signature and scoped-authority validation remain separate protocol
+ * concerns and are not inferred from an action value.
+ */
+typedef enum stn_contract_action {
+    STN_CONTRACT_ACTION_CREATE = 1,
+    STN_CONTRACT_ACTION_AMEND = 2,
+    STN_CONTRACT_ACTION_APPROVE = 3,
+    STN_CONTRACT_ACTION_REJECT = 4,
+    STN_CONTRACT_ACTION_EXECUTE = 5,
+    STN_CONTRACT_ACTION_REVOKE = 6,
+    STN_CONTRACT_ACTION_CLOSE = 7
+} stn_contract_action;
+
 typedef enum stn_contract_status {
     STN_CONTRACT_OK = 0,
     STN_CONTRACT_ARGUMENT,
@@ -83,7 +101,10 @@ typedef enum stn_contract_status {
     STN_CONTRACT_TERMS_LIMIT,
     STN_CONTRACT_LENGTH,
     STN_CONTRACT_CAPACITY,
-    STN_CONTRACT_ADDRESS_ERROR
+    STN_CONTRACT_ADDRESS_ERROR,
+    STN_CONTRACT_ACTION_ERROR,
+    STN_CONTRACT_TRANSITION_ERROR,
+    STN_CONTRACT_SEQUENCE_ERROR
 } stn_contract_status;
 
 /*
@@ -248,5 +269,43 @@ stn_contract_status stn_contract_address(
     const uint8_t *input,
     size_t input_length,
     stn_address *address);
+
+/*
+ * Determine the deterministic next state for a Contract v1 action.
+ *
+ * current_state and action must be supported protocol values. The function
+ * evaluates lifecycle policy only; it does not validate identity, signatures,
+ * authority, accepted history or consensus acceptance.
+ *
+ * On success next_state receives the protocol-defined resulting state.
+ * Output is unchanged on failure.
+ */
+stn_contract_status stn_contract_transition(
+    uint16_t current_state,
+    uint16_t action,
+    uint16_t *next_state);
+
+/*
+ * Validate and apply a Contract v1 lifecycle action to a native contract
+ * object.
+ *
+ * expected_sequence is the sequence value carried by the action. It must be
+ * exactly current->sequence + 1. Sequence overflow is rejected.
+ *
+ * The resulting contract preserves version, type, created_at, participants and
+ * terms, advances sequence exactly once, and applies only the deterministic
+ * state change defined by stn_contract_transition().
+ *
+ * This function does not authenticate the actor or evaluate signatures or
+ * scoped authority. Those checks belong to the existing identity/signature/
+ * authority layers before an action can become accepted Chain state.
+ *
+ * Output is unchanged on failure.
+ */
+stn_contract_status stn_contract_apply_action(
+    const stn_contract *current,
+    uint16_t action,
+    uint64_t expected_sequence,
+    stn_contract *next);
 
 #endif

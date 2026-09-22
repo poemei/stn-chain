@@ -408,3 +408,158 @@ stn_contract_status stn_contract_address(
 
     return STN_CONTRACT_OK;
 }
+
+static int contract_action_valid(uint16_t action)
+{
+    switch (action) {
+    case STN_CONTRACT_ACTION_CREATE:
+    case STN_CONTRACT_ACTION_AMEND:
+    case STN_CONTRACT_ACTION_APPROVE:
+    case STN_CONTRACT_ACTION_REJECT:
+    case STN_CONTRACT_ACTION_EXECUTE:
+    case STN_CONTRACT_ACTION_REVOKE:
+    case STN_CONTRACT_ACTION_CLOSE:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+stn_contract_status stn_contract_transition(
+    uint16_t current_state,
+    uint16_t action,
+    uint16_t *next_state)
+{
+    uint16_t result;
+
+    if (next_state == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    if (!contract_state_valid(current_state)) {
+        return STN_CONTRACT_STATE_ERROR;
+    }
+
+    if (!contract_action_valid(action)) {
+        return STN_CONTRACT_ACTION_ERROR;
+    }
+
+    switch (action) {
+    case STN_CONTRACT_ACTION_CREATE:
+        if (current_state != STN_CONTRACT_STATE_DRAFT) {
+            return STN_CONTRACT_TRANSITION_ERROR;
+        }
+        result = STN_CONTRACT_STATE_ISSUED;
+        break;
+
+    case STN_CONTRACT_ACTION_AMEND:
+        if (current_state != STN_CONTRACT_STATE_ISSUED &&
+            current_state != STN_CONTRACT_STATE_REVIEW) {
+            return STN_CONTRACT_TRANSITION_ERROR;
+        }
+        result = STN_CONTRACT_STATE_REVIEW;
+        break;
+
+    case STN_CONTRACT_ACTION_APPROVE:
+        if (current_state == STN_CONTRACT_STATE_REVIEW) {
+            result = STN_CONTRACT_STATE_APPROVALS;
+        } else if (current_state == STN_CONTRACT_STATE_APPROVALS) {
+            result = STN_CONTRACT_STATE_ATTESTATION;
+        } else {
+            return STN_CONTRACT_TRANSITION_ERROR;
+        }
+        break;
+
+    case STN_CONTRACT_ACTION_REJECT:
+        if (current_state != STN_CONTRACT_STATE_ISSUED &&
+            current_state != STN_CONTRACT_STATE_REVIEW &&
+            current_state != STN_CONTRACT_STATE_APPROVALS &&
+            current_state != STN_CONTRACT_STATE_ATTESTATION) {
+            return STN_CONTRACT_TRANSITION_ERROR;
+        }
+        result = STN_CONTRACT_STATE_REJECTED;
+        break;
+
+    case STN_CONTRACT_ACTION_EXECUTE:
+        if (current_state != STN_CONTRACT_STATE_ATTESTATION) {
+            return STN_CONTRACT_TRANSITION_ERROR;
+        }
+        result = STN_CONTRACT_STATE_EXECUTED;
+        break;
+
+    case STN_CONTRACT_ACTION_REVOKE:
+        if (current_state != STN_CONTRACT_STATE_ISSUED &&
+            current_state != STN_CONTRACT_STATE_REVIEW &&
+            current_state != STN_CONTRACT_STATE_APPROVALS &&
+            current_state != STN_CONTRACT_STATE_ATTESTATION &&
+            current_state != STN_CONTRACT_STATE_EXECUTED) {
+            return STN_CONTRACT_TRANSITION_ERROR;
+        }
+        result = STN_CONTRACT_STATE_REVOKED;
+        break;
+
+    case STN_CONTRACT_ACTION_CLOSE:
+        if (current_state != STN_CONTRACT_STATE_EXECUTED &&
+            current_state != STN_CONTRACT_STATE_REJECTED &&
+            current_state != STN_CONTRACT_STATE_REVOKED) {
+            return STN_CONTRACT_TRANSITION_ERROR;
+        }
+        result = STN_CONTRACT_STATE_CLOSED;
+        break;
+
+    default:
+        return STN_CONTRACT_ACTION_ERROR;
+    }
+
+    *next_state = result;
+    return STN_CONTRACT_OK;
+}
+
+stn_contract_status stn_contract_apply_action(
+    const stn_contract *current,
+    uint16_t action,
+    uint64_t expected_sequence,
+    stn_contract *next)
+{
+    stn_contract updated;
+    stn_contract_status status;
+    uint16_t next_state;
+
+    if (current == NULL || next == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    if (current->version != STN_CONTRACT_VERSION) {
+        return STN_CONTRACT_VERSION_ERROR;
+    }
+
+    if (!contract_type_valid(current->type)) {
+        return STN_CONTRACT_TYPE_ERROR;
+    }
+
+    if (!contract_state_valid(current->state)) {
+        return STN_CONTRACT_STATE_ERROR;
+    }
+
+    if (current->sequence == UINT64_MAX ||
+        expected_sequence != current->sequence + UINT64_C(1)) {
+        return STN_CONTRACT_SEQUENCE_ERROR;
+    }
+
+    status = stn_contract_transition(
+        current->state,
+        action,
+        &next_state);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    updated = *current;
+    updated.sequence = expected_sequence;
+    updated.state = next_state;
+
+    *next = updated;
+    return STN_CONTRACT_OK;
+}
+
