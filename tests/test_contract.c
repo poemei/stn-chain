@@ -45,6 +45,16 @@ int test_contract(void)
         0x72,0x68,0xb5,0x5b,0x74,0x47,0x6e,0xe8,
         0x35,0x3e,0x91,0x51,0x86,0x20,0x3c,0x01
     };
+    static const uint8_t action_signature[STN_IDENTITY_SIGNATURE_SIZE] = {
+        0xdc,0x30,0x7a,0x6a,0xc5,0x82,0x72,0xa0,
+        0xbf,0x25,0x47,0x97,0x55,0xf7,0xbc,0xb9,
+        0xde,0x70,0x8b,0x77,0xe7,0x52,0x72,0xc0,
+        0x9b,0xe5,0xf3,0xca,0x5d,0xc2,0x5a,0x5c,
+        0xca,0x8e,0x66,0x0c,0xe2,0x50,0x70,0x43,
+        0x8a,0xe8,0x24,0x73,0x19,0x50,0xb3,0x4b,
+        0xe5,0xc1,0x46,0xa3,0xc5,0x41,0x8b,0x23,
+        0x01,0x74,0x4f,0xd0,0x97,0xa6,0x09,0x01
+    };
     stn_contract_participant participants[2];
     stn_contract_participant extracted;
     stn_contract_participant before_participant;
@@ -73,6 +83,8 @@ int test_contract(void)
     uint8_t other_actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
     uint8_t signature_mutated[STN_IDENTITY_SIGNATURE_SIZE];
     uint8_t signature_contract_mutated[STN_CONTRACT_MAX_SIZE];
+    uint8_t action_canonical[STN_CONTRACT_MAX_SIZE];
+    uint8_t action_canonical_mutated[STN_CONTRACT_MAX_SIZE];
     uint8_t approval_key[STN_CONTRACT_APPROVAL_KEY_SIZE];
     uint8_t approval_key_again[STN_CONTRACT_APPROVAL_KEY_SIZE];
     uint8_t approval_key_other[STN_CONTRACT_APPROVAL_KEY_SIZE];
@@ -1303,6 +1315,234 @@ int test_contract(void)
     CHECK(stn_contract_approval_state_consume(
         NULL,
         approval_key) == STN_CONTRACT_ARGUMENT);
+
+    /*
+     * Contract action validation composition.
+     *
+     * Build one exact REVIEW contract at sequence 42. The fixed signature
+     * authenticates signing_actor approving that canonical contract at
+     * sequence 43. Authority evidence is scoped to the same actor/action/
+     * contract tuple. Validation must not consume accepted approval state.
+     */
+    transition_contract = contract;
+    transition_contract.sequence = UINT64_C(42);
+    transition_contract.state = STN_CONTRACT_STATE_REVIEW;
+
+    written_again = 0u;
+    CHECK(stn_contract_encode(
+        &transition_contract,
+        action_canonical,
+        sizeof(action_canonical),
+        &written_again) == STN_CONTRACT_OK);
+
+    CHECK(stn_contract_authority_action(
+        STN_CONTRACT_ACTION_APPROVE,
+        authority_action) == STN_CONTRACT_OK);
+    CHECK(stn_contract_authority_context(
+        action_canonical,
+        written_again,
+        authority_context) == STN_CONTRACT_OK);
+
+    authority_written = 0u;
+    CHECK(stn_authority_evidence_encode(
+        signing_actor,
+        authority_action,
+        authority_context,
+        authority_evidence,
+        sizeof(authority_evidence),
+        &authority_written) == STN_AUTHORITY_AUTHORIZED);
+    CHECK(authority_written == STN_AUTHORITY_EVIDENCE_SIZE);
+
+    memset(approval_store, 0, sizeof(approval_store));
+    stn_contract_approval_state_initialize(
+        &approval_state,
+        approval_store,
+        4u);
+
+    CHECK(stn_contract_validate_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        action_signature,
+        authority_evidence,
+        authority_written,
+        &approval_state) == STN_CONTRACT_OK);
+    CHECK(approval_state.accepted_count == 0u);
+
+    /* Exact +1 sequence is part of action validity. */
+    CHECK(stn_contract_validate_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(44),
+        action_canonical,
+        written_again,
+        signing_actor,
+        action_signature,
+        authority_evidence,
+        authority_written,
+        &approval_state) == STN_CONTRACT_SEQUENCE_ERROR);
+
+    /* The canonical bytes must describe the supplied current contract exactly. */
+    memcpy(action_canonical_mutated, action_canonical, written_again);
+    action_canonical_mutated[written_again - 1u] ^= 0x01u;
+    CHECK(stn_contract_validate_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical_mutated,
+        written_again,
+        signing_actor,
+        action_signature,
+        authority_evidence,
+        authority_written,
+        &approval_state) == STN_CONTRACT_LENGTH);
+
+    /* A different current object cannot borrow valid canonical action evidence. */
+    before_contract = transition_contract;
+    before_contract.created_at ^= UINT64_C(1);
+    CHECK(stn_contract_validate_action(
+        &before_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        action_signature,
+        authority_evidence,
+        authority_written,
+        &approval_state) == STN_CONTRACT_LENGTH);
+
+    /* Signature authentication remains an independent required layer. */
+    memcpy(signature_mutated, action_signature, sizeof(signature_mutated));
+    signature_mutated[STN_IDENTITY_SIGNATURE_SIZE - 1u] ^= 0x01u;
+    CHECK(stn_contract_validate_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        signature_mutated,
+        authority_evidence,
+        authority_written,
+        &approval_state) == STN_CONTRACT_SIGNATURE_ERROR);
+
+    /* Valid signature without matching scoped authority is not sufficient. */
+    memcpy(
+        authority_evidence_mutated,
+        authority_evidence,
+        authority_written);
+    authority_evidence_mutated[
+        STN_AUTHORITY_EVIDENCE_SIZE - 1u] ^= 0x01u;
+    CHECK(stn_contract_validate_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        action_signature,
+        authority_evidence_mutated,
+        authority_written,
+        &approval_state) == STN_CONTRACT_AUTHORITY_ERROR);
+
+    /* APPROVE checks accepted duplicate state but does not consume it. */
+    CHECK(stn_contract_approval_key(
+        action_canonical,
+        written_again,
+        UINT64_C(43),
+        signing_actor,
+        approval_key) == STN_CONTRACT_OK);
+    CHECK(stn_contract_approval_state_consume(
+        &approval_state,
+        approval_key) == STN_CONTRACT_OK);
+    CHECK(approval_state.accepted_count == 1u);
+    CHECK(stn_contract_validate_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        action_signature,
+        authority_evidence,
+        authority_written,
+        &approval_state) == STN_CONTRACT_DUPLICATE_APPROVAL);
+    CHECK(approval_state.accepted_count == 1u);
+
+    /* APPROVE requires an accepted-history view for duplicate detection. */
+    CHECK(stn_contract_validate_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        action_signature,
+        authority_evidence,
+        authority_written,
+        NULL) == STN_CONTRACT_ARGUMENT);
+
+    /* Malformed required inputs fail before any state can be changed. */
+    CHECK(stn_contract_validate_action(
+        NULL,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        action_signature,
+        authority_evidence,
+        authority_written,
+        &approval_state) == STN_CONTRACT_ARGUMENT);
+    CHECK(stn_contract_validate_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        NULL,
+        written_again,
+        signing_actor,
+        action_signature,
+        authority_evidence,
+        authority_written,
+        &approval_state) == STN_CONTRACT_ARGUMENT);
+    CHECK(stn_contract_validate_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        NULL,
+        action_signature,
+        authority_evidence,
+        authority_written,
+        &approval_state) == STN_CONTRACT_ARGUMENT);
+    CHECK(stn_contract_validate_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        NULL,
+        authority_evidence,
+        authority_written,
+        &approval_state) == STN_CONTRACT_ARGUMENT);
+    CHECK(stn_contract_validate_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        action_signature,
+        NULL,
+        authority_written,
+        &approval_state) == STN_CONTRACT_ARGUMENT);
+
 
     /* Zero-participant / zero-terms contracts are valid structural objects. */
     contract.type = STN_CONTRACT_GENERIC;

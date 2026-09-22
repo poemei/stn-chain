@@ -457,6 +457,31 @@ stn_contract_status stn_contract_approval_state_rebuild(
     size_t key_count);
 
 
+/*
+ * Validate one Contract v1 action against the established protocol layers.
+ *
+ * Validation is deliberately compositional:
+ *   - canonical_contract establishes the exact addressed agreement;
+ *   - actor/signature authenticate the action tuple;
+ *   - authority evidence permits that actor/action/contract scope;
+ *   - expected_sequence and current state are checked by the Contract engine;
+ *   - APPROVE additionally checks accepted duplicate-approval state.
+ *
+ * This function validates only. It does not consume approval state, mutate the
+ * current contract, publish accepted history, or decide consensus acceptance.
+ */
+stn_contract_status stn_contract_validate_action(
+    const stn_contract *current,
+    uint16_t action,
+    uint64_t expected_sequence,
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    const uint8_t signature[STN_IDENTITY_SIGNATURE_SIZE],
+    const uint8_t *authority_evidence,
+    size_t authority_evidence_length,
+    const stn_contract_approval_state *approval_state);
+
 stn_contract_status stn_contract_apply_action(
     const stn_contract *current,
     uint16_t action,

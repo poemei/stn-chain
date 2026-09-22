@@ -916,6 +916,199 @@ stn_contract_status stn_contract_approval_state_rebuild(
     return STN_CONTRACT_OK;
 }
 
+static stn_contract_status contract_matches_canonical(
+    const stn_contract *current,
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length)
+{
+    stn_contract decoded;
+    stn_contract_participant participant;
+    stn_contract_status status;
+    size_t i;
+
+    if (current == NULL || canonical_contract == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    status = stn_contract_decode(
+        canonical_contract,
+        canonical_contract_length,
+        &decoded);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    if (current->version != decoded.version ||
+        current->type != decoded.type ||
+        current->sequence != decoded.sequence ||
+        current->created_at != decoded.created_at ||
+        current->state != decoded.state ||
+        current->participant_count != decoded.participant_count ||
+        current->terms_length != decoded.terms_length) {
+        return STN_CONTRACT_LENGTH;
+    }
+
+    if (current->participant_count != 0u) {
+        if (current->participants != NULL) {
+            for (i = 0u; i < current->participant_count; ++i) {
+                status = stn_contract_participant_at(
+                    &decoded,
+                    (uint16_t)i,
+                    &participant);
+
+                if (status != STN_CONTRACT_OK) {
+                    return status;
+                }
+
+                if (memcmp(
+                        current->participants[i].identity,
+                        participant.identity,
+                        STN_ADDRESS_ID_SIZE) != 0 ||
+                    current->participants[i].role != participant.role) {
+                    return STN_CONTRACT_LENGTH;
+                }
+            }
+        } else if (current->participant_bytes != NULL) {
+            if (memcmp(
+                    current->participant_bytes,
+                    decoded.participant_bytes,
+                    (size_t)current->participant_count *
+                        STN_CONTRACT_PARTICIPANT_SIZE) != 0) {
+                return STN_CONTRACT_LENGTH;
+            }
+        } else {
+            return STN_CONTRACT_ARGUMENT;
+        }
+    }
+
+    if (current->terms_length != 0u) {
+        if (current->terms == NULL || decoded.terms == NULL) {
+            return STN_CONTRACT_ARGUMENT;
+        }
+
+        if (memcmp(
+                current->terms,
+                decoded.terms,
+                current->terms_length) != 0) {
+            return STN_CONTRACT_LENGTH;
+        }
+    }
+
+    return STN_CONTRACT_OK;
+}
+
+
+stn_contract_status stn_contract_validate_action(
+    const stn_contract *current,
+    uint16_t action,
+    uint64_t expected_sequence,
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    const uint8_t signature[STN_IDENTITY_SIGNATURE_SIZE],
+    const uint8_t *authority_evidence,
+    size_t authority_evidence_length,
+    const stn_contract_approval_state *approval_state)
+{
+    stn_contract next;
+    stn_contract_status status;
+    uint8_t approval_key[STN_CONTRACT_APPROVAL_KEY_SIZE];
+
+    if (current == NULL ||
+        canonical_contract == NULL ||
+        actor == NULL ||
+        signature == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    if (authority_evidence_length != 0u &&
+        authority_evidence == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    /*
+     * The supplied canonical bytes must describe this exact current Contract
+     * v1 object. Otherwise a valid signature or authority grant for a different
+     * agreement must never authorize the current transition.
+     */
+    status = contract_matches_canonical(
+        current,
+        canonical_contract,
+        canonical_contract_length);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    /*
+     * Reuse the established transition/sequence engine without publishing its
+     * result. This validates current state, permitted action and exact +1
+     * sequence while leaving current and accepted state untouched.
+     */
+    status = stn_contract_apply_action(
+        current,
+        action,
+        expected_sequence,
+        &next);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    status = stn_contract_signature_verify(
+        actor,
+        action,
+        canonical_contract,
+        canonical_contract_length,
+        expected_sequence,
+        signature);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    status = stn_contract_authority_evaluate(
+        actor,
+        action,
+        canonical_contract,
+        canonical_contract_length,
+        authority_evidence,
+        authority_evidence_length);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    if (action == STN_CONTRACT_ACTION_APPROVE) {
+        if (approval_state == NULL) {
+            return STN_CONTRACT_ARGUMENT;
+        }
+
+        status = stn_contract_approval_key(
+            canonical_contract,
+            canonical_contract_length,
+            expected_sequence,
+            actor,
+            approval_key);
+
+        if (status != STN_CONTRACT_OK) {
+            return status;
+        }
+
+        status = stn_contract_approval_state_check(
+            approval_state,
+            approval_key);
+
+        if (status != STN_CONTRACT_OK) {
+            return status;
+        }
+    }
+
+    return STN_CONTRACT_OK;
+}
+
+
 stn_contract_status stn_contract_apply_action(
     const stn_contract *current,
     uint16_t action,
