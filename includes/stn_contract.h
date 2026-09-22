@@ -482,6 +482,35 @@ stn_contract_status stn_contract_validate_action(
     size_t authority_evidence_length,
     const stn_contract_approval_state *approval_state);
 
+/*
+ * Apply one Contract v1 action after consensus has accepted that exact action.
+ *
+ * The caller establishes consensus acceptance before calling this function.
+ * This primitive does not decide consensus and does not re-run signature or
+ * authority validation. It deterministically publishes the already-accepted
+ * Contract state transition and, for APPROVE, consumes the corresponding
+ * accepted duplicate-approval key.
+ *
+ * canonical_contract must be the exact canonical representation of current.
+ * expected_sequence must be exactly current->sequence + 1.
+ *
+ * APPROVE requires approval_state. Non-APPROVE actions do not consume approval
+ * state and permit approval_state to be NULL.
+ *
+ * Application is atomic with respect to caller-visible outputs: next is
+ * unchanged on failure, and approval_state is not modified unless the complete
+ * accepted action can be applied successfully.
+ */
+stn_contract_status stn_contract_accept_action(
+    const stn_contract *current,
+    uint16_t action,
+    uint64_t expected_sequence,
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    stn_contract_approval_state *approval_state,
+    stn_contract *next);
+
 stn_contract_status stn_contract_apply_action(
     const stn_contract *current,
     uint16_t action,

@@ -43,6 +43,18 @@ Headers are in includes/ and C sources in src/.
 See [build instructions](docs/BUILD.md).
 Planned OS/architecture boundaries are listed in [platforms](platforms/README.md).
 
+## Windows startup
+
+Run `build\stn-chain.exe` without arguments to start the node on
+`127.0.0.1:18473`. Like Linux, Windows resumes existing history or creates
+history with the existing built-in genesis when absent. The default data file
+is `stn-chain-dev.stns` in the current working directory; use `--data PATH`
+to keep a fixed location across launches. The filename does not enable `--dev`.
+An existing history supplies its genesis anchor and undergoes normal full
+validation. Invalid or unreadable history fails without replacement.
+`--genesis BLOCK` still selects an explicit anchor; `--dev` remains optional.
+This changes application startup, not Windows service/boot registration.
+
 ## Run for local stratumd integration
 
 After running `build.cmd`, run `build\stn-chain.exe --dev` for the local

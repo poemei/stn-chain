@@ -29,6 +29,27 @@ static int read_file(const char *path,uint8_t *bytes,size_t cap,size_t *n)
     *n=fread(bytes,1,cap,f);extra=fgetc(f);bad=ferror(f);(void)fclose(f);
     return !bad && extra==EOF && *n!=0;
 }
+/* Read only the anchor; storage load subsequently validates the entire history. */
+static int history_genesis(const wchar_t *path,uint8_t *bytes,size_t *length)
+{
+    uint8_t header[16];DWORD read_count;size_t size;int ok;
+    BY_HANDLE_FILE_INFORMATION info;
+    HANDLE file=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,
+        FILE_FLAG_OPEN_REPARSE_POINT,NULL);
+    if(file==INVALID_HANDLE_VALUE){return GetLastError()==ERROR_FILE_NOT_FOUND ? 0 : -1;}
+    ok=GetFileType(file)==FILE_TYPE_DISK && GetFileInformationByHandle(file,&info) &&
+        !(info.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT));
+    if(ok){ok=ReadFile(file,header,sizeof(header),&read_count,NULL) && read_count==sizeof(header) &&
+        memcmp(header,"STNS\0\1\0\0",8)==0 && stn_wire_read(header+8,4)!=0;}
+    if(ok){
+        size=(size_t)stn_wire_read(header+12,4);
+        ok=size>=STN_BLOCK_HEADER_SIZE+STN_BLOCK_MIN_BODY && size<=STN_BLOCK_MAX_SIZE;
+        if(ok){ok=ReadFile(file,bytes,(DWORD)size,&read_count,NULL) && read_count==size;}
+        if(ok){*length=size;}
+    }
+    if(!CloseHandle(file)){ok=0;}
+    return ok ? 1 : -1;
+}
 static size_t initial_storage_capacity(const wchar_t *path)
 {
     WIN32_FILE_ATTRIBUTE_DATA a;ULONGLONG n;size_t required=APP_STORAGE_INITIAL;
@@ -202,11 +223,19 @@ int stn_windows_app(int argc,char **argv)
         }else{goto usage;}
     }
     if((dev && ((genesis_path==NULL)!=(transaction_path==NULL))) ||
-       (!dev && (genesis_path==NULL || transaction_path!=NULL))){goto usage;}
+       (!dev && transaction_path!=NULL)){goto usage;}
     if(once && candidates.count!=0){goto usage;}
     genesis=malloc(STN_BLOCK_MAX_SIZE);body=malloc(STN_BLOCK_MAX_BODY);mining.template_bytes=malloc(STN_BLOCK_MAX_SIZE);
     if(genesis==NULL || body==NULL || mining.template_bytes==NULL){goto cleanup;}
-    if(dev && genesis_path==NULL){development_genesis(genesis);genesis_length=364;memcpy(body,genesis+168,196);transaction_length=192;}
+    if(MultiByteToWideChar(CP_ACP,0,data,-1,relative,260)==0){goto cleanup;}
+    path_length=GetFullPathNameW(relative,260,absolute,NULL);
+    if(path_length==0 || path_length>=260 || stn_windows_storage_init(&disk,absolute,&storage)!=STN_STORAGE_OK){fprintf(stderr,"Data path requires a trusted existing local NTFS directory.\n");goto cleanup;}
+    if(genesis_path==NULL){
+        int existing=dev ? 0 : history_genesis(absolute,genesis,&genesis_length);
+        if(existing<0){fprintf(stderr,"Cannot read existing history genesis; history was not replaced.\n");goto cleanup;}
+        if(existing==0){development_genesis(genesis);genesis_length=364;}
+        if(dev){memcpy(body,genesis+168,196);transaction_length=192;}
+    }
     else{
         if(!read_file(genesis_path,genesis,STN_BLOCK_MAX_SIZE,&genesis_length) ||
            (dev && !read_file(transaction_path,body+4,STN_TX_MAX_SIZE,&transaction_length))){fprintf(stderr,"Cannot read genesis/transaction.\n");goto cleanup;}
@@ -217,9 +246,6 @@ int stn_windows_app(int argc,char **argv)
     chain.genesis_bytes=genesis;chain.genesis_length=genesis_length;chain.pow_policy=&policy;chain.hash_provider.hash=stn_sha256;
     if(dev && (stn_block_body_validate_structure(body,4+transaction_length,1)!=STN_DATA_OK ||
        memcmp(body+24,chain.network_id,32)!=0)){fprintf(stderr,"Invalid selected transaction or network.\n");goto cleanup;}
-    if(MultiByteToWideChar(CP_ACP,0,data,-1,relative,260)==0){goto cleanup;}
-    path_length=GetFullPathNameW(relative,260,absolute,NULL);
-    if(path_length==0 || path_length>=260 || stn_windows_storage_init(&disk,absolute,&storage)!=STN_STORAGE_OK){fprintf(stderr,"Data path requires a trusted existing local NTFS directory.\n");goto cleanup;}
     {
         size_t cap=initial_storage_capacity(absolute);
         if(cap<STN_STORAGE_OVERHEAD+4u+genesis_length){cap=STN_STORAGE_OVERHEAD+4u+genesis_length;}
@@ -293,7 +319,7 @@ cleanup:
     stn_chain_state_release(&mining.active);stn_pending_clear(&pending);free(genesis);free(body);free(mining.snapshot);free(mining.workspace.current_bytes);free(mining.workspace.next_bytes);free(mining.template_bytes);
     return result;
 usage:
-    puts("Usage: stn-chain --dev [--data PATH] [--rpc-port 18473]\n"
+    puts("Usage: stn-chain [--data PATH] [--rpc-port 18473]\nResume saved history or initialize the built-in genesis if absent.\nOptional --dev enables the repeated development transaction.\n"
          "   or: stn-chain --genesis BLOCK --data PATH [--rpc-port PORT]\n"
          "Explicit selected content: --dev --genesis BLOCK --transaction STNT.\nRepeat --peer IPv4:PORT for automatic outbound P2P (not with --once).\nLoopback RPC only. --once serves one connection. Port 0 chooses a free port.");
     return argc==1 ? EXIT_SUCCESS : EXIT_FAILURE;

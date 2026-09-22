@@ -22,6 +22,18 @@ The script builds the node only. Existing solution/project workflows below
 are optional for IDE use and the existing qualification/test targets.
 Historical qualification results retain their original build context.
 
+## Windows startup
+
+Run `build\stn-chain.exe` without arguments to start the node on
+`127.0.0.1:18473`. Like Linux, Windows resumes existing history or creates
+history with the existing built-in genesis when absent. The default data file
+is `stn-chain-dev.stns` in the current working directory; use `--data PATH`
+to keep a fixed location across launches. The filename does not enable `--dev`.
+An existing history supplies its genesis anchor and undergoes normal full
+validation. Invalid or unreadable history fails without replacement.
+`--genesis BLOCK` still selects an explicit anchor; `--dev` remains optional.
+This changes application startup, not Windows service/boot registration.
+
 ## Phase 18 address foundation
 
 Build the existing solution in Release/x64, then run
@@ -71,7 +83,7 @@ ISO C17, not C++.
 
 Release | x64 is currently the only solution configuration. Use Build >
 Build Solution, then Debug > Start Without Debugging to run the console
-development node. Use the configured development launch arguments or run-dev.cmd to start loopback RPC; no arguments print usage.
+development node. Use the configured development launch arguments or run-dev.cmd to start loopback RPC; no arguments resume or initialize the default history.
 
 ## Optional solution configuration
 

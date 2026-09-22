@@ -5,6 +5,21 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Windows automatic genesis startup - 2026-09-22
+
+- Windows now starts without required arguments, matching Linux: recover the
+  anchor from saved STNS history or initialize the existing built-in genesis
+  when history is absent. Full history validation still precedes serving RPC.
+- Malformed/unreadable history is not replaced. Explicit genesis and optional
+  development transaction behavior are preserved. Default data remains
+  `stn-chain-dev.stns` relative to the working directory; RPC remains loopback.
+- `build.cmd`: Windows x64, zero warnings/errors. Ten focused executable checks
+  passed: no-argument startup, creation, restart preservation, explicit anchor,
+  implicit anchor recovery, corrupt/truncated history rejection and dev mode.
+- No consensus, storage format, mining or STNC interface changes. Linux source
+  unchanged; no Linux requalification or Windows service registration added.
+
+
 ### Phase 18 Contract build reconciliation - 2026-09-22
 
 - Restored the existing Contract authority status and public authority API
