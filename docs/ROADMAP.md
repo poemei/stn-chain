@@ -111,13 +111,13 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
 														   Additional hardware/backend qualification
 														   may continue independently.
 
-                     18 Contract Engine   **ACTIVE**       Address foundation is
-                                                           qualified and canonical
-                                                           Contract v1 foundation is
-                                                           implemented; qualification
-                                                           pending. No VM, EVM,
-                                                           arbitrary bytecode, scripts
-                                                           or gas.
+                     18 Contract Engine   **ACTIVE**       Address foundation, canonical
+														   Contract v1 foundation, deterministic
+														   lifecycle transitions, sequencing, and
+														   scoped Phase 14 authority integration
+														   are qualified on Windows x64 and Linux
+														   x64. No VM, EVM, arbitrary bytecode,
+														   scripts or gas.
 
                      19 Economics /       **NOT STARTED**  Native economics, issuance
                         Issuance /                         and reward rules remain
