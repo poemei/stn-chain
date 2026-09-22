@@ -65,7 +65,8 @@ CORE_SOURCES := \
 	src/stn_storage.c \
 	src/stn_transaction.c \
 	src/stn_validation.c \
-	src/stn_contract.c
+	src/stn_contract.c \
+	src/stn_contract_transaction.c
 
 CRYPTO_SOURCES := \
 	src/crypto/ed25519_donna/ed25519_provider.c
