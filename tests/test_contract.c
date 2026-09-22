@@ -1544,6 +1544,251 @@ int test_contract(void)
         &approval_state) == STN_CONTRACT_ARGUMENT);
 
 
+    /*
+     * Accepted Contract action application.
+     *
+     * Consensus acceptance is established by the caller before this primitive
+     * is invoked. Accepted application advances the deterministic Contract
+     * state and, for APPROVE, consumes exactly one accepted approval key.
+     */
+    transition_contract = contract;
+    transition_contract.sequence = UINT64_C(42);
+    transition_contract.state = STN_CONTRACT_STATE_REVIEW;
+
+    written_again = 0u;
+    CHECK(stn_contract_encode(
+        &transition_contract,
+        action_canonical,
+        sizeof(action_canonical),
+        &written_again) == STN_CONTRACT_OK);
+
+    memset(approval_store, 0, sizeof(approval_store));
+    stn_contract_approval_state_initialize(
+        &approval_state,
+        approval_store,
+        4u);
+
+    memset(&transitioned, 0, sizeof(transitioned));
+    CHECK(stn_contract_accept_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        &approval_state,
+        &transitioned) == STN_CONTRACT_OK);
+    CHECK(transitioned.version == transition_contract.version);
+    CHECK(transitioned.type == transition_contract.type);
+    CHECK(transitioned.sequence == UINT64_C(43));
+    CHECK(transitioned.created_at == transition_contract.created_at);
+    CHECK(transitioned.state == STN_CONTRACT_STATE_APPROVALS);
+    CHECK(transitioned.participants == transition_contract.participants);
+    CHECK(transitioned.participant_count ==
+          transition_contract.participant_count);
+    CHECK(transitioned.participant_bytes ==
+          transition_contract.participant_bytes);
+    CHECK(transitioned.terms == transition_contract.terms);
+    CHECK(transitioned.terms_length == transition_contract.terms_length);
+    CHECK(approval_state.accepted_count == 1u);
+
+    CHECK(stn_contract_approval_key(
+        action_canonical,
+        written_again,
+        UINT64_C(43),
+        signing_actor,
+        approval_key) == STN_CONTRACT_OK);
+    CHECK(stn_contract_approval_state_check(
+        &approval_state,
+        approval_key) == STN_CONTRACT_DUPLICATE_APPROVAL);
+
+    /*
+     * Re-applying the same accepted APPROVE is a duplicate. Neither the
+     * destination Contract nor accepted approval state may change.
+     */
+    memset(&before_transitioned, 0x5au, sizeof(before_transitioned));
+    transitioned = before_transitioned;
+    CHECK(stn_contract_accept_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        &approval_state,
+        &transitioned) == STN_CONTRACT_DUPLICATE_APPROVAL);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+    CHECK(approval_state.accepted_count == 1u);
+
+    /*
+     * Capacity failure is atomic. A fresh accepted APPROVE cannot publish the
+     * next Contract if its approval key cannot also enter accepted state.
+     */
+    stn_contract_approval_state_initialize(
+        &approval_state,
+        approval_store,
+        1u);
+    CHECK(stn_contract_approval_state_consume(
+        &approval_state,
+        approval_key) == STN_CONTRACT_OK);
+    CHECK(approval_state.accepted_count == 1u);
+
+    transitioned = before_transitioned;
+    CHECK(stn_contract_accept_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        other_actor,
+        &approval_state,
+        &transitioned) == STN_CONTRACT_CAPACITY);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+    CHECK(approval_state.accepted_count == 1u);
+
+    /*
+     * Canonical mismatch and sequence failure also preserve both caller-visible
+     * outputs.
+     */
+    memset(approval_store, 0, sizeof(approval_store));
+    stn_contract_approval_state_initialize(
+        &approval_state,
+        approval_store,
+        4u);
+
+    memcpy(action_canonical_mutated, action_canonical, written_again);
+    action_canonical_mutated[written_again - 1u] ^= 0x01u;
+
+    transitioned = before_transitioned;
+    CHECK(stn_contract_accept_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical_mutated,
+        written_again,
+        signing_actor,
+        &approval_state,
+        &transitioned) == STN_CONTRACT_LENGTH);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+    CHECK(approval_state.accepted_count == 0u);
+
+    transitioned = before_transitioned;
+    CHECK(stn_contract_accept_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(44),
+        action_canonical,
+        written_again,
+        signing_actor,
+        &approval_state,
+        &transitioned) == STN_CONTRACT_SEQUENCE_ERROR);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+    CHECK(approval_state.accepted_count == 0u);
+
+    /*
+     * Non-APPROVE accepted actions do not require or consume approval state.
+     * REVIEW -> REJECTED is deterministic and advances sequence exactly once.
+     */
+    transitioned = before_transitioned;
+    CHECK(stn_contract_accept_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_REJECT,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        NULL,
+        &transitioned) == STN_CONTRACT_OK);
+    CHECK(transitioned.sequence == UINT64_C(43));
+    CHECK(transitioned.state == STN_CONTRACT_STATE_REJECTED);
+    CHECK(approval_state.accepted_count == 0u);
+
+    /* APPROVE requires accepted approval state. */
+    transitioned = before_transitioned;
+    CHECK(stn_contract_accept_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        NULL,
+        &transitioned) == STN_CONTRACT_ARGUMENT);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    /* Required malformed arguments leave the destination untouched. */
+    transitioned = before_transitioned;
+    CHECK(stn_contract_accept_action(
+        NULL,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        &approval_state,
+        &transitioned) == STN_CONTRACT_ARGUMENT);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    transitioned = before_transitioned;
+    CHECK(stn_contract_accept_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        NULL,
+        written_again,
+        signing_actor,
+        &approval_state,
+        &transitioned) == STN_CONTRACT_ARGUMENT);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    transitioned = before_transitioned;
+    CHECK(stn_contract_accept_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        NULL,
+        &approval_state,
+        &transitioned) == STN_CONTRACT_ARGUMENT);
+    CHECK(memcmp(
+        &transitioned,
+        &before_transitioned,
+        sizeof(transitioned)) == 0);
+
+    CHECK(stn_contract_accept_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        action_canonical,
+        written_again,
+        signing_actor,
+        &approval_state,
+        NULL) == STN_CONTRACT_ARGUMENT);
+    CHECK(approval_state.accepted_count == 0u);
+
+
     /* Zero-participant / zero-terms contracts are valid structural objects. */
     contract.type = STN_CONTRACT_GENERIC;
     contract.sequence = 0u;

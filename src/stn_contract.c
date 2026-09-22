@@ -1109,6 +1109,104 @@ stn_contract_status stn_contract_validate_action(
 }
 
 
+stn_contract_status stn_contract_accept_action(
+    const stn_contract *current,
+    uint16_t action,
+    uint64_t expected_sequence,
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    stn_contract_approval_state *approval_state,
+    stn_contract *next)
+{
+    stn_contract updated;
+    stn_contract_status status;
+    uint8_t approval_key[STN_CONTRACT_APPROVAL_KEY_SIZE];
+
+    if (current == NULL ||
+        canonical_contract == NULL ||
+        actor == NULL ||
+        next == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    /*
+     * Accepted application is bound to the exact current canonical Contract.
+     * Consensus acceptance of one agreement must never advance another native
+     * object merely because its lifecycle fields happen to permit the action.
+     */
+    status = contract_matches_canonical(
+        current,
+        canonical_contract,
+        canonical_contract_length);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    /*
+     * Build the complete next Contract state first. Nothing caller-visible is
+     * published until every action-specific accepted-state operation can also
+     * succeed.
+     */
+    status = stn_contract_apply_action(
+        current,
+        action,
+        expected_sequence,
+        &updated);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    if (action == STN_CONTRACT_ACTION_APPROVE) {
+        if (approval_state == NULL) {
+            return STN_CONTRACT_ARGUMENT;
+        }
+
+        status = stn_contract_approval_key(
+            canonical_contract,
+            canonical_contract_length,
+            expected_sequence,
+            actor,
+            approval_key);
+
+        if (status != STN_CONTRACT_OK) {
+            return status;
+        }
+
+        /*
+         * Check first so duplicate/capacity failures leave both outputs
+         * untouched. consume() is the sole publication of accepted approval
+         * state and cannot fail after these deterministic preconditions.
+         */
+        status = stn_contract_approval_state_check(
+            approval_state,
+            approval_key);
+
+        if (status != STN_CONTRACT_OK) {
+            return status;
+        }
+
+        if (approval_state->accepted_count ==
+            approval_state->accepted_capacity) {
+            return STN_CONTRACT_CAPACITY;
+        }
+
+        status = stn_contract_approval_state_consume(
+            approval_state,
+            approval_key);
+
+        if (status != STN_CONTRACT_OK) {
+            return status;
+        }
+    }
+
+    *next = updated;
+    return STN_CONTRACT_OK;
+}
+
+
 stn_contract_status stn_contract_apply_action(
     const stn_contract *current,
     uint16_t action,
