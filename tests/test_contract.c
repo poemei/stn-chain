@@ -55,6 +55,13 @@ int test_contract(void)
     uint8_t authority_before[STN_AUTHORITY_CONTEXT_SIZE];
     uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
     uint8_t other_actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
+    uint8_t approval_key[STN_CONTRACT_APPROVAL_KEY_SIZE];
+    uint8_t approval_key_again[STN_CONTRACT_APPROVAL_KEY_SIZE];
+    uint8_t approval_key_other[STN_CONTRACT_APPROVAL_KEY_SIZE];
+    uint8_t approval_key_next_sequence[STN_CONTRACT_APPROVAL_KEY_SIZE];
+    uint8_t approval_store[4u * STN_CONTRACT_APPROVAL_KEY_SIZE];
+    uint8_t approval_rebuild[3u * STN_CONTRACT_APPROVAL_KEY_SIZE];
+    stn_contract_approval_state approval_state;
     char address_text[STN_ADDRESS_TEXT_CAPACITY];
     char address_text_again[STN_ADDRESS_TEXT_CAPACITY];
     size_t written;
@@ -809,6 +816,7 @@ int test_contract(void)
         UINT64_C(101),
         NULL) == STN_CONTRACT_ARGUMENT);
 
+
     /*
      * Phase 14 scoped-authority bridge.
      *
@@ -991,6 +999,190 @@ int test_contract(void)
         written,
         authority_evidence,
         authority_written) == STN_CONTRACT_ARGUMENT);
+
+    /*
+     * Contract duplicate-approval prevention.
+     *
+     * Approval identity is scoped to the exact canonical contract identifier,
+     * action sequence and canonical approving identity. Only accepted approval
+     * state is consumed; pending arrival order is not authoritative.
+     */
+    memset(approval_key, 0, sizeof(approval_key));
+    memset(approval_key_again, 0, sizeof(approval_key_again));
+    memset(approval_key_other, 0, sizeof(approval_key_other));
+    memset(approval_key_next_sequence, 0, sizeof(approval_key_next_sequence));
+
+    CHECK(stn_contract_approval_key(
+        canonical,
+        written,
+        UINT64_C(43),
+        actor,
+        approval_key) == STN_CONTRACT_OK);
+
+    CHECK(memcmp(
+        approval_key,
+        address_a.identifier,
+        STN_ADDRESS_ID_SIZE) == 0);
+    CHECK(memcmp(
+        approval_key + STN_ADDRESS_ID_SIZE,
+        "\x00\x00\x00\x00\x00\x00\x00\x2b",
+        8u) == 0);
+
+    CHECK(stn_contract_approval_key(
+        canonical,
+        written,
+        UINT64_C(43),
+        actor,
+        approval_key_again) == STN_CONTRACT_OK);
+    CHECK(memcmp(
+        approval_key,
+        approval_key_again,
+        STN_CONTRACT_APPROVAL_KEY_SIZE) == 0);
+
+    CHECK(stn_contract_approval_key(
+        canonical,
+        written,
+        UINT64_C(43),
+        other_actor,
+        approval_key_other) == STN_CONTRACT_OK);
+    CHECK(memcmp(
+        approval_key,
+        approval_key_other,
+        STN_CONTRACT_APPROVAL_KEY_SIZE) != 0);
+
+    CHECK(stn_contract_approval_key(
+        canonical,
+        written,
+        UINT64_C(44),
+        actor,
+        approval_key_next_sequence) == STN_CONTRACT_OK);
+    CHECK(memcmp(
+        approval_key,
+        approval_key_next_sequence,
+        STN_CONTRACT_APPROVAL_KEY_SIZE) != 0);
+
+    memset(approval_store, 0, sizeof(approval_store));
+    stn_contract_approval_state_initialize(
+        &approval_state,
+        approval_store,
+        4u);
+    CHECK(approval_state.accepted_count == 0u);
+
+    CHECK(stn_contract_approval_state_check(
+        &approval_state,
+        approval_key) == STN_CONTRACT_OK);
+    CHECK(stn_contract_approval_state_consume(
+        &approval_state,
+        approval_key) == STN_CONTRACT_OK);
+    CHECK(approval_state.accepted_count == 1u);
+    CHECK(stn_contract_approval_state_check(
+        &approval_state,
+        approval_key) == STN_CONTRACT_DUPLICATE_APPROVAL);
+    CHECK(stn_contract_approval_state_consume(
+        &approval_state,
+        approval_key) == STN_CONTRACT_DUPLICATE_APPROVAL);
+    CHECK(approval_state.accepted_count == 1u);
+
+    /* Different identity and later sequence remain independently fresh. */
+    CHECK(stn_contract_approval_state_check(
+        &approval_state,
+        approval_key_other) == STN_CONTRACT_OK);
+    CHECK(stn_contract_approval_state_consume(
+        &approval_state,
+        approval_key_other) == STN_CONTRACT_OK);
+    CHECK(stn_contract_approval_state_check(
+        &approval_state,
+        approval_key_next_sequence) == STN_CONTRACT_OK);
+    CHECK(stn_contract_approval_state_consume(
+        &approval_state,
+        approval_key_next_sequence) == STN_CONTRACT_OK);
+    CHECK(approval_state.accepted_count == 3u);
+
+    /* Accepted-history rebuild reproduces the same deterministic state. */
+    memcpy(
+        approval_rebuild,
+        approval_key,
+        STN_CONTRACT_APPROVAL_KEY_SIZE);
+    memcpy(
+        approval_rebuild + STN_CONTRACT_APPROVAL_KEY_SIZE,
+        approval_key_other,
+        STN_CONTRACT_APPROVAL_KEY_SIZE);
+    memcpy(
+        approval_rebuild + (2u * STN_CONTRACT_APPROVAL_KEY_SIZE),
+        approval_key_next_sequence,
+        STN_CONTRACT_APPROVAL_KEY_SIZE);
+
+    approval_state.accepted_count = 0u;
+    CHECK(stn_contract_approval_state_rebuild(
+        &approval_state,
+        approval_rebuild,
+        3u) == STN_CONTRACT_OK);
+    CHECK(approval_state.accepted_count == 3u);
+    CHECK(stn_contract_approval_state_check(
+        &approval_state,
+        approval_key) == STN_CONTRACT_DUPLICATE_APPROVAL);
+    CHECK(stn_contract_approval_state_check(
+        &approval_state,
+        approval_key_other) == STN_CONTRACT_DUPLICATE_APPROVAL);
+    CHECK(stn_contract_approval_state_check(
+        &approval_state,
+        approval_key_next_sequence) == STN_CONTRACT_DUPLICATE_APPROVAL);
+
+    /* Duplicate accepted history is invalid and does not publish partial state. */
+    memcpy(
+        approval_rebuild + STN_CONTRACT_APPROVAL_KEY_SIZE,
+        approval_key,
+        STN_CONTRACT_APPROVAL_KEY_SIZE);
+    approval_state.accepted_count = 0u;
+    CHECK(stn_contract_approval_state_rebuild(
+        &approval_state,
+        approval_rebuild,
+        2u) == STN_CONTRACT_DUPLICATE_APPROVAL);
+    CHECK(approval_state.accepted_count == 0u);
+
+    /* Capacity and malformed arguments fail deterministically. */
+    stn_contract_approval_state_initialize(
+        &approval_state,
+        approval_store,
+        1u);
+    CHECK(stn_contract_approval_state_consume(
+        &approval_state,
+        approval_key) == STN_CONTRACT_OK);
+    CHECK(stn_contract_approval_state_consume(
+        &approval_state,
+        approval_key_other) == STN_CONTRACT_CAPACITY);
+    CHECK(approval_state.accepted_count == 1u);
+
+    CHECK(stn_contract_approval_key(
+        canonical,
+        STN_CONTRACT_HEADER_SIZE - 1u,
+        UINT64_C(43),
+        actor,
+        approval_key_again) == STN_CONTRACT_TRUNCATED);
+    CHECK(stn_contract_approval_key(
+        NULL,
+        written,
+        UINT64_C(43),
+        actor,
+        approval_key_again) == STN_CONTRACT_ARGUMENT);
+    CHECK(stn_contract_approval_key(
+        canonical,
+        written,
+        UINT64_C(43),
+        NULL,
+        approval_key_again) == STN_CONTRACT_ARGUMENT);
+    CHECK(stn_contract_approval_key(
+        canonical,
+        written,
+        UINT64_C(43),
+        actor,
+        NULL) == STN_CONTRACT_ARGUMENT);
+    CHECK(stn_contract_approval_state_check(
+        NULL,
+        approval_key) == STN_CONTRACT_ARGUMENT);
+    CHECK(stn_contract_approval_state_consume(
+        NULL,
+        approval_key) == STN_CONTRACT_ARGUMENT);
 
     /* Zero-participant / zero-terms contracts are valid structural objects. */
     contract.type = STN_CONTRACT_GENERIC;

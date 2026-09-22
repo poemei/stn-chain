@@ -641,6 +641,157 @@ stn_contract_status stn_contract_authority_evaluate(
     return STN_CONTRACT_OK;
 }
 
+
+stn_contract_status stn_contract_approval_key(
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    uint64_t sequence,
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    uint8_t key[STN_CONTRACT_APPROVAL_KEY_SIZE])
+{
+    stn_address address;
+    uint8_t canonical_actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
+    uint8_t built[STN_CONTRACT_APPROVAL_KEY_SIZE];
+    stn_contract_status status;
+
+    if (canonical_contract == NULL || actor == NULL || key == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    status = stn_contract_address(
+        canonical_contract,
+        canonical_contract_length,
+        &address);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    if (stn_identity_derive(actor, canonical_actor) != STN_IDENTITY_VALID) {
+        return STN_CONTRACT_AUTHORITY_ERROR;
+    }
+
+    memcpy(built, address.identifier, STN_ADDRESS_ID_SIZE);
+    write_be(built + STN_ADDRESS_ID_SIZE, 8u, sequence);
+    memcpy(
+        built + STN_ADDRESS_ID_SIZE + 8u,
+        canonical_actor,
+        STN_IDENTITY_PUBLIC_KEY_SIZE);
+
+    memcpy(key, built, sizeof(built));
+    return STN_CONTRACT_OK;
+}
+
+void stn_contract_approval_state_initialize(
+    stn_contract_approval_state *state,
+    uint8_t *accepted,
+    size_t accepted_capacity)
+{
+    if (state == NULL) {
+        return;
+    }
+
+    state->accepted = accepted;
+    state->accepted_count = 0u;
+    state->accepted_capacity = accepted_capacity;
+}
+
+stn_contract_status stn_contract_approval_state_check(
+    const stn_contract_approval_state *state,
+    const uint8_t key[STN_CONTRACT_APPROVAL_KEY_SIZE])
+{
+    size_t i;
+
+    if (state == NULL || key == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    if (state->accepted_count > state->accepted_capacity ||
+        (state->accepted_capacity != 0u && state->accepted == NULL)) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    for (i = 0u; i < state->accepted_count; ++i) {
+        if (memcmp(
+                state->accepted + (i * STN_CONTRACT_APPROVAL_KEY_SIZE),
+                key,
+                STN_CONTRACT_APPROVAL_KEY_SIZE) == 0) {
+            return STN_CONTRACT_DUPLICATE_APPROVAL;
+        }
+    }
+
+    return STN_CONTRACT_OK;
+}
+
+stn_contract_status stn_contract_approval_state_consume(
+    stn_contract_approval_state *state,
+    const uint8_t key[STN_CONTRACT_APPROVAL_KEY_SIZE])
+{
+    stn_contract_status status;
+
+    if (state == NULL || key == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    status = stn_contract_approval_state_check(state, key);
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    if (state->accepted_count == state->accepted_capacity) {
+        return STN_CONTRACT_CAPACITY;
+    }
+
+    memcpy(
+        state->accepted +
+            (state->accepted_count * STN_CONTRACT_APPROVAL_KEY_SIZE),
+        key,
+        STN_CONTRACT_APPROVAL_KEY_SIZE);
+
+    ++state->accepted_count;
+    return STN_CONTRACT_OK;
+}
+
+stn_contract_status stn_contract_approval_state_rebuild(
+    stn_contract_approval_state *state,
+    const uint8_t *keys,
+    size_t key_count)
+{
+    size_t i;
+    size_t original_count;
+    stn_contract_status status;
+
+    if (state == NULL ||
+        (key_count != 0u && keys == NULL)) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    if (state->accepted_count > state->accepted_capacity ||
+        (state->accepted_capacity != 0u && state->accepted == NULL)) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    if (key_count > state->accepted_capacity) {
+        return STN_CONTRACT_CAPACITY;
+    }
+
+    original_count = state->accepted_count;
+    state->accepted_count = 0u;
+
+    for (i = 0u; i < key_count; ++i) {
+        status = stn_contract_approval_state_consume(
+            state,
+            keys + (i * STN_CONTRACT_APPROVAL_KEY_SIZE));
+
+        if (status != STN_CONTRACT_OK) {
+            state->accepted_count = original_count;
+            return status;
+        }
+    }
+
+    return STN_CONTRACT_OK;
+}
+
 stn_contract_status stn_contract_apply_action(
     const stn_contract *current,
     uint16_t action,

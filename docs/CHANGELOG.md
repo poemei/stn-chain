@@ -5,6 +5,26 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 18 Contract build reconciliation - 2026-09-22
+
+- Restored the existing Contract authority status and public authority API
+  declarations; appended the duplicate-approval status without renumbering
+  existing statuses. Retained the current approval API and implementation.
+- Restored the committed authority qualification tests and identity fixtures
+  alongside the approval tests, and declared their missing caller-owned buffers.
+  All prior committed Contract checks and the canonical serialization/address
+  fixture are retained. No Contract implementation or consensus change.
+- Windows x64 validation: `cmd /c build.cmd test-contract` passed with 363
+  checks and zero failures; `cmd /c build.cmd` also succeeded. Both compiled
+  as ISO C17 with /W4 /WX and no compiler warnings or errors.
+- The shared header/test fixes also cover Linux. The existing Makefile node
+  and `make test-contract` targets already include the Contract, authority,
+  identity and crypto sources; no platform-specific build changes were needed.
+- Limitation: native Linux compilation/execution was not performed because
+  this editing host has no usable Linux toolchain or WSL distribution.
+  Linux qualification remains pending. No new Contract functionality,
+  accepted-history integration, deployment or release is claimed.
+
 ### Windows command-line build workflow - 2026-09-22
 
 - Made `build.cmd` the primary Windows node build entry point, with automatic

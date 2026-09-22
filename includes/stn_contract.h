@@ -10,6 +10,9 @@
 
 #define STN_CONTRACT_VERSION 1u
 
+#define STN_CONTRACT_AUTHORITY_ACTION_DOMAIN 0x43u
+#define STN_CONTRACT_AUTHORITY_CONTEXT_DOMAIN 0x43u
+
 #define STN_CONTRACT_HEADER_SIZE 32u
 #define STN_CONTRACT_PARTICIPANT_SIZE 34u
 
@@ -20,19 +23,6 @@
     (STN_CONTRACT_HEADER_SIZE + \
      (STN_CONTRACT_MAX_PARTICIPANTS * STN_CONTRACT_PARTICIPANT_SIZE) + \
      STN_CONTRACT_MAX_TERMS)
-
-/*
- * Phase 14 scoped-authority tokens used by the Contract Engine.
- *
- * Tokens retain the existing Phase 14 format: byte 0 is the authority version
- * and the remaining bytes are deterministic protocol data. They are opaque to
- * the authority primitive; Contract v1 assigns their meaning here.
- *
- * The action token identifies the Contract v1 action. The context token binds
- * authority to the exact canonical contract identifier underlying stnc0_.
- */
-#define STN_CONTRACT_AUTHORITY_ACTION_DOMAIN 0x43u
-#define STN_CONTRACT_AUTHORITY_CONTEXT_DOMAIN 0x43u
 
 /*
  * Contract types are protocol-defined.
@@ -119,7 +109,8 @@ typedef enum stn_contract_status {
     STN_CONTRACT_ACTION_ERROR,
     STN_CONTRACT_TRANSITION_ERROR,
     STN_CONTRACT_SEQUENCE_ERROR,
-    STN_CONTRACT_AUTHORITY_ERROR
+    STN_CONTRACT_AUTHORITY_ERROR,
+    STN_CONTRACT_DUPLICATE_APPROVAL
 } stn_contract_status;
 
 /*
@@ -317,6 +308,7 @@ stn_contract_status stn_contract_transition(
  *
  * Output is unchanged on failure.
  */
+
 /*
  * Build the Phase 14 scoped-authority action token for a Contract v1 action.
  *
@@ -361,6 +353,85 @@ stn_contract_status stn_contract_authority_evaluate(
     size_t canonical_contract_length,
     const uint8_t *evidence,
     size_t evidence_length);
+
+
+/*
+ * Accepted Contract approval state.
+ *
+ * An approval key is the exact tuple:
+ *
+ *   canonical contract identifier + contract sequence + approving identity
+ *
+ * This state records only approvals that have become accepted Chain state.
+ * Pending arrival order, wall-clock time and transport metadata do not
+ * participate. Buffers are caller-owned; no protocol-level approval ceiling is
+ * imposed by this primitive.
+ */
+#define STN_CONTRACT_APPROVAL_KEY_SIZE \
+    (STN_ADDRESS_ID_SIZE + 8u + STN_IDENTITY_PUBLIC_KEY_SIZE)
+
+typedef struct stn_contract_approval_state {
+    uint8_t *accepted;
+    size_t accepted_count;
+    size_t accepted_capacity;
+} stn_contract_approval_state;
+
+/*
+ * Build the canonical duplicate-approval key for an APPROVE action.
+ *
+ * canonical_contract must be an exact structurally valid Contract v1 object.
+ * sequence is the sequence carried by the approval action. actor is
+ * canonicalized through the existing identity layer.
+ *
+ * Output is unchanged on failure.
+ */
+stn_contract_status stn_contract_approval_key(
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    uint64_t sequence,
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    uint8_t key[STN_CONTRACT_APPROVAL_KEY_SIZE]);
+
+/*
+ * Initialize caller-owned accepted approval state.
+ *
+ * accepted_capacity is measured in approval keys, not bytes.
+ */
+void stn_contract_approval_state_initialize(
+    stn_contract_approval_state *state,
+    uint8_t *accepted,
+    size_t accepted_capacity);
+
+/*
+ * Check whether an exact canonical approval key is already accepted.
+ *
+ * STN_CONTRACT_OK means fresh. STN_CONTRACT_DUPLICATE_APPROVAL means the exact
+ * contract/sequence/identity tuple is already present.
+ */
+stn_contract_status stn_contract_approval_state_check(
+    const stn_contract_approval_state *state,
+    const uint8_t key[STN_CONTRACT_APPROVAL_KEY_SIZE]);
+
+/*
+ * Consume an approval only after the corresponding APPROVE action becomes
+ * accepted Chain state.
+ *
+ * Duplicate keys are rejected. Capacity exhaustion fails explicitly.
+ */
+stn_contract_status stn_contract_approval_state_consume(
+    stn_contract_approval_state *state,
+    const uint8_t key[STN_CONTRACT_APPROVAL_KEY_SIZE]);
+
+/*
+ * Deterministically rebuild accepted approval state from canonical approval
+ * keys enumerated in accepted history order.
+ *
+ * Output state becomes usable only on success.
+ */
+stn_contract_status stn_contract_approval_state_rebuild(
+    stn_contract_approval_state *state,
+    const uint8_t *keys,
+    size_t key_count);
 
 
 stn_contract_status stn_contract_apply_action(
