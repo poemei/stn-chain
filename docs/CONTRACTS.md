@@ -24,6 +24,9 @@ may provide evidence. None independently determines accepted Chain state.
 
 ---
 
+## STNC Core
+Utilizing Contracts **WILL** be implemented in *STNC Core* which will give the user a Graphical User Interface to a Contract.
+
 ## Contract Model
 
 Conceptually, an STN Chain contract consists of:
