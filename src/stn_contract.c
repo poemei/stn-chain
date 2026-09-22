@@ -515,6 +515,132 @@ stn_contract_status stn_contract_transition(
     return STN_CONTRACT_OK;
 }
 
+
+stn_contract_status stn_contract_authority_action(
+    uint16_t action,
+    uint8_t authority_action[STN_AUTHORITY_ACTION_SIZE])
+{
+    uint8_t token[STN_AUTHORITY_ACTION_SIZE] = {0};
+
+    if (authority_action == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    if (!contract_action_valid(action)) {
+        return STN_CONTRACT_ACTION_ERROR;
+    }
+
+    token[0] = STN_AUTHORITY_VERSION;
+    token[1] = STN_CONTRACT_AUTHORITY_ACTION_DOMAIN;
+    token[2] = (uint8_t)((action >> 8) & 0xffu);
+    token[3] = (uint8_t)(action & 0xffu);
+
+    if (stn_authority_action_validate(token) != STN_AUTHORITY_AUTHORIZED) {
+        return STN_CONTRACT_AUTHORITY_ERROR;
+    }
+
+    memcpy(
+        authority_action,
+        token,
+        STN_AUTHORITY_ACTION_SIZE);
+
+    return STN_CONTRACT_OK;
+}
+
+stn_contract_status stn_contract_authority_context(
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    uint8_t authority_context[STN_AUTHORITY_CONTEXT_SIZE])
+{
+    uint8_t token[STN_AUTHORITY_CONTEXT_SIZE] = {0};
+    stn_address address;
+    stn_contract_status status;
+
+    if (canonical_contract == NULL || authority_context == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    status = stn_contract_address(
+        canonical_contract,
+        canonical_contract_length,
+        &address);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    /*
+     * Phase 14 tokens require byte 0 to carry the authority version. The
+     * remaining 31 bytes bind the scope to the canonical Contract v1
+     * identifier. No textual stnc0_ representation is involved.
+     */
+    token[0] = STN_AUTHORITY_VERSION;
+    token[1] = STN_CONTRACT_AUTHORITY_CONTEXT_DOMAIN;
+    memcpy(
+        token + 2,
+        address.identifier,
+        STN_AUTHORITY_CONTEXT_SIZE - 2u);
+
+    if (stn_authority_context_validate(token) != STN_AUTHORITY_AUTHORIZED) {
+        return STN_CONTRACT_AUTHORITY_ERROR;
+    }
+
+    memcpy(
+        authority_context,
+        token,
+        STN_AUTHORITY_CONTEXT_SIZE);
+
+    return STN_CONTRACT_OK;
+}
+
+stn_contract_status stn_contract_authority_evaluate(
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    uint16_t action,
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    const uint8_t *evidence,
+    size_t evidence_length)
+{
+    uint8_t authority_action[STN_AUTHORITY_ACTION_SIZE];
+    uint8_t authority_context[STN_AUTHORITY_CONTEXT_SIZE];
+    stn_contract_status status;
+    stn_authority_result authority_status;
+
+    if (actor == NULL || canonical_contract == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    status = stn_contract_authority_action(
+        action,
+        authority_action);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    status = stn_contract_authority_context(
+        canonical_contract,
+        canonical_contract_length,
+        authority_context);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    authority_status = stn_authority_evaluate(
+        actor,
+        authority_action,
+        authority_context,
+        evidence,
+        evidence_length);
+
+    if (authority_status != STN_AUTHORITY_AUTHORIZED) {
+        return STN_CONTRACT_AUTHORITY_ERROR;
+    }
+
+    return STN_CONTRACT_OK;
+}
+
 stn_contract_status stn_contract_apply_action(
     const stn_contract *current,
     uint16_t action,

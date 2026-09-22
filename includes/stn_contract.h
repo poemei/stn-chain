@@ -3,6 +3,7 @@
 #define STN_CONTRACT_H
 
 #include "stn_address.h"
+#include "stn_authority.h"
 #include "stn_platform.h"
 
 #include <stddef.h>
@@ -19,6 +20,19 @@
     (STN_CONTRACT_HEADER_SIZE + \
      (STN_CONTRACT_MAX_PARTICIPANTS * STN_CONTRACT_PARTICIPANT_SIZE) + \
      STN_CONTRACT_MAX_TERMS)
+
+/*
+ * Phase 14 scoped-authority tokens used by the Contract Engine.
+ *
+ * Tokens retain the existing Phase 14 format: byte 0 is the authority version
+ * and the remaining bytes are deterministic protocol data. They are opaque to
+ * the authority primitive; Contract v1 assigns their meaning here.
+ *
+ * The action token identifies the Contract v1 action. The context token binds
+ * authority to the exact canonical contract identifier underlying stnc0_.
+ */
+#define STN_CONTRACT_AUTHORITY_ACTION_DOMAIN 0x43u
+#define STN_CONTRACT_AUTHORITY_CONTEXT_DOMAIN 0x43u
 
 /*
  * Contract types are protocol-defined.
@@ -104,7 +118,8 @@ typedef enum stn_contract_status {
     STN_CONTRACT_ADDRESS_ERROR,
     STN_CONTRACT_ACTION_ERROR,
     STN_CONTRACT_TRANSITION_ERROR,
-    STN_CONTRACT_SEQUENCE_ERROR
+    STN_CONTRACT_SEQUENCE_ERROR,
+    STN_CONTRACT_AUTHORITY_ERROR
 } stn_contract_status;
 
 /*
@@ -302,6 +317,52 @@ stn_contract_status stn_contract_transition(
  *
  * Output is unchanged on failure.
  */
+/*
+ * Build the Phase 14 scoped-authority action token for a Contract v1 action.
+ *
+ * The token is deterministic and contains no signer, signature, grant or
+ * transport state. Contract actions remain the protocol values defined by
+ * stn_contract_action.
+ *
+ * Output is unchanged on failure.
+ */
+stn_contract_status stn_contract_authority_action(
+    uint16_t action,
+    uint8_t authority_action[STN_AUTHORITY_ACTION_SIZE]);
+
+/*
+ * Build the Phase 14 scoped-authority context token for an exact canonical
+ * Contract v1 object.
+ *
+ * The canonical contract bytes are structurally validated and their existing
+ * stnc0_ identifier is used as the authority context. This scopes authority to
+ * the exact agreement identified by the Chain rather than to textual display
+ * data or transport metadata.
+ *
+ * Output is unchanged on failure.
+ */
+stn_contract_status stn_contract_authority_context(
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    uint8_t authority_context[STN_AUTHORITY_CONTEXT_SIZE]);
+
+/*
+ * Evaluate Phase 14 scoped-authority evidence for a Contract v1 action.
+ *
+ * This function performs only exact Phase 14 subject/action/context evidence
+ * evaluation. It does not validate an authority grant, revocation state,
+ * signature, accepted history or consensus acceptance. Those remain owned by
+ * the existing Phase 14 authority/lifecycle machinery.
+ */
+stn_contract_status stn_contract_authority_evaluate(
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    uint16_t action,
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    const uint8_t *evidence,
+    size_t evidence_length);
+
+
 stn_contract_status stn_contract_apply_action(
     const stn_contract *current,
     uint16_t action,

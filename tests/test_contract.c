@@ -45,6 +45,16 @@ int test_contract(void)
     uint8_t mutated[STN_CONTRACT_MAX_SIZE];
     uint8_t output_guard[STN_CONTRACT_MAX_SIZE];
     uint8_t output_before[STN_CONTRACT_MAX_SIZE];
+    uint8_t authority_action[STN_AUTHORITY_ACTION_SIZE];
+    uint8_t authority_action_again[STN_AUTHORITY_ACTION_SIZE];
+    uint8_t authority_context[STN_AUTHORITY_CONTEXT_SIZE];
+    uint8_t authority_context_again[STN_AUTHORITY_CONTEXT_SIZE];
+    uint8_t authority_evidence[STN_AUTHORITY_EVIDENCE_SIZE];
+    uint8_t authority_evidence_mutated[STN_AUTHORITY_EVIDENCE_SIZE];
+    uint8_t authority_guard[STN_AUTHORITY_CONTEXT_SIZE];
+    uint8_t authority_before[STN_AUTHORITY_CONTEXT_SIZE];
+    uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
+    uint8_t other_actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
     char address_text[STN_ADDRESS_TEXT_CAPACITY];
     char address_text_again[STN_ADDRESS_TEXT_CAPACITY];
     size_t written;
@@ -52,6 +62,7 @@ int test_contract(void)
     size_t address_written;
     size_t address_written_again;
     size_t expected_size;
+    size_t authority_written;
     size_t i;
     uint16_t next_state;
     uint16_t before_state;
@@ -797,6 +808,189 @@ int test_contract(void)
         STN_CONTRACT_ACTION_CREATE,
         UINT64_C(101),
         NULL) == STN_CONTRACT_ARGUMENT);
+
+    /*
+     * Phase 14 scoped-authority bridge.
+     *
+     * Contract v1 assigns deterministic meanings to the existing opaque
+     * Phase 14 action/context tokens. The authority primitive still owns
+     * evidence structure and exact subject/action/context matching.
+     */
+    memset(authority_action, 0, sizeof(authority_action));
+    memset(authority_action_again, 0, sizeof(authority_action_again));
+
+    CHECK(stn_contract_authority_action(
+        STN_CONTRACT_ACTION_APPROVE,
+        authority_action) == STN_CONTRACT_OK);
+    CHECK(authority_action[0] == STN_AUTHORITY_VERSION);
+    CHECK(authority_action[1] == STN_CONTRACT_AUTHORITY_ACTION_DOMAIN);
+    CHECK(authority_action[2] == 0x00u);
+    CHECK(authority_action[3] == (uint8_t)STN_CONTRACT_ACTION_APPROVE);
+    for (i = 4u; i < STN_AUTHORITY_ACTION_SIZE; ++i) {
+        CHECK(authority_action[i] == 0u);
+    }
+
+    CHECK(stn_contract_authority_action(
+        STN_CONTRACT_ACTION_APPROVE,
+        authority_action_again) == STN_CONTRACT_OK);
+    CHECK(memcmp(
+        authority_action,
+        authority_action_again,
+        STN_AUTHORITY_ACTION_SIZE) == 0);
+
+    memset(authority_guard, 0x5au, sizeof(authority_guard));
+    memcpy(authority_before, authority_guard, sizeof(authority_guard));
+    CHECK(stn_contract_authority_action(
+        0xffffu,
+        authority_guard) == STN_CONTRACT_ACTION_ERROR);
+    CHECK(memcmp(
+        authority_guard,
+        authority_before,
+        STN_AUTHORITY_ACTION_SIZE) == 0);
+    CHECK(stn_contract_authority_action(
+        STN_CONTRACT_ACTION_APPROVE,
+        NULL) == STN_CONTRACT_ARGUMENT);
+
+    memset(authority_context, 0, sizeof(authority_context));
+    memset(authority_context_again, 0, sizeof(authority_context_again));
+
+    CHECK(stn_contract_authority_context(
+        canonical,
+        written,
+        authority_context) == STN_CONTRACT_OK);
+    CHECK(authority_context[0] == STN_AUTHORITY_VERSION);
+    CHECK(authority_context[1] == STN_CONTRACT_AUTHORITY_CONTEXT_DOMAIN);
+    CHECK(memcmp(
+        authority_context + 2,
+        address_a.identifier,
+        STN_AUTHORITY_CONTEXT_SIZE - 2u) == 0);
+
+    CHECK(stn_contract_authority_context(
+        canonical,
+        written,
+        authority_context_again) == STN_CONTRACT_OK);
+    CHECK(memcmp(
+        authority_context,
+        authority_context_again,
+        STN_AUTHORITY_CONTEXT_SIZE) == 0);
+
+    memset(authority_guard, 0x5au, sizeof(authority_guard));
+    memcpy(authority_before, authority_guard, sizeof(authority_guard));
+    CHECK(stn_contract_authority_context(
+        mutated,
+        STN_CONTRACT_HEADER_SIZE - 1u,
+        authority_guard) == STN_CONTRACT_TRUNCATED);
+    CHECK(memcmp(
+        authority_guard,
+        authority_before,
+        STN_AUTHORITY_CONTEXT_SIZE) == 0);
+    CHECK(stn_contract_authority_context(
+        NULL,
+        written,
+        authority_guard) == STN_CONTRACT_ARGUMENT);
+    CHECK(memcmp(
+        authority_guard,
+        authority_before,
+        STN_AUTHORITY_CONTEXT_SIZE) == 0);
+    CHECK(stn_contract_authority_context(
+        canonical,
+        written,
+        NULL) == STN_CONTRACT_ARGUMENT);
+
+    /*
+     * Build canonical Phase 14 evidence and prove that Contract evaluation
+     * accepts only the exact actor/action/context tuple.
+     */
+    fill_identity(actor, 0x20u);
+    fill_identity(other_actor, 0x40u);
+
+    authority_written = 0u;
+    CHECK(stn_authority_evidence_encode(
+        actor,
+        authority_action,
+        authority_context,
+        authority_evidence,
+        sizeof(authority_evidence),
+        &authority_written) == STN_AUTHORITY_AUTHORIZED);
+    CHECK(authority_written == STN_AUTHORITY_EVIDENCE_SIZE);
+
+    CHECK(stn_contract_authority_evaluate(
+        actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        written,
+        authority_evidence,
+        authority_written) == STN_CONTRACT_OK);
+
+    CHECK(stn_contract_authority_evaluate(
+        other_actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        written,
+        authority_evidence,
+        authority_written) == STN_CONTRACT_AUTHORITY_ERROR);
+
+    CHECK(stn_contract_authority_evaluate(
+        actor,
+        STN_CONTRACT_ACTION_REJECT,
+        canonical,
+        written,
+        authority_evidence,
+        authority_written) == STN_CONTRACT_AUTHORITY_ERROR);
+
+    memcpy(
+        authority_evidence_mutated,
+        authority_evidence,
+        authority_written);
+    authority_evidence_mutated[
+        STN_AUTHORITY_EVIDENCE_SIZE - 1u] ^= 0x01u;
+    CHECK(stn_contract_authority_evaluate(
+        actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        written,
+        authority_evidence_mutated,
+        authority_written) == STN_CONTRACT_AUTHORITY_ERROR);
+
+    CHECK(stn_contract_authority_evaluate(
+        actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        written,
+        NULL,
+        0u) == STN_CONTRACT_AUTHORITY_ERROR);
+
+    CHECK(stn_contract_authority_evaluate(
+        actor,
+        0xffffu,
+        canonical,
+        written,
+        authority_evidence,
+        authority_written) == STN_CONTRACT_ACTION_ERROR);
+
+    CHECK(stn_contract_authority_evaluate(
+        actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        STN_CONTRACT_HEADER_SIZE - 1u,
+        authority_evidence,
+        authority_written) == STN_CONTRACT_TRUNCATED);
+
+    CHECK(stn_contract_authority_evaluate(
+        NULL,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        written,
+        authority_evidence,
+        authority_written) == STN_CONTRACT_ARGUMENT);
+
+    CHECK(stn_contract_authority_evaluate(
+        actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        NULL,
+        written,
+        authority_evidence,
+        authority_written) == STN_CONTRACT_ARGUMENT);
 
     /* Zero-participant / zero-terms contracts are valid structural objects. */
     contract.type = STN_CONTRACT_GENERIC;

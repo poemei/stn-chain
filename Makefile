@@ -132,7 +132,6 @@ uninstall:
 	@echo "Removed $(BINDIR)/$(TARGET)"
 	@echo "Data and logs preserved:"
 	@echo "  $(DATADIR)"
-	@echo "  $(LOGDIR)"
 
 # Enable/start is deliberately separate from staging files under DESTDIR.
 install-service: install
@@ -145,7 +144,7 @@ clean:
 	rm -rf $(BUILD_DIR)
 	@echo "Build files removed."
 
-# Same fixed address vectors as the Visual Studio test suite.
+# Same fixed address vectors as the Windows test suite.
 .PHONY: test-address
 test-address: $(BUILD_DIR)/test-address
 	$(BUILD_DIR)/test-address
@@ -154,11 +153,11 @@ $(BUILD_DIR)/test-address: tests/test_address.c src/stn_address.c platforms/linu
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_ADDRESS_TEST_MAIN tests/test_address.c src/stn_address.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
 
-# Canonical Contract v1 qualification vectors.
+# Canonical Contract v1 qualification vectors and Phase 14 authority bridge.
 .PHONY: test-contract
 test-contract: $(BUILD_DIR)/test-contract
 	$(BUILD_DIR)/test-contract
 
-$(BUILD_DIR)/test-contract: tests/test_contract.c src/stn_contract.c src/stn_address.c platforms/linux/stn_sha256.c includes/stn_contract.h includes/stn_address.h includes/stn_sha256.h
+$(BUILD_DIR)/test-contract: tests/test_contract.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract.h includes/stn_address.h includes/stn_authority.h includes/stn_identity.h includes/stn_sha256.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_CONTRACT_TEST_MAIN tests/test_contract.c src/stn_contract.c src/stn_address.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_CONTRACT_TEST_MAIN tests/test_contract.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)

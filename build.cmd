@@ -87,6 +87,9 @@ cl %CFLAGS% %INCLUDES% /DSTN_CONTRACT_TEST_MAIN ^
     tests\test_contract.c ^
     src\stn_contract.c ^
     src\stn_address.c ^
+    src\stn_authority.c ^
+    src\stn_identity.c ^
+    src\crypto\ed25519_donna\ed25519_provider.c ^
     platforms\windows\stn_sha256.c ^
     /Fo"%OBJ_DIR%\\" ^
     /Fe"%TEST_TARGET%" ^
