@@ -642,6 +642,130 @@ stn_contract_status stn_contract_authority_evaluate(
 }
 
 
+
+stn_contract_status stn_contract_signature_verify(
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    uint16_t action,
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    uint64_t sequence,
+    const uint8_t signature[STN_IDENTITY_SIGNATURE_SIZE])
+{
+    uint8_t canonical_actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
+    uint8_t unsigned_bytes[
+        STN_CONTRACT_MAX_SIZE +
+        STN_IDENTITY_PUBLIC_KEY_SIZE +
+        2u +
+        8u];
+    uint8_t statement[
+        STN_IDENTITY_DOMAIN_SIZE +
+        STN_CONTRACT_MAX_SIZE +
+        STN_IDENTITY_PUBLIC_KEY_SIZE +
+        2u +
+        8u];
+    size_t unsigned_length;
+    size_t statement_length;
+    stn_contract_status status;
+    stn_identity_result identity_status;
+
+    if (actor == NULL ||
+        canonical_contract == NULL ||
+        signature == NULL) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    if (!contract_action_valid(action)) {
+        return STN_CONTRACT_ACTION_ERROR;
+    }
+
+    status = stn_contract_validate_structure(
+        canonical_contract,
+        canonical_contract_length);
+
+    if (status != STN_CONTRACT_OK) {
+        return status;
+    }
+
+    identity_status = stn_identity_derive(
+        actor,
+        canonical_actor);
+
+    if (identity_status != STN_IDENTITY_VALID) {
+        return STN_CONTRACT_SIGNATURE_ERROR;
+    }
+
+    /*
+     * Canonical Contract action signing bytes:
+     *
+     *   exact canonical Contract v1 bytes
+     *   canonical actor identity (32 bytes)
+     *   action (2-byte big-endian)
+     *   action sequence (8-byte big-endian)
+     *
+     * stn_identity_statement() applies the existing STN identity signing
+     * domain. Signature verification authenticates this exact tuple only.
+     * Authority, transition validity, accepted history and consensus remain
+     * separate checks.
+     */
+    memcpy(
+        unsigned_bytes,
+        canonical_contract,
+        canonical_contract_length);
+
+    memcpy(
+        unsigned_bytes + canonical_contract_length,
+        canonical_actor,
+        STN_IDENTITY_PUBLIC_KEY_SIZE);
+
+    write_be(
+        unsigned_bytes +
+            canonical_contract_length +
+            STN_IDENTITY_PUBLIC_KEY_SIZE,
+        2u,
+        action);
+
+    write_be(
+        unsigned_bytes +
+            canonical_contract_length +
+            STN_IDENTITY_PUBLIC_KEY_SIZE +
+            2u,
+        8u,
+        sequence);
+
+    unsigned_length =
+        canonical_contract_length +
+        STN_IDENTITY_PUBLIC_KEY_SIZE +
+        2u +
+        8u;
+
+    statement_length = 0u;
+
+    identity_status = stn_identity_statement(
+        unsigned_bytes,
+        unsigned_length,
+        statement,
+        sizeof(statement),
+        &statement_length);
+
+    if (identity_status != STN_IDENTITY_VALID) {
+        return STN_CONTRACT_SIGNATURE_ERROR;
+    }
+
+    identity_status = stn_identity_verify(
+        canonical_actor,
+        statement,
+        statement_length,
+        signature,
+        STN_IDENTITY_SIGNATURE_SIZE);
+
+    if (identity_status != STN_IDENTITY_VALID) {
+        return STN_CONTRACT_SIGNATURE_ERROR;
+    }
+
+    return STN_CONTRACT_OK;
+}
+
+
 stn_contract_status stn_contract_approval_key(
     const uint8_t *canonical_contract,
     size_t canonical_contract_length,

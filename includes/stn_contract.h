@@ -110,6 +110,7 @@ typedef enum stn_contract_status {
     STN_CONTRACT_TRANSITION_ERROR,
     STN_CONTRACT_SEQUENCE_ERROR,
     STN_CONTRACT_AUTHORITY_ERROR,
+    STN_CONTRACT_SIGNATURE_ERROR,
     STN_CONTRACT_DUPLICATE_APPROVAL
 } stn_contract_status;
 
@@ -353,6 +354,28 @@ stn_contract_status stn_contract_authority_evaluate(
     size_t canonical_contract_length,
     const uint8_t *evidence,
     size_t evidence_length);
+
+
+
+/*
+ * Contract action signature verification.
+ *
+ * A signature authenticates the actor for one exact Contract v1 action. It
+ * does not establish scoped authority, lifecycle validity, accepted history or
+ * consensus acceptance. Those remain separate protocol checks.
+ *
+ * The signed statement is deterministic and binds the actor to the supplied
+ * action, exact canonical contract and action sequence. Verification reuses the
+ * existing STN identity/signature layer; Contract does not define a second
+ * cryptographic provider.
+ */
+stn_contract_status stn_contract_signature_verify(
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    uint16_t action,
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length,
+    uint64_t sequence,
+    const uint8_t signature[STN_IDENTITY_SIGNATURE_SIZE]);
 
 
 /*

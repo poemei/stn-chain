@@ -29,6 +29,22 @@ int test_contract(void)
     static const uint8_t terms[] = {
         'S','T','N',' ','C','h','a','i','n',' ','C','o','n','t','r','a','c','t'
     };
+    static const uint8_t signing_actor[STN_IDENTITY_PUBLIC_KEY_SIZE] = {
+        0xd7,0x5a,0x98,0x01,0x82,0xb1,0x0a,0xb7,
+        0xd5,0x4b,0xfe,0xd3,0xc9,0x64,0x07,0x3a,
+        0x0e,0xe1,0x72,0xf3,0xda,0xa6,0x23,0x25,
+        0xaf,0x02,0x1a,0x68,0xf7,0x07,0x51,0x1a
+    };
+    static const uint8_t contract_signature[STN_IDENTITY_SIGNATURE_SIZE] = {
+        0xa2,0xf0,0x63,0xb0,0x36,0xd9,0xb3,0xdb,
+        0x38,0xf2,0xe7,0xfd,0x40,0xd5,0xa1,0x0e,
+        0x8d,0xb0,0xfe,0xe6,0x5b,0xde,0xb4,0x03,
+        0x58,0x99,0x2a,0x2f,0xf9,0xf6,0xd7,0x16,
+        0xc8,0x04,0x5e,0x81,0xa0,0x19,0x92,0x44,
+        0x5d,0x8a,0xef,0x46,0x49,0x6d,0xe6,0x27,
+        0x72,0x68,0xb5,0x5b,0x74,0x47,0x6e,0xe8,
+        0x35,0x3e,0x91,0x51,0x86,0x20,0x3c,0x01
+    };
     stn_contract_participant participants[2];
     stn_contract_participant extracted;
     stn_contract_participant before_participant;
@@ -55,6 +71,8 @@ int test_contract(void)
     uint8_t authority_before[STN_AUTHORITY_CONTEXT_SIZE];
     uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
     uint8_t other_actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
+    uint8_t signature_mutated[STN_IDENTITY_SIGNATURE_SIZE];
+    uint8_t signature_contract_mutated[STN_CONTRACT_MAX_SIZE];
     uint8_t approval_key[STN_CONTRACT_APPROVAL_KEY_SIZE];
     uint8_t approval_key_again[STN_CONTRACT_APPROVAL_KEY_SIZE];
     uint8_t approval_key_other[STN_CONTRACT_APPROVAL_KEY_SIZE];
@@ -999,6 +1017,108 @@ int test_contract(void)
         written,
         authority_evidence,
         authority_written) == STN_CONTRACT_ARGUMENT);
+
+    /*
+     * Contract action signature verification.
+     *
+     * This fixed vector signs the existing canonical Contract v1 vector using
+     * the existing STN identity statement domain. Verification must bind the
+     * exact canonical contract, canonical actor, action and action sequence.
+     * Signature validity authenticates only; authority and consensus remain
+     * separate checks.
+     */
+    CHECK(stn_contract_signature_verify(
+        signing_actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        written,
+        UINT64_C(43),
+        contract_signature) == STN_CONTRACT_OK);
+
+    CHECK(stn_contract_signature_verify(
+        signing_actor,
+        STN_CONTRACT_ACTION_REJECT,
+        canonical,
+        written,
+        UINT64_C(43),
+        contract_signature) == STN_CONTRACT_SIGNATURE_ERROR);
+
+    CHECK(stn_contract_signature_verify(
+        signing_actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        written,
+        UINT64_C(44),
+        contract_signature) == STN_CONTRACT_SIGNATURE_ERROR);
+
+    CHECK(stn_contract_signature_verify(
+        other_actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        written,
+        UINT64_C(43),
+        contract_signature) == STN_CONTRACT_SIGNATURE_ERROR);
+
+    memcpy(signature_contract_mutated, canonical, written);
+    signature_contract_mutated[written - 1u] ^= 0x01u;
+    CHECK(stn_contract_signature_verify(
+        signing_actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        signature_contract_mutated,
+        written,
+        UINT64_C(43),
+        contract_signature) == STN_CONTRACT_SIGNATURE_ERROR);
+
+    memcpy(signature_mutated, contract_signature, sizeof(signature_mutated));
+    signature_mutated[STN_IDENTITY_SIGNATURE_SIZE - 1u] ^= 0x01u;
+    CHECK(stn_contract_signature_verify(
+        signing_actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        written,
+        UINT64_C(43),
+        signature_mutated) == STN_CONTRACT_SIGNATURE_ERROR);
+
+    CHECK(stn_contract_signature_verify(
+        signing_actor,
+        0xffffu,
+        canonical,
+        written,
+        UINT64_C(43),
+        contract_signature) == STN_CONTRACT_ACTION_ERROR);
+
+    CHECK(stn_contract_signature_verify(
+        signing_actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        STN_CONTRACT_HEADER_SIZE - 1u,
+        UINT64_C(43),
+        contract_signature) == STN_CONTRACT_TRUNCATED);
+
+    CHECK(stn_contract_signature_verify(
+        NULL,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        written,
+        UINT64_C(43),
+        contract_signature) == STN_CONTRACT_ARGUMENT);
+
+    CHECK(stn_contract_signature_verify(
+        signing_actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        NULL,
+        written,
+        UINT64_C(43),
+        contract_signature) == STN_CONTRACT_ARGUMENT);
+
+    CHECK(stn_contract_signature_verify(
+        signing_actor,
+        STN_CONTRACT_ACTION_APPROVE,
+        canonical,
+        written,
+        UINT64_C(43),
+        NULL) == STN_CONTRACT_ARGUMENT);
+
 
     /*
      * Contract duplicate-approval prevention.
