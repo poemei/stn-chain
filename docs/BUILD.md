@@ -1,4 +1,26 @@
-# Visual Studio Build
+# Build
+
+## Primary Windows build
+
+Run `build.cmd` from an ordinary Command Prompt in the repository root.
+The script discovers and initializes the installed x64 MSVC toolchain.
+Install Microsoft C++ Build Tools with the x64 compiler and Windows SDK;
+the Visual Studio IDE is not required. An existing IDE installation also
+provides a usable compiler. No MSBuild or CMake invocation is needed.
+
+The script compiles the production node as ISO C17 with optimization,
+static release CRT, warning level 4 and warnings treated as errors.
+Output is `build\stn-chain.exe`; object files are in `build\obj`.
+`build.cmd clean` removes the repository build directory, including test
+outputs. Keep new source entries aligned with the script source list.
+
+Verified on Windows x64 on 2026-09-22: `cmd /c build.cmd` succeeded with
+zero compiler warnings and errors. This verifies the installed MSVC
+toolchain path; a separate Build Tools-only installation was not exercised.
+
+The script builds the node only. Existing solution/project workflows below
+are optional for IDE use and the existing qualification/test targets.
+Historical qualification results retain their original build context.
 
 ## Phase 18 address foundation
 
@@ -41,7 +63,7 @@ atomic NTFS persistence, clean shutdown/restart, concurrency, and height 65.
 Temporary chain files and processes are cleaned up. Test outputs remain in build/.
 This test fixture is not a production deployment or identity-provider implementation.
 
-## Normal Visual Studio build
+## Optional Visual Studio build
 
 Open stn-chain.sln in the repository root with Visual Studio 2026 and the
 Desktop development with C++ workload. The project compiles .c files as
@@ -51,7 +73,7 @@ Release | x64 is currently the only solution configuration. Use Build >
 Build Solution, then Debug > Start Without Debugging to run the console
 development node. Use the configured development launch arguments or run-dev.cmd to start loopback RPC; no arguments print usage.
 
-## Configuration
+## Optional solution configuration
 
 - Platform toolset: v145 (installed MSVC 14.51.36231).
 - Windows SDK: 10.0.26100.0.

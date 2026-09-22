@@ -36,14 +36,17 @@ For unattended Linux startup and boot/reboot service installation, see
 [Linux startup](platforms/linux/README.md). Saved history resumes; missing
 history initializes the existing built-in genesis.
 
-Open [stn-chain.sln](stn-chain.sln) in Visual Studio 2026 and build
-Release | x64. Headers are in includes/ and C sources in src/.
-See [Visual Studio build instructions](docs/BUILD.md).
+Run `build.cmd` from an ordinary Windows Command Prompt. It discovers the
+installed MSVC x64 toolchain and builds `build\stn-chain.exe`. Microsoft C++
+Build Tools and the Windows SDK are required; the Visual Studio IDE is not.
+Headers are in includes/ and C sources in src/.
+See [build instructions](docs/BUILD.md).
 Planned OS/architecture boundaries are listed in [platforms](platforms/README.md).
 
 ## Run for local stratumd integration
 
-After building Release | x64, double-click [run-dev.cmd](run-dev.cmd). The node
+After running `build.cmd`, run `build\stn-chain.exe --dev` for the local
+development fixture. The node
 listens on 127.0.0.1:18473 using binary STNC RPC v2. This explicit development
 fixture supplies mining work and accepts valid solutions to multiple concurrent
 loopback clients; it is not Stratum or Bitcoin JSON-RPC. See [running and mining work](docs/MINING_WORK.md) for

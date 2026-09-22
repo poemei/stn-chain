@@ -2,6 +2,15 @@
 
 Status: initial register. Open choices are not implementation defaults.
 
+## Windows build entry point (2026-09-22)
+
+Operations replaces the IDE-first portion of D-006 with `build.cmd` as the
+primary Windows build entry point. Standalone MSVC C++ Build Tools and the
+Windows SDK suffice; the Visual Studio IDE is optional. The script discovers
+and initializes the x64 toolchain and compiles the node directly. Existing
+project/test workflows remain optional. No CMake requirement is introduced.
+This supersedes build workflow only, with no protocol or consensus change.
+
 ## Phase 18 Chunk 1 - native address foundation (2026-09-21)
 
 Operations authorizes `stn0_` for identity/person, `stnc0_` for contracts and

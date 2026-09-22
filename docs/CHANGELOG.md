@@ -5,6 +5,20 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Windows command-line build workflow - 2026-09-22
+
+- Made `build.cmd` the primary Windows node build entry point, with automatic
+  x64 MSVC toolchain initialization from an ordinary Command Prompt. Standalone
+  C++ Build Tools and Windows SDK suffice; the Visual Studio IDE is optional.
+- Corrected source-list expansion, enabled warnings as errors and static CRT,
+  and made clean validate the build directory before removal.
+- Updated repository workflow instructions, README, build documentation and
+  decision register. Existing test/project workflows remain optional.
+- Verification: `cmd /c build.cmd` succeeded on Windows x64 with zero compiler
+  warnings/errors. No runtime regressions or other platform builds were run
+  for this build-only change; Build Tools-only installation was not separately
+  exercised. Protocol, consensus and application behavior are unchanged.
+
 ### Phase 18 Chunk 2 - canonical contract foundation - 2026-09-22
 
 - Added the portable ISO C17 Contract v1 structural foundation with canonical
