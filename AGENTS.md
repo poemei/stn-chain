@@ -19,11 +19,11 @@ compatibility requirement.
 
 ## Build workflow
 
-Use native Visual Studio .sln/.vcxproj files for the primary Windows
-development experience. Support building and running tests in the IDE.
-Do not introduce a CMake requirement. Command-line MSBuild may support
-automation; it is not the owner's primary workflow. Keep core sources
-portable for a separate Linux/macOS build path.
+Use build.cmd as the primary Windows build entry point from an ordinary
+Command Prompt. Standalone MSVC C++ Build Tools and the Windows SDK suffice;
+the Visual Studio IDE and MSBuild project workflow are optional, not required.
+Preserve optional existing project files. Do not introduce a CMake requirement.
+Keep core sources portable for the Linux Makefile and future platform work.
 
 ## Supplied organizational policy references
 
