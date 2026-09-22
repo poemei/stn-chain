@@ -20,9 +20,13 @@ are not claims of a published or deployed release.
 - The shared header/test fixes also cover Linux. The existing Makefile node
   and `make test-contract` targets already include the Contract, authority,
   identity and crypto sources; no platform-specific build changes were needed.
-- Limitation: native Linux compilation/execution was not performed because
-  this editing host has no usable Linux toolchain or WSL distribution.
-  Linux qualification remains pending. No new Contract functionality,
+- Operations supplied Linux `build/test-contract` output: 363 checks, zero
+  failures. The printed canonical Contract v1 bytes and address exactly match
+  the Windows result:
+  `stnc0_ef239f94fddc52ddddffe3739092f868ee99539504ede605e039381ed41e3800`.
+  This is user-supplied Linux execution evidence, not a local agent run.
+- Limitation: the supplied Linux output does not establish full node build
+  results or compiler warning status. No new Contract functionality,
   accepted-history integration, deployment or release is claimed.
 
 ### Windows command-line build workflow - 2026-09-22
