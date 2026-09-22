@@ -64,7 +64,8 @@ CORE_SOURCES := \
 	src/stn_rpc.c \
 	src/stn_storage.c \
 	src/stn_transaction.c \
-	src/stn_validation.c
+	src/stn_validation.c \
+	src/stn_contract.c
 
 CRYPTO_SOURCES := \
 	src/crypto/ed25519_donna/ed25519_provider.c
