@@ -1915,10 +1915,18 @@ int test_contract(void)
         2u,
         &rebuild_state,
         &history_contract) == STN_CONTRACT_OK);
-    CHECK(memcmp(
-        &history_contract,
-        &rebuilt_contract,
-        sizeof(history_contract)) == 0);
+    CHECK(history_contract.version == rebuilt_contract.version);
+    CHECK(history_contract.type == rebuilt_contract.type);
+    CHECK(history_contract.sequence == rebuilt_contract.sequence);
+    CHECK(history_contract.created_at == rebuilt_contract.created_at);
+    CHECK(history_contract.state == rebuilt_contract.state);
+    CHECK(history_contract.participants == rebuilt_contract.participants);
+    CHECK(history_contract.participant_count ==
+          rebuilt_contract.participant_count);
+    CHECK(history_contract.participant_bytes ==
+          rebuilt_contract.participant_bytes);
+    CHECK(history_contract.terms == rebuilt_contract.terms);
+    CHECK(history_contract.terms_length == rebuilt_contract.terms_length);
     CHECK(rebuild_state.accepted_count == 2u);
     CHECK(stn_contract_approval_state_check(
         &rebuild_state,
