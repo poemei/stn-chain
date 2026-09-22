@@ -92,6 +92,16 @@ int test_contract(void)
     uint8_t approval_store[4u * STN_CONTRACT_APPROVAL_KEY_SIZE];
     uint8_t approval_rebuild[3u * STN_CONTRACT_APPROVAL_KEY_SIZE];
     stn_contract_approval_state approval_state;
+    stn_contract_approval_state rebuild_state;
+    stn_contract_accepted_action accepted_history[2];
+    stn_contract history_contract;
+    stn_contract rebuilt_contract;
+    stn_contract before_rebuilt_contract;
+    uint8_t rebuild_canonical_one[STN_CONTRACT_MAX_SIZE];
+    uint8_t rebuild_canonical_two[STN_CONTRACT_MAX_SIZE];
+    uint8_t rebuild_approval_store[4u * STN_CONTRACT_APPROVAL_KEY_SIZE];
+    size_t rebuild_written_one;
+    size_t rebuild_written_two;
     char address_text[STN_ADDRESS_TEXT_CAPACITY];
     char address_text_again[STN_ADDRESS_TEXT_CAPACITY];
     size_t written;
@@ -1788,6 +1798,310 @@ int test_contract(void)
         NULL) == STN_CONTRACT_ARGUMENT);
     CHECK(approval_state.accepted_count == 0u);
 
+
+    /*
+     * Accepted-history Contract reconstruction.
+     *
+     * Rebuild starts from one accepted REVIEW Contract at sequence 42 and
+     * replays accepted Chain history in exact order. The first APPROVE advances
+     * to APPROVALS at sequence 43; the second APPROVE advances to ATTESTATION
+     * at sequence 44. Both accepted approval keys must be reconstructed.
+     */
+    transition_contract = contract;
+    transition_contract.sequence = UINT64_C(42);
+    transition_contract.state = STN_CONTRACT_STATE_REVIEW;
+
+    rebuild_written_one = 0u;
+    CHECK(stn_contract_encode(
+        &transition_contract,
+        rebuild_canonical_one,
+        sizeof(rebuild_canonical_one),
+        &rebuild_written_one) == STN_CONTRACT_OK);
+
+    CHECK(stn_contract_apply_action(
+        &transition_contract,
+        STN_CONTRACT_ACTION_APPROVE,
+        UINT64_C(43),
+        &history_contract) == STN_CONTRACT_OK);
+
+    rebuild_written_two = 0u;
+    CHECK(stn_contract_encode(
+        &history_contract,
+        rebuild_canonical_two,
+        sizeof(rebuild_canonical_two),
+        &rebuild_written_two) == STN_CONTRACT_OK);
+
+    memset(accepted_history, 0, sizeof(accepted_history));
+
+    accepted_history[0].action = STN_CONTRACT_ACTION_APPROVE;
+    accepted_history[0].sequence = UINT64_C(43);
+    accepted_history[0].canonical_contract = rebuild_canonical_one;
+    accepted_history[0].canonical_contract_length = rebuild_written_one;
+    memcpy(
+        accepted_history[0].actor,
+        signing_actor,
+        STN_IDENTITY_PUBLIC_KEY_SIZE);
+
+    accepted_history[1].action = STN_CONTRACT_ACTION_APPROVE;
+    accepted_history[1].sequence = UINT64_C(44);
+    accepted_history[1].canonical_contract = rebuild_canonical_two;
+    accepted_history[1].canonical_contract_length = rebuild_written_two;
+    memcpy(
+        accepted_history[1].actor,
+        other_actor,
+        STN_IDENTITY_PUBLIC_KEY_SIZE);
+
+    memset(rebuild_approval_store, 0, sizeof(rebuild_approval_store));
+    stn_contract_approval_state_initialize(
+        &rebuild_state,
+        rebuild_approval_store,
+        4u);
+
+    memset(&rebuilt_contract, 0, sizeof(rebuilt_contract));
+    CHECK(stn_contract_rebuild_accepted_state(
+        &transition_contract,
+        accepted_history,
+        2u,
+        &rebuild_state,
+        &rebuilt_contract) == STN_CONTRACT_OK);
+    CHECK(rebuilt_contract.version == transition_contract.version);
+    CHECK(rebuilt_contract.type == transition_contract.type);
+    CHECK(rebuilt_contract.sequence == UINT64_C(44));
+    CHECK(rebuilt_contract.created_at == transition_contract.created_at);
+    CHECK(rebuilt_contract.state == STN_CONTRACT_STATE_ATTESTATION);
+    CHECK(rebuilt_contract.participants == transition_contract.participants);
+    CHECK(rebuilt_contract.participant_count ==
+          transition_contract.participant_count);
+    CHECK(rebuilt_contract.participant_bytes ==
+          transition_contract.participant_bytes);
+    CHECK(rebuilt_contract.terms == transition_contract.terms);
+    CHECK(rebuilt_contract.terms_length == transition_contract.terms_length);
+    CHECK(rebuild_state.accepted_count == 2u);
+
+    CHECK(stn_contract_approval_key(
+        rebuild_canonical_one,
+        rebuild_written_one,
+        UINT64_C(43),
+        signing_actor,
+        approval_key) == STN_CONTRACT_OK);
+    CHECK(stn_contract_approval_state_check(
+        &rebuild_state,
+        approval_key) == STN_CONTRACT_DUPLICATE_APPROVAL);
+
+    CHECK(stn_contract_approval_key(
+        rebuild_canonical_two,
+        rebuild_written_two,
+        UINT64_C(44),
+        other_actor,
+        approval_key_other) == STN_CONTRACT_OK);
+    CHECK(stn_contract_approval_state_check(
+        &rebuild_state,
+        approval_key_other) == STN_CONTRACT_DUPLICATE_APPROVAL);
+
+    /*
+     * Repeating reconstruction from the same initial state and accepted history
+     * must produce the same Contract and accepted approval state.
+     */
+    memset(rebuild_approval_store, 0, sizeof(rebuild_approval_store));
+    stn_contract_approval_state_initialize(
+        &rebuild_state,
+        rebuild_approval_store,
+        4u);
+    memset(&history_contract, 0, sizeof(history_contract));
+
+    CHECK(stn_contract_rebuild_accepted_state(
+        &transition_contract,
+        accepted_history,
+        2u,
+        &rebuild_state,
+        &history_contract) == STN_CONTRACT_OK);
+    CHECK(memcmp(
+        &history_contract,
+        &rebuilt_contract,
+        sizeof(history_contract)) == 0);
+    CHECK(rebuild_state.accepted_count == 2u);
+    CHECK(stn_contract_approval_state_check(
+        &rebuild_state,
+        approval_key) == STN_CONTRACT_DUPLICATE_APPROVAL);
+    CHECK(stn_contract_approval_state_check(
+        &rebuild_state,
+        approval_key_other) == STN_CONTRACT_DUPLICATE_APPROVAL);
+
+    /*
+     * Empty accepted history reconstructs exactly the supplied initial Contract
+     * and an empty accepted approval view.
+     */
+    memset(rebuild_approval_store, 0xa5, sizeof(rebuild_approval_store));
+    stn_contract_approval_state_initialize(
+        &rebuild_state,
+        rebuild_approval_store,
+        4u);
+    rebuild_state.accepted_count = 2u;
+    memset(&history_contract, 0, sizeof(history_contract));
+
+    CHECK(stn_contract_rebuild_accepted_state(
+        &transition_contract,
+        NULL,
+        0u,
+        &rebuild_state,
+        &history_contract) == STN_CONTRACT_OK);
+    CHECK(memcmp(
+        &history_contract,
+        &transition_contract,
+        sizeof(history_contract)) == 0);
+    CHECK(rebuild_state.accepted_count == 0u);
+
+    /*
+     * Wrong accepted order/sequence fails without publishing reconstructed
+     * Contract state or accepted approval count.
+     */
+    accepted_history[1].sequence = UINT64_C(45);
+    memset(rebuild_approval_store, 0, sizeof(rebuild_approval_store));
+    stn_contract_approval_state_initialize(
+        &rebuild_state,
+        rebuild_approval_store,
+        4u);
+    rebuild_state.accepted_count = 1u;
+    memset(rebuild_approval_store, 0x3c, STN_CONTRACT_APPROVAL_KEY_SIZE);
+    before_rebuilt_contract = transition_contract;
+    before_rebuilt_contract.sequence = UINT64_C(999);
+    before_rebuilt_contract.state = STN_CONTRACT_STATE_CLOSED;
+    rebuilt_contract = before_rebuilt_contract;
+
+    CHECK(stn_contract_rebuild_accepted_state(
+        &transition_contract,
+        accepted_history,
+        2u,
+        &rebuild_state,
+        &rebuilt_contract) == STN_CONTRACT_SEQUENCE_ERROR);
+    CHECK(memcmp(
+        &rebuilt_contract,
+        &before_rebuilt_contract,
+        sizeof(rebuilt_contract)) == 0);
+    CHECK(rebuild_state.accepted_count == 1u);
+
+    accepted_history[1].sequence = UINT64_C(44);
+
+    /*
+     * Canonical history must describe the exact reconstructed current Contract.
+     * A mismatched second entry is rejected and no caller-visible state is
+     * published.
+     */
+    accepted_history[1].canonical_contract = rebuild_canonical_one;
+    accepted_history[1].canonical_contract_length = rebuild_written_one;
+    rebuild_state.accepted_count = 0u;
+    rebuilt_contract = before_rebuilt_contract;
+
+    CHECK(stn_contract_rebuild_accepted_state(
+        &transition_contract,
+        accepted_history,
+        2u,
+        &rebuild_state,
+        &rebuilt_contract) == STN_CONTRACT_LENGTH);
+    CHECK(memcmp(
+        &rebuilt_contract,
+        &before_rebuilt_contract,
+        sizeof(rebuilt_contract)) == 0);
+    CHECK(rebuild_state.accepted_count == 0u);
+
+    accepted_history[1].canonical_contract = rebuild_canonical_two;
+    accepted_history[1].canonical_contract_length = rebuild_written_two;
+
+    /*
+     * Duplicate accepted APPROVE history is rejected deterministically.
+     * Use the same actor for both entries and the same sequence scope by
+     * presenting the first entry twice; the second entry cannot match the
+     * reconstructed current Contract and therefore cannot be accepted.
+     */
+    accepted_history[1] = accepted_history[0];
+    rebuild_state.accepted_count = 0u;
+    rebuilt_contract = before_rebuilt_contract;
+
+    CHECK(stn_contract_rebuild_accepted_state(
+        &transition_contract,
+        accepted_history,
+        2u,
+        &rebuild_state,
+        &rebuilt_contract) != STN_CONTRACT_OK);
+    CHECK(memcmp(
+        &rebuilt_contract,
+        &before_rebuilt_contract,
+        sizeof(rebuilt_contract)) == 0);
+    CHECK(rebuild_state.accepted_count == 0u);
+
+    accepted_history[1].action = STN_CONTRACT_ACTION_APPROVE;
+    accepted_history[1].sequence = UINT64_C(44);
+    accepted_history[1].canonical_contract = rebuild_canonical_two;
+    accepted_history[1].canonical_contract_length = rebuild_written_two;
+    memcpy(
+        accepted_history[1].actor,
+        other_actor,
+        STN_IDENTITY_PUBLIC_KEY_SIZE);
+
+    /*
+     * Insufficient accepted-approval capacity prevents reconstruction from
+     * publishing partial Contract or approval state.
+     */
+    memset(rebuild_approval_store, 0, sizeof(rebuild_approval_store));
+    stn_contract_approval_state_initialize(
+        &rebuild_state,
+        rebuild_approval_store,
+        1u);
+    rebuilt_contract = before_rebuilt_contract;
+
+    CHECK(stn_contract_rebuild_accepted_state(
+        &transition_contract,
+        accepted_history,
+        2u,
+        &rebuild_state,
+        &rebuilt_contract) == STN_CONTRACT_CAPACITY);
+    CHECK(memcmp(
+        &rebuilt_contract,
+        &before_rebuilt_contract,
+        sizeof(rebuilt_contract)) == 0);
+    CHECK(rebuild_state.accepted_count == 0u);
+
+    /*
+     * Malformed history entries and required arguments fail deterministically.
+     */
+    accepted_history[0].canonical_contract = NULL;
+    rebuilt_contract = before_rebuilt_contract;
+    CHECK(stn_contract_rebuild_accepted_state(
+        &transition_contract,
+        accepted_history,
+        2u,
+        &rebuild_state,
+        &rebuilt_contract) == STN_CONTRACT_ARGUMENT);
+    CHECK(memcmp(
+        &rebuilt_contract,
+        &before_rebuilt_contract,
+        sizeof(rebuilt_contract)) == 0);
+    accepted_history[0].canonical_contract = rebuild_canonical_one;
+
+    CHECK(stn_contract_rebuild_accepted_state(
+        NULL,
+        accepted_history,
+        2u,
+        &rebuild_state,
+        &rebuilt_contract) == STN_CONTRACT_ARGUMENT);
+    CHECK(stn_contract_rebuild_accepted_state(
+        &transition_contract,
+        NULL,
+        2u,
+        &rebuild_state,
+        &rebuilt_contract) == STN_CONTRACT_ARGUMENT);
+    CHECK(stn_contract_rebuild_accepted_state(
+        &transition_contract,
+        accepted_history,
+        2u,
+        NULL,
+        &rebuilt_contract) == STN_CONTRACT_ARGUMENT);
+    CHECK(stn_contract_rebuild_accepted_state(
+        &transition_contract,
+        accepted_history,
+        2u,
+        &rebuild_state,
+        NULL) == STN_CONTRACT_ARGUMENT);
 
     /* Zero-participant / zero-terms contracts are valid structural objects. */
     contract.type = STN_CONTRACT_GENERIC;

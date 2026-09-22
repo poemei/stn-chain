@@ -511,6 +511,51 @@ stn_contract_status stn_contract_accept_action(
     stn_contract_approval_state *approval_state,
     stn_contract *next);
 
+/*
+ * One already-accepted Contract action used for deterministic state rebuild.
+ *
+ * The history entry contains only consensus-visible Contract inputs required to
+ * reproduce accepted Contract state. It does not carry arrival time, transport
+ * metadata, pending state, signatures or authority evidence: those were
+ * validated before the action entered accepted Chain history.
+ *
+ * canonical_contract is the exact canonical representation of the Contract
+ * state immediately before this accepted action.
+ */
+typedef struct stn_contract_accepted_action {
+    uint16_t action;
+    uint64_t sequence;
+    const uint8_t *canonical_contract;
+    size_t canonical_contract_length;
+    uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
+} stn_contract_accepted_action;
+
+/*
+ * Deterministically reconstruct Contract state from accepted history.
+ *
+ * initial is the accepted Contract state immediately before history[0].
+ * history must be enumerated in accepted Chain order. Each entry is applied
+ * through stn_contract_accept_action(), so lifecycle, exact sequence,
+ * canonical-current binding and duplicate APPROVE consumption remain identical
+ * to normal accepted-state application.
+ *
+ * approval_state is rebuilt from the supplied history. Its caller-owned buffer
+ * and capacity are preserved, but accepted_count becomes the reconstructed
+ * count only on complete success.
+ *
+ * Output is atomic: current and approval_state are unchanged on failure.
+ *
+ * No signature, authority, pending, transport, persistence or consensus
+ * decision is performed here. Accepted history is evidence supplied by the
+ * existing Chain reconstruction/reorganization machinery.
+ */
+stn_contract_status stn_contract_rebuild_accepted_state(
+    const stn_contract *initial,
+    const stn_contract_accepted_action *history,
+    size_t history_count,
+    stn_contract_approval_state *approval_state,
+    stn_contract *current);
+
 stn_contract_status stn_contract_apply_action(
     const stn_contract *current,
     uint16_t action,

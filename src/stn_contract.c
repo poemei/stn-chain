@@ -1207,6 +1207,87 @@ stn_contract_status stn_contract_accept_action(
 }
 
 
+stn_contract_status stn_contract_rebuild_accepted_state(
+    const stn_contract *initial,
+    const stn_contract_accepted_action *history,
+    size_t history_count,
+    stn_contract_approval_state *approval_state,
+    stn_contract *current)
+{
+    stn_contract rebuilt;
+    stn_contract next;
+    stn_contract_approval_state working_approvals;
+    stn_contract_status status;
+    uint8_t *accepted_buffer;
+    size_t accepted_capacity;
+    size_t original_count;
+    size_t i;
+
+    if (initial == NULL ||
+        approval_state == NULL ||
+        current == NULL ||
+        (history_count != 0u && history == NULL)) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    if (approval_state->accepted_count > approval_state->accepted_capacity ||
+        (approval_state->accepted_capacity != 0u &&
+         approval_state->accepted == NULL)) {
+        return STN_CONTRACT_ARGUMENT;
+    }
+
+    /*
+     * Rebuild uses the caller-owned approval buffer without allocation. The
+     * visible accepted_count is withheld until the complete accepted history
+     * succeeds. Existing bytes beyond accepted_count are not authoritative.
+     */
+    accepted_buffer = approval_state->accepted;
+    accepted_capacity = approval_state->accepted_capacity;
+    original_count = approval_state->accepted_count;
+
+    working_approvals.accepted = accepted_buffer;
+    working_approvals.accepted_count = 0u;
+    working_approvals.accepted_capacity = accepted_capacity;
+
+    rebuilt = *initial;
+
+    for (i = 0u; i < history_count; ++i) {
+        const stn_contract_accepted_action *entry = &history[i];
+
+        if (entry->canonical_contract == NULL) {
+            approval_state->accepted_count = original_count;
+            return STN_CONTRACT_ARGUMENT;
+        }
+
+        status = stn_contract_accept_action(
+            &rebuilt,
+            entry->action,
+            entry->sequence,
+            entry->canonical_contract,
+            entry->canonical_contract_length,
+            entry->actor,
+            &working_approvals,
+            &next);
+
+        if (status != STN_CONTRACT_OK) {
+            approval_state->accepted_count = original_count;
+            return status;
+        }
+
+        rebuilt = next;
+    }
+
+    /*
+     * No further fallible operation remains. Publish reconstructed accepted
+     * approval count and Contract state together from the caller's perspective.
+     */
+    approval_state->accepted_count = working_approvals.accepted_count;
+    *current = rebuilt;
+
+    return STN_CONTRACT_OK;
+}
+
+
 stn_contract_status stn_contract_apply_action(
     const stn_contract *current,
     uint16_t action,
