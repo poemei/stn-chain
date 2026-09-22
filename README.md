@@ -91,6 +91,7 @@ compatibility with either is not currently a requirement.
 - [Peer protocol, synchronization and recovery](docs/PEER_PROTOCOL.md)
 - [Platform isolation and invariance](docs/PORTABILITY.md)
 - [RPC application/miner interface](docs/RPC.md)
+- [CONTRACTS](docs/CONTRACTS.md)
 - [Changelog](docs/CHANGELOG.md)
 
 These documents distinguish established direction from proposed engineering

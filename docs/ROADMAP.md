@@ -111,11 +111,13 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
 														   Additional hardware/backend qualification
 														   may continue independently.
 
-                     18 Contract Engine   **ACTIVE**       Locked deterministic
-                                                           addressed-agreement engine
-                                                           remains future work; no VM,
-                                                           EVM, arbitrary bytecode,
-                                                           scripts or gas.
+                     18 Contract Engine   **ACTIVE**       Address foundation is
+                                                           qualified and canonical
+                                                           Contract v1 foundation is
+                                                           implemented; qualification
+                                                           pending. No VM, EVM,
+                                                           arbitrary bytecode, scripts
+                                                           or gas.
 
                      19 Economics /       **NOT STARTED**  Native economics, issuance
                         Issuance /                         and reward rules remain
@@ -953,10 +955,39 @@ integration test count, Windows/Linux runtime qualification or public
 update. The existing Chunk 1 Windows/Linux native-address qualification remains
 the current evidence baseline.
 
-Contract state machines and contract storage have not started. The established
-design remains addressed agreements with deterministic participants, fields,
-authority, sequence, signatures and state transitions. Wallet behavior and all
-economics remain Phase 19. This component does not change existing Chain behavior.
+### Phase 18 Chunk 2 --- Canonical Contract Foundation --- IMPLEMENTED / QUALIFICATION PENDING
+
+The portable ISO C17 Contract v1 structural foundation is implemented with
+canonical `STCT` framing, explicit big-endian fields, bounded participants and
+bounded terms. Protocol-defined contract types cover generic agreements, work
+offers, contributor agreements, policies, organizational decisions and service
+agreements. Contract lifecycle states cover draft, issued, review, approvals,
+attestation, executed, rejected, revoked and closed. Participant roles cover
+participant, issuer, recipient, approver and attestor.
+
+Each participant is encoded canonically as a 32-byte Chain identity followed by
+a 16-bit role. Decoding validates packed wire entries without casting canonical
+bytes to native C structures or depending on native alignment or padding. The
+decoded contract exposes a borrowed canonical participant-byte view, with indexed
+participant extraction into native participant objects when required.
+
+Structural validation and deterministic `stnc0_` contract-address derivation use
+the existing typed Chain address foundation. The complete canonical Contract v1
+bytes are the derivation source. Contract addressing identifies the canonical
+contract object; it does not establish identity, ownership, signature validity
+or authority.
+
+The structural contract codec does not duplicate signatures or authority.
+Existing Chain identity, signature and scoped-authority foundations remain
+separate and authoritative for later Contract Engine integration.
+
+This increment defines the canonical contract object only. Accepted-history
+integration, contract transaction admission, STNC contract methods, persistence,
+contract state-transition enforcement, wallet behavior and economics are not
+included. Wallet behavior and all economics remain Phase 19.
+
+No build, runtime or cross-platform qualification result is claimed for Chunk 2
+by this roadmap update. Qualification remains pending.
 
 No VM, EVM, arbitrary bytecode, arbitrary scripts or gas is authorized.
 

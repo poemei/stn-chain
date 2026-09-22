@@ -5,6 +5,40 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 18 Chunk 2 - canonical contract foundation - 2026-09-22
+
+- Added the portable ISO C17 Contract v1 structural foundation with canonical
+  `STCT` framing, explicit big-endian fields, bounded participants and bounded
+  terms. Contract encoding is allocation-free and platform-independent.
+- Added protocol-defined contract types for generic agreements, work offers,
+  contributor agreements, policies, organizational decisions and service
+  agreements.
+- Added explicit contract lifecycle states for draft, issued, review,
+  approvals, attestation, executed, rejected, revoked and closed, together
+  with participant, issuer, recipient, approver and attestor roles.
+- Contract participants are encoded canonically as a 32-byte identity followed
+  by a 16-bit role. Decoding validates packed wire entries without casting
+  canonical bytes to native C structures or depending on native alignment or
+  padding.
+- Added a borrowed canonical participant-byte view and indexed participant
+  extraction so callers can obtain native participant objects safely while
+  preserving deterministic wire representation.
+- Added structural validation and deterministic `stnc0_` contract-address
+  derivation through the existing typed Chain address foundation. The complete
+  canonical Contract v1 bytes are the derivation source; address generation
+  does not establish identity, ownership or authority.
+- Contract signatures and authority are not duplicated inside the structural
+  contract codec. Existing Chain identity, signature and scoped-authority
+  foundations remain separate and authoritative for later Contract Engine
+  integration.
+- This increment defines the canonical contract object only. It does not add
+  accepted-history integration, contract transactions, STNC contract methods,
+  persistence, contract state-transition enforcement, wallet behavior or
+  economics.
+- No VM, EVM, arbitrary bytecode, scripts or gas were introduced.
+- No build, runtime or cross-platform qualification results are claimed by
+  this entry; qualification remains pending.
+
 
 ### Phase 18 Chunk 1 - STNC identity address derivation - 2026-09-21
 
