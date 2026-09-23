@@ -41,4 +41,21 @@ stn_contract_status stn_contract_vote_accept(
     const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
     int *reached);
 
+/*
+ * Apply one consensus-accepted APPROVE vote to Contract state.
+ *
+ * REVIEW enters APPROVALS while votes accumulate. APPROVALS remains
+ * APPROVALS until strict majority is reached. The vote that reaches majority
+ * advances the Contract to ATTESTATION. Sequence advances exactly once for
+ * every accepted vote. Duplicate/ineligible votes do not mutate either state.
+ */
+stn_contract_status stn_contract_vote_apply(
+    const stn_contract *current,
+    uint64_t expected_sequence,
+    const uint8_t *canonical_draft,
+    size_t canonical_draft_length,
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    stn_contract_vote_state *vote_state,
+    stn_contract *next);
+
 #endif
