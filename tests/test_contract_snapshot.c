@@ -198,7 +198,8 @@ int test_contract_snapshot(void)
         stn_chain_state_release(&moved);
         CHECK(moved.contracts==NULL);
     }
-    contract_chain_create();\n    printf("Contract snapshot: %u checks, %u failures.\n",checks,failures);
+    contract_chain_create();
+    printf("Contract snapshot: %u checks, %u failures.\n",checks,failures);
     return failures!=0u;
 }
 #ifdef STN_CONTRACT_SNAPSHOT_TEST_MAIN
