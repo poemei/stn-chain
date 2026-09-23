@@ -6,6 +6,7 @@
 #include "stn_pow.h"
 #include "stn_authority.h"
 #include "stn_lifecycle.h"
+#include "stn_contract_snapshot.h"
 
 #define STN_CHAIN_MAX_BATCH 64u
 
@@ -41,13 +42,14 @@ typedef struct stn_chain_state {
     stn_block_header target_history[60];
     size_t target_history_count;
     stn_lifecycle_state *lifecycle;
+    stn_contract_snapshot *contracts;
     uint64_t publication_activation_height;
 } stn_chain_state;
 /* One local reference per owning state. Plain structure copies are BORROWS,
  * never independent owners. share writes a fresh output; move replaces a
  * zero-initialized/owned destination and clears source. release clears state.
  * Borrowed states must not be released or replaced in place; they cannot outlive
- * the owner. Lifecycle pointers originate only from Chain initialization/
+ * the owner. Lifecycle and Contract snapshot pointers originate only from Chain initialization/
  * validation and must not be assigned independently. move requires non-NULL
  * arguments; self-share/self-move are no-ops. Ownership calls on the same
  * snapshot require external serialization.
