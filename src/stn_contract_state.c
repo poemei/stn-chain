@@ -57,7 +57,7 @@ stn_contract_status stn_contract_state_register(
     if(stn_contract_state_find(state,address.identifier,&existing)==STN_CONTRACT_OK)
         return STN_CONTRACT_ADDRESS_ERROR;
     if(state->entry_count==state->entry_capacity)return STN_CONTRACT_CAPACITY;
-    if(state->vote_count>state->vote_capacity-draft.participant_count)
+    if(draft.participant_count>state->vote_capacity-state->vote_count)
         return STN_CONTRACT_CAPACITY;
     memset(&entry,0,sizeof(entry));
     status=stn_contract_vote_state_initialize(&votes,canonical_draft,
