@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "stn_sha256.h"
+#include "stn_contract_transaction.h"
 
 /* Frozen checksums of exact qualified legacy genesis fixtures. */
 stn_data_status stn_chain_publication_activation(const stn_chain_context *c,uint64_t *height)
