@@ -25,8 +25,15 @@ int test_contract_snapshot(void)
 
     a=stn_contract_snapshot_create();CHECK(a!=NULL);
     sa=stn_contract_snapshot_state(a);CHECK(sa!=NULL);
-    CHECK(stn_contract_state_register(sa,draft,draft_length,&index)==STN_CONTRACT_OK);
+    CHECK(stn_contract_snapshot_register(a,draft,draft_length,&index)==STN_CONTRACT_OK);
     CHECK(sa->entry_count==1u);
+    CHECK(sa->entries[0].canonical_draft!=draft);
+    {
+        uint8_t saved=draft[0];
+        draft[0]^=0xffu;
+        CHECK(sa->entries[0].canonical_draft[0]!=draft[0]);
+        draft[0]=saved;
+    }
 
     b=stn_contract_snapshot_clone(a);CHECK(b!=NULL);
     sb=stn_contract_snapshot_state(b);CHECK(sb!=NULL);
@@ -34,6 +41,9 @@ int test_contract_snapshot(void)
     CHECK(sb->entry_count==1u);
     CHECK(memcmp(sb->entries[0].contract_id,sa->entries[0].contract_id,
         STN_ADDRESS_ID_SIZE)==0);
+    CHECK(sb->entries[0].canonical_draft!=sa->entries[0].canonical_draft);
+    CHECK(memcmp(sb->entries[0].canonical_draft,sa->entries[0].canonical_draft,
+        sa->entries[0].canonical_draft_length)==0);
 
     sb->entries[0].current.sequence=7u;
     CHECK(sa->entries[0].current.sequence==0u);
