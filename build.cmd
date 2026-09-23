@@ -12,8 +12,9 @@ cd /d "%~dp0"
 
 if /i "%~1"=="clean" goto clean
 if /i "%~1"=="test-contract" goto setup
+if /i "%~1"=="test-contract-consensus" goto setup
 if not "%~1"=="" (
-    echo Usage: build.cmd [clean^|test-contract]
+    echo Usage: build.cmd [clean^|test-contract^|test-contract-consensus]
     exit /b 1
 )
 
@@ -53,6 +54,7 @@ set "CFLAGS=/nologo /std:c17 /W4 /WX /O2 /MT /TC /DWIN32 /D_WINDOWS /D_CRT_SECUR
 set "INCLUDES=/Iincludes /Isrc /Isrc\crypto\ed25519_donna /Iplatforms\windows"
 
 if /i "%~1"=="test-contract" goto test_contract
+if /i "%~1"=="test-contract-consensus" goto test_contract_consensus
 
 echo.
 echo STN Chain Windows x64 build
@@ -104,6 +106,39 @@ if errorlevel 1 goto test_fail
 
 echo.
 echo CONTRACT TEST SUCCESSFUL
+exit /b 0
+
+:test_contract_consensus
+set "TEST_TARGET=%BUILD_DIR%\test-contract-consensus.exe"
+
+echo.
+echo STN Chain Contract majority consensus qualification test
+echo Compiler: Microsoft cl.exe
+echo Target:   %TEST_TARGET%
+echo.
+
+cl %CFLAGS% %INCLUDES% /DSTN_CONTRACT_CONSENSUS_TEST_MAIN ^
+    tests\test_contract_consensus.c ^
+    src\stn_contract_consensus.c ^
+    src\stn_contract.c ^
+    src\stn_address.c ^
+    src\stn_authority.c ^
+    src\stn_identity.c ^
+    src\crypto\ed25519_donna\ed25519_provider.c ^
+    platforms\windows\stn_sha256.c ^
+    /Fo"%OBJ_DIR%\\" ^
+    /Fe"%TEST_TARGET%" ^
+    /link /INCREMENTAL:NO bcrypt.lib
+
+if errorlevel 1 goto fail
+
+echo.
+echo Running Contract majority consensus qualification test...
+"%TEST_TARGET%"
+if errorlevel 1 goto test_fail
+
+echo.
+echo CONTRACT CONSENSUS TEST SUCCESSFUL
 exit /b 0
 
 :test_fail
