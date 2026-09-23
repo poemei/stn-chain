@@ -162,3 +162,13 @@ test-contract: $(BUILD_DIR)/test-contract
 $(BUILD_DIR)/test-contract: tests/test_contract.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract.h includes/stn_address.h includes/stn_authority.h includes/stn_identity.h includes/stn_sha256.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_CONTRACT_TEST_MAIN tests/test_contract.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+
+
+# Contract majority consensus qualification.
+.PHONY: test-contract-consensus
+test-contract-consensus: $(BUILD_DIR)/test-contract-consensus
+	$(BUILD_DIR)/test-contract-consensus
+
+$(BUILD_DIR)/test-contract-consensus: tests/test_contract_consensus.c src/stn_contract_consensus.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract_consensus.h includes/stn_contract.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_CONTRACT_CONSENSUS_TEST_MAIN tests/test_contract_consensus.c src/stn_contract_consensus.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
