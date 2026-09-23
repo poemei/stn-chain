@@ -115,30 +115,6 @@ static stn_lifecycle_result consume_publication(stn_lifecycle_state *s,const stn
     return STN_LIFECYCLE_OK;
 }
 
-stn_lifecycle_result stn_lifecycle_authority_evidence_active(
-    const stn_lifecycle_state *s,const uint8_t *evidence,size_t evidence_length,
-    const uint8_t *roots,size_t root_count,const stn_hash_provider *p)
-{
-    size_t i;
-    uint8_t active[STN_AUTHORITY_EVIDENCE_SIZE];
-    if(s==NULL || evidence==NULL || p==NULL ||
-       evidence_length!=STN_AUTHORITY_EVIDENCE_SIZE)
-        return STN_LIFECYCLE_ARGUMENT;
-    if(stn_authority_evidence_validate(evidence,evidence_length)!=
-       STN_AUTHORITY_AUTHORIZED)
-        return STN_LIFECYCLE_INVALID;
-    for(i=0;i<s->grant_count;++i){
-        const uint8_t *grant=s->grant_bytes+i*STN_LIFECYCLE_MAX_GRANT_SIZE;
-        stn_authority_grant_result r=stn_authority_grant_active(
-            grant,STN_AUTHORITY_GRANT_SIZE,roots,root_count,p,
-            &s->authority,active);
-        if(r==STN_AUTHORITY_VALID_GRANT &&
-           memcmp(active,evidence,STN_AUTHORITY_EVIDENCE_SIZE)==0)
-            return STN_LIFECYCLE_OK;
-    }
-    return STN_LIFECYCLE_INVALID;
-}
-
 stn_lifecycle_result stn_lifecycle_apply_transaction(stn_lifecycle_state *s,const stn_transaction *tx,const uint8_t *roots,size_t root_count,const stn_hash_provider *p)
 {
     const uint8_t *b;size_t n;uint8_t statement[256],evidence[STN_AUTHORITY_EVIDENCE_SIZE],id[32];size_t written=0;stn_lifecycle_result r;
