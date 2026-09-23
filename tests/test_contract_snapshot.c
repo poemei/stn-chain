@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_contract_snapshot.h"
+#include "stn_chain.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -43,6 +44,20 @@ int test_contract_snapshot(void)
 
     stn_contract_snapshot_release(b);
     stn_contract_snapshot_release(a);
+
+    {
+        stn_chain_state owner={0},copy={0},moved={0};
+        owner.contracts=stn_contract_snapshot_create();
+        CHECK(owner.contracts!=NULL);
+        CHECK(stn_chain_state_share(&owner,&copy)==STN_DATA_OK);
+        CHECK(copy.contracts==owner.contracts);
+        stn_chain_state_move(&moved,&copy);
+        CHECK(copy.contracts==NULL && moved.contracts==owner.contracts);
+        stn_chain_state_release(&owner);
+        CHECK(moved.contracts!=NULL);
+        stn_chain_state_release(&moved);
+        CHECK(moved.contracts==NULL);
+    }
     printf("Contract snapshot: %u checks, %u failures.\n",checks,failures);
     return failures!=0u;
 }
