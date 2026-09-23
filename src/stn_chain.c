@@ -295,7 +295,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
 {
     stn_chain_report r=initial_report();
     stn_block b;
-    stn_chain_state next;stn_chain_lifecycle_owned *candidate_lifecycle;
+    stn_chain_state next;stn_chain_lifecycle_owned *candidate_lifecycle=NULL;
     stn_contract_snapshot *candidate_contracts=NULL;
     int has_lifecycle=0,has_contracts=0,reused_lifecycle=0;
     stn_data_status status;
