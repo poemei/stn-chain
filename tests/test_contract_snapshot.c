@@ -497,6 +497,25 @@ static void contract_chain_create(void)
             CHECK(state->entries[0].current.state==STN_CONTRACT_STATE_APPROVALS);
             CHECK(state->entries[0].current.sequence==3u);
 
+            {
+                stn_chain_state stale_state={0};
+                CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+                memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
+                memcpy(block.header.previous_hash,approval_one.tip_id,32);block.header.height=6u;block.header.timestamp=6u;
+                block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
+                CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
+                    block.header.transaction_commitment)==STN_DATA_OK);
+                CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+                report=stn_chain_validate_candidate(&context,&approval_one,
+                    child_bytes,child_length,&stale_state);
+                CHECK(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT);
+                CHECK(stn_contract_snapshot_const_state(approval_one.contracts)->entries[0].current.state==
+                    STN_CONTRACT_STATE_APPROVALS);
+                CHECK(stn_contract_snapshot_const_state(approval_one.contracts)->entries[0].current.sequence==3u);
+                CHECK(stn_contract_snapshot_const_state(approval_one.contracts)->entries[0].vote_count==1u);
+                stn_chain_state_release(&stale_state);
+            }
+
             approvals=state->entries[0].current;approvals.participants=participants;approvals.participant_bytes=NULL;
             CHECK(stn_contract_encode(&approvals,approvals_bytes,sizeof(approvals_bytes),&approvals_length)==STN_CONTRACT_OK);
             CHECK(stn_authority_evidence_encode(approver_two,authority_action,authority_context,
