@@ -9,9 +9,11 @@ struct stn_contract_snapshot {
     stn_contract_state_store state;
     stn_contract_state_entry entries[STN_CONTRACT_STATE_MAX_CONTRACTS];
     uint8_t votes[STN_CONTRACT_STATE_MAX_VOTES * STN_CONTRACT_VOTE_KEY_SIZE];
+    uint8_t *draft_bytes;
+    size_t draft_bytes_length;
 };
 
-static void bind(stn_contract_snapshot *snapshot)
+static int bind(stn_contract_snapshot *snapshot,const uint8_t *old_drafts)
 {
     size_t i;
     snapshot->state.entries=snapshot->entries;
@@ -19,21 +21,25 @@ static void bind(stn_contract_snapshot *snapshot)
     snapshot->state.votes=snapshot->votes;
     snapshot->state.vote_capacity=STN_CONTRACT_STATE_MAX_VOTES;
     for(i=0;i<snapshot->state.entry_count;++i){
-        /*
-         * Contract DRAFT bytes are immutable accepted-history evidence and are
-         * borrowed by the snapshot. Mutable current state retains the same
-         * participant/terms representation established by registration.
-         */
-        if(snapshot->entries[i].current.participants==NULL &&
-           snapshot->entries[i].canonical_draft!=NULL){
-            stn_contract decoded;
-            if(stn_contract_decode(snapshot->entries[i].canonical_draft,
-                snapshot->entries[i].canonical_draft_length,&decoded)==STN_CONTRACT_OK){
-                snapshot->entries[i].current.participant_bytes=decoded.participant_bytes;
-                snapshot->entries[i].current.terms=decoded.terms;
-            }
-        }
+        stn_contract_state_entry *entry=&snapshot->entries[i];
+        size_t offset;
+        stn_contract decoded;
+        if(entry->canonical_draft==NULL || old_drafts==NULL ||
+           entry->canonical_draft<old_drafts ||
+           (size_t)(entry->canonical_draft-old_drafts)>snapshot->draft_bytes_length)
+            return 0;
+        offset=(size_t)(entry->canonical_draft-old_drafts);
+        if(entry->canonical_draft_length>snapshot->draft_bytes_length-offset)
+            return 0;
+        entry->canonical_draft=snapshot->draft_bytes+offset;
+        if(stn_contract_decode(entry->canonical_draft,
+            entry->canonical_draft_length,&decoded)!=STN_CONTRACT_OK)
+            return 0;
+        decoded.sequence=entry->current.sequence;
+        decoded.state=entry->current.state;
+        entry->current=decoded;
     }
+    return 1;
 }
 
 stn_contract_snapshot *stn_contract_snapshot_create(void)
@@ -56,7 +62,15 @@ stn_contract_snapshot *stn_contract_snapshot_clone(
     if(snapshot==NULL)return NULL;
     memcpy(snapshot,source,sizeof(*snapshot));
     snapshot->references=1u;
-    bind(snapshot);
+    snapshot->draft_bytes=NULL;
+    if(source->draft_bytes_length!=0u){
+        snapshot->draft_bytes=malloc(source->draft_bytes_length);
+        if(snapshot->draft_bytes==NULL){free(snapshot);return NULL;}
+        memcpy(snapshot->draft_bytes,source->draft_bytes,source->draft_bytes_length);
+    }
+    if(!bind(snapshot,source->draft_bytes)){
+        free(snapshot->draft_bytes);free(snapshot);return NULL;
+    }
     return snapshot;
 }
 
@@ -73,7 +87,10 @@ void stn_contract_snapshot_release(stn_contract_snapshot *snapshot)
 {
     if(snapshot==NULL)return;
     if(snapshot->references==0u)abort();
-    if(--snapshot->references==0u)free(snapshot);
+    if(--snapshot->references==0u){
+        free(snapshot->draft_bytes);
+        free(snapshot);
+    }
 }
 
 stn_contract_state_store *stn_contract_snapshot_state(
@@ -86,4 +103,39 @@ const stn_contract_state_store *stn_contract_snapshot_const_state(
     const stn_contract_snapshot *snapshot)
 {
     return snapshot==NULL ? NULL : &snapshot->state;
+}
+
+stn_contract_status stn_contract_snapshot_register(
+    stn_contract_snapshot *snapshot,const uint8_t *canonical_draft,
+    size_t canonical_draft_length,size_t *index)
+{
+    uint8_t *grown,*old_drafts;
+    size_t old_length;
+    stn_contract_status status;
+    if(snapshot==NULL || canonical_draft==NULL || index==NULL)
+        return STN_CONTRACT_ARGUMENT;
+    if(canonical_draft_length>STN_CONTRACT_MAX_SIZE ||
+       snapshot->draft_bytes_length>SIZE_MAX-canonical_draft_length)
+        return STN_CONTRACT_CAPACITY;
+    old_drafts=snapshot->draft_bytes;
+    old_length=snapshot->draft_bytes_length;
+    grown=malloc(old_length+canonical_draft_length);
+    if(grown==NULL)return STN_CONTRACT_CAPACITY;
+    if(old_length!=0u)memcpy(grown,old_drafts,old_length);
+    memcpy(grown+old_length,canonical_draft,canonical_draft_length);
+    snapshot->draft_bytes=grown;
+    snapshot->draft_bytes_length=old_length+canonical_draft_length;
+    if(old_length!=0u && !bind(snapshot,old_drafts)){
+        snapshot->draft_bytes=old_drafts;snapshot->draft_bytes_length=old_length;
+        free(grown);return STN_CONTRACT_ARGUMENT;
+    }
+    status=stn_contract_state_register(&snapshot->state,grown+old_length,
+        canonical_draft_length,index);
+    if(status!=STN_CONTRACT_OK){
+        if(old_length!=0u)bind(snapshot,grown);
+        snapshot->draft_bytes=old_drafts;snapshot->draft_bytes_length=old_length;
+        free(grown);return status;
+    }
+    free(old_drafts);
+    return STN_CONTRACT_OK;
 }
