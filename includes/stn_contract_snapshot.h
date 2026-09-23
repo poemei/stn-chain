@@ -18,4 +18,12 @@ stn_contract_state_store *stn_contract_snapshot_state(
 const stn_contract_state_store *stn_contract_snapshot_const_state(
     const stn_contract_snapshot *snapshot);
 
+/* Copy and register an immutable canonical DRAFT into snapshot-owned storage.
+ * No Contract state may borrow candidate/block bytes beyond this call. */
+stn_contract_status stn_contract_snapshot_register(
+    stn_contract_snapshot *snapshot,
+    const uint8_t *canonical_draft,
+    size_t canonical_draft_length,
+    size_t *index);
+
 #endif
