@@ -119,3 +119,38 @@ stn_contract_status stn_contract_vote_accept(
     *reached=state->accepted_count>=state->required_count ? 1 : 0;
     return STN_CONTRACT_OK;
 }
+
+
+stn_contract_status stn_contract_vote_apply(
+    const stn_contract *current,uint64_t expected_sequence,
+    const uint8_t *canonical_draft,size_t canonical_draft_length,
+    const uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE],
+    stn_contract_vote_state *vote_state,stn_contract *next)
+{
+    stn_contract candidate;
+    stn_contract_status status;
+    size_t before_count;
+    int reached=0;
+    if(current==NULL || canonical_draft==NULL || actor==NULL ||
+       vote_state==NULL || next==NULL)return STN_CONTRACT_ARGUMENT;
+    if(current->state!=STN_CONTRACT_STATE_REVIEW &&
+       current->state!=STN_CONTRACT_STATE_APPROVALS)
+        return STN_CONTRACT_TRANSITION_ERROR;
+    if(current->sequence==UINT64_MAX || expected_sequence!=current->sequence+1u)
+        return STN_CONTRACT_SEQUENCE_ERROR;
+
+    before_count=vote_state->accepted_count;
+    status=stn_contract_vote_accept(vote_state,canonical_draft,
+        canonical_draft_length,actor,&reached);
+    if(status!=STN_CONTRACT_OK)return status;
+
+    candidate=*current;
+    candidate.sequence=expected_sequence;
+    candidate.state=reached ? STN_CONTRACT_STATE_ATTESTATION :
+        STN_CONTRACT_STATE_APPROVALS;
+
+    /* vote_accept mutates only after all checks. No operation below can fail. */
+    *next=candidate;
+    (void)before_count;
+    return STN_CONTRACT_OK;
+}
