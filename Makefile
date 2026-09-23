@@ -67,6 +67,7 @@ CORE_SOURCES := \
 	src/stn_validation.c \
 	src/stn_contract.c \
 	src/stn_contract_consensus.c \
+	src/stn_contract_lineage.c \
 	src/stn_contract_transaction.c
 
 CRYPTO_SOURCES := \
@@ -173,3 +174,13 @@ test-contract-consensus: $(BUILD_DIR)/test-contract-consensus
 $(BUILD_DIR)/test-contract-consensus: tests/test_contract_consensus.c src/stn_contract_consensus.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract_consensus.h includes/stn_contract.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_CONTRACT_CONSENSUS_TEST_MAIN tests/test_contract_consensus.c src/stn_contract_consensus.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+
+
+# Stable Contract DRAFT-origin lineage qualification.
+.PHONY: test-contract-lineage
+test-contract-lineage: $(BUILD_DIR)/test-contract-lineage
+	$(BUILD_DIR)/test-contract-lineage
+
+$(BUILD_DIR)/test-contract-lineage: tests/test_contract_lineage.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract_lineage.h includes/stn_contract.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_CONTRACT_LINEAGE_TEST_MAIN tests/test_contract_lineage.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
