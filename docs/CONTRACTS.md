@@ -248,15 +248,14 @@ The STN Chain contract model anticipates explicit protocol actions such as:
 - `REVOKE`;
 - `CLOSE`.
 
-These actions describe the Contract Engine model.
+These actions are implemented as canonical Contract action transactions and are
+evaluated by the Chain against accepted Contract state.
 
-The current Contract v1 structural foundation does not yet implement accepted
-contract actions or state-transition enforcement.
-
-When those semantics are introduced, the Chain must evaluate the applicable
-participant identity, signer authority, signature, current state, permitted
-transition, sequence and duplicate-action rules under deterministic protocol
-rules.
+For each action, the Chain evaluates the applicable participant identity,
+Ed25519 signature, scoped signer authority, immutable Contract lineage, current
+state, permitted transition, exact next sequence and approval-vote rules under
+deterministic protocol rules. Candidate failure does not partially mutate the
+previous accepted Contract snapshot.
 
 ---
 
@@ -336,108 +335,198 @@ encoding.
 
 ---
 
-## Current Phase 18 Status
+## Contract Identity and Lineage
 
-Phase 18 is the active Contract Engine feature phase.
+The exact canonical DRAFT is the immutable Contract origin.
 
-### Chunk 1 — Address Foundation
+Its canonical bytes determine the Contract's stable `stnc0_` identifier.
+Accepted lifecycle progression changes sequence and state, but does not derive a
+new Contract address at each state.
 
-The typed address foundation is complete and qualified on Windows x64 and Linux
-x64 for the recorded scope.
+A later action belongs to the same Contract lineage only when the immutable
+DRAFT fields remain identical. Version, type, creation value, participants and
+terms cannot be changed while claiming the original Contract identity.
 
-It establishes:
-
-- `stn0_` identity addresses;
-- `stnc0_` contract addresses;
-- `stnw0_` wallet-namespace addresses;
-- deterministic derivation;
-- full text encoding and decoding;
-- structural validation;
-- 32-byte identifier access;
-- display-only abbreviation.
-
-The STNC identity-address integration is implemented separately through STNC v2
-method `0x0009 DERIVE_ADDRESS`. Its current RPC operation accepts identity
-address derivation only.
-
-### Chunk 2 — Canonical Contract Foundation
-
-The Contract v1 structural foundation is implemented.
-
-It establishes:
-
-- canonical `STCT` framing;
-- explicit big-endian fields;
-- bounded participants;
-- bounded terms;
-- protocol-defined contract types;
-- protocol-defined contract states;
-- protocol-defined participant roles;
-- portable canonical participant encoding;
-- safe participant extraction without native-structure wire casting;
-- structural validation;
-- deterministic `stnc0_` derivation from canonical Contract v1 bytes.
-
-Chunk 2 implementation and qualification are separate.
-
-No build, runtime or cross-platform qualification result is claimed here for
-Chunk 2 until that evidence is recorded.
+This separates stable Contract identity from mutable accepted state.
 
 ---
 
-## Not Yet Implemented by Chunk 2
+## Contract Action Transaction
 
-The canonical Contract v1 foundation does not by itself add:
+Contract actions use STNT transaction type 5 with the following canonical
+payload fields:
 
-- contract transaction admission;
-- accepted-history contract integration;
-- STNC contract methods;
-- contract persistence semantics;
-- contract state-transition enforcement;
-- signature application to contract actions;
-- authority evaluation for contract actions;
-- duplicate approval prevention;
-- amendment processing;
-- execution processing;
-- contract settlement;
-- wallet behavior;
-- economics.
+| Field | Size |
+| --- | ---: |
+| Version | 2 bytes |
+| Action | 2 bytes |
+| Sequence | 8 bytes |
+| Contract Length | 4 bytes |
+| Authority Length | 4 bytes |
+| Actor | 32 bytes |
+| Signature | 64 bytes |
+| Canonical Contract | Contract Length |
+| Authority Evidence | Authority Length |
 
-Those capabilities require later bounded Contract Engine increments.
+All integer fields are big-endian. The fixed action header is 116 bytes.
+Current scoped authority evidence is the existing fixed 97-byte Chain authority
+representation.
 
-Phase 19 remains responsible for authoritative economic semantics, including
-wallet behavior, balances, miner compensation, issuance, transfers and contract
-settlement where those features are ultimately defined.
+The action signature authenticates the exact canonical current Contract bytes,
+canonical actor identity, action and sequence. Authority is evaluated separately
+against the immutable canonical DRAFT.
 
-Staging contract and wallet-address prerequisites does not give them economic
-meaning before the Economy protocol defines that meaning.
+---
+
+## Majority Approval
+
+Approval is not established merely because one participant submits an APPROVE
+action.
+
+Eligible voters are the unique participants in the canonical DRAFT whose role is
+`APPROVER`.
+
+A duplicate APPROVER identity is invalid. A Contract with no eligible approvers
+cannot establish approval authority.
+
+The required approval threshold is strict majority:
+
+    floor(eligible_approvers / 2) + 1
+
+Each eligible identity may contribute one accepted approval vote for a Contract
+origin. Duplicate votes are rejected.
+
+An accepted vote advances the Contract sequence. While the vote count remains
+below the threshold the Contract is in APPROVALS. Reaching the threshold advances
+the Contract to ATTESTATION.
+
+The qualified three-approver fixture therefore requires two accepted votes:
+
+    REVIEW/2
+    -> APPROVE #1
+    -> APPROVALS/3
+    -> APPROVE #2
+    -> ATTESTATION/4
+
+Consensus acceptance remains a Chain protocol decision. The vote set is evidence
+evaluated under that protocol; no participant independently determines accepted
+Chain state.
+
+---
+
+## Accepted State and Recovery
+
+Contract accepted state is owned by the Chain state snapshot.
+
+For each bounded Contract entry the snapshot retains the stable Contract
+identifier, independently owned canonical DRAFT evidence, current accepted
+Contract state, eligible/required approval counts and accepted vote evidence.
+
+Candidate evaluation is atomic. A failed Contract action or other candidate
+failure does not partially mutate the prior accepted Contract snapshot.
+
+Contract state is reconstructible from accepted block history through the
+existing Chain history-reconstruction path. It is not loaded from a separate
+trusted Contract-state file.
+
+Cross-platform qualification has demonstrated reconstruction through majority
+approval. Replaying the accepted history reconstructs the same canonical DRAFT
+identity, three eligible approvers, majority threshold two, two accepted votes
+and `ATTESTATION/4`.
+
+---
+
+## Qualified Lifecycle
+
+The current qualified primary path is:
+
+    DRAFT/0
+    -> CREATE
+    -> ISSUED/1
+    -> AMEND
+    -> REVIEW/2
+    -> APPROVE
+    -> APPROVALS/3
+    -> APPROVE
+    -> ATTESTATION/4
+    -> EXECUTE
+    -> EXECUTED/5
+
+Qualified terminal branches also include:
+
+    REVIEW/2 -> REJECTED/3 -> CLOSED/4
+    REVIEW/2 -> REVOKED/3
+
+Authority evidence accepted earlier in canonical candidate transaction order may
+authorize a later Contract action. Evidence appearing later in the candidate
+cannot retroactively authorize an earlier action.
+
+Stale Contract state/sequence is rejected without changing accepted state.
+
+---
+
+## Current Phase 18 Status
+
+The Contract Engine is implemented and qualified on Windows x64 and Linux x64
+for the current bounded scope:
+
+- typed Contract addressing;
+- canonical Contract v1 representation;
+- Contract action transaction codec and STNT type 5;
+- stable canonical-DRAFT identity and lineage;
+- Ed25519 action authentication;
+- scoped authority evaluation;
+- deterministic lifecycle transitions;
+- strict-majority approval by eligible APPROVER participants;
+- duplicate-vote prevention in the Contract consensus primitive;
+- bounded snapshot-owned accepted state;
+- candidate failure atomicity and snapshot isolation;
+- stale-state rejection;
+- canonical same-block authority ordering;
+- accepted-history reconstruction through majority approval.
+
+The Contract-capable Chain build was installed and the deployed Chain daemon was
+restarted on 2026-09-22.
+
+Phase 18 remains ACTIVE. Application-facing STNC Contract methods are not claimed
+complete by this document. ARM qualification is not claimed.
+
+Phase 19 remains responsible for native economic semantics. The Contract Engine
+does not introduce balances, issuance, rewards, gas or settlement economics.
+
+No VM, EVM, arbitrary bytecode or arbitrary script execution is introduced.
 
 ---
 
 ## Implementation Boundary
 
-The current Contract v1 implementation is intentionally small.
+The Contract Engine remains deliberately bounded.
 
-The structural codec answers:
+The canonical codec answers:
 
 > Are these exact bytes a structurally valid canonical Contract v1 object?
 
 The typed address layer answers:
 
-> What deterministic `stnc0_` identifier corresponds to these exact canonical
-> contract bytes?
+> What stable `stnc0_` identifier corresponds to the exact canonical DRAFT?
 
-Existing identity and cryptographic foundations answer separate questions about
-signatures and authority.
+The identity/signature layer answers:
 
-Future Contract Engine state-transition logic will answer whether an action is
-permitted against accepted contract state.
+> Did this actor authenticate this exact Contract action and sequence?
 
-Consensus ultimately determines whether resulting evidence becomes accepted
-Chain state.
+The authority layer answers:
 
-Keeping those responsibilities separate prevents a contract parser from quietly
-becoming an execution engine, authority system, wallet or consensus substitute.
+> Is this actor permitted to perform this action for this Contract origin?
+
+The Contract consensus/state layer answers:
+
+> Is the action valid against current accepted Contract state, and if it is an
+> approval, does the accepted vote set reach the deterministic majority threshold?
+
+Chain consensus determines whether that evidence becomes accepted state.
+
+Keeping these responsibilities separate prevents the Contract Engine from
+becoming a general-purpose VM, wallet, economic system or substitute authority.
 
 ---
 
