@@ -28,6 +28,19 @@ static const uint8_t create_action_signature[64]={
     0xe3,0x83,0x0a,0x3e,0x42,0xb6,0xe2,0x56,0x8d,0xf2,0xff,0x55,0x5b,0xc6,0x68,0x04
 };
 
+static const uint8_t amend_grant_signature[64]={
+    0x5c,0x48,0x54,0x27,0x5a,0x7b,0x72,0x26,0xcc,0x05,0x46,0xba,0x25,0x8f,0x4a,0x7d,
+    0x8b,0xa9,0xff,0xe9,0xb9,0x09,0xec,0x28,0xcb,0x73,0x78,0x42,0x10,0xd1,0xcc,0x23,
+    0x83,0xeb,0x4f,0xd5,0x7f,0xb1,0xa4,0x48,0x61,0xe1,0xdd,0x8d,0x5e,0x31,0xfb,0xea,
+    0x20,0x37,0xbf,0x8f,0xb1,0x35,0x31,0x48,0x1e,0xe2,0xfa,0x26,0x84,0xb4,0x8d,0x09
+};
+static const uint8_t amend_action_signature[64]={
+    0xa4,0x86,0x8d,0x11,0x69,0x29,0x44,0xa0,0x73,0xbe,0x4f,0xdd,0x41,0x3e,0x97,0x75,
+    0x57,0x88,0xb5,0xf6,0x23,0x73,0x26,0xba,0x0b,0x74,0xd9,0x8f,0xea,0xa0,0x93,0xe0,
+    0x7a,0x05,0x75,0xe0,0x23,0x9c,0xeb,0x04,0xeb,0x78,0xc2,0x96,0x18,0xe0,0x46,0x35,
+    0x9f,0x9d,0x32,0xb2,0x1a,0x29,0xb8,0x46,0x9a,0x53,0x67,0x92,0xdc,0x7d,0xf1,0x07
+};
+
 static void contract_chain_create(void)
 {
     static const uint8_t terms[]={'T'};
@@ -133,6 +146,66 @@ static void contract_chain_create(void)
     report=stn_chain_validate_candidate(&context,&genesis_state,child_bytes,child_length,&rejected);
     CHECK(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT);
     CHECK(stn_contract_snapshot_const_state(genesis_state.contracts)->entry_count==0u);
+
+
+    {
+        stn_contract issued=state->entries[0].current;
+        stn_chain_state grant_state={0},review_state={0};
+        uint8_t issued_bytes[STN_CONTRACT_MAX_SIZE],amend_evidence[STN_AUTHORITY_EVIDENCE_SIZE];
+        uint8_t amend_grant[STN_AUTHORITY_GRANT_SIZE],amend_grant_tx[STN_TX_MAX_SIZE];
+        size_t issued_length=0,amend_evidence_length=0,amend_grant_length=0,amend_grant_tx_length=0;
+
+        issued.participants=&participant;issued.participant_bytes=NULL;
+        CHECK(stn_contract_encode(&issued,issued_bytes,sizeof(issued_bytes),&issued_length)==STN_CONTRACT_OK);
+        CHECK(stn_contract_authority_action(STN_CONTRACT_ACTION_AMEND,authority_action)==STN_CONTRACT_OK);
+        CHECK(stn_contract_authority_context(draft_bytes,draft_length,authority_context)==STN_CONTRACT_OK);
+        CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
+            amend_evidence,sizeof(amend_evidence),&amend_evidence_length)==STN_AUTHORITY_AUTHORIZED);
+        CHECK(stn_authority_grant_encode(chain_root,amend_evidence,amend_grant_signature,
+            amend_grant,sizeof(amend_grant),&amend_grant_length)==STN_AUTHORITY_VALID_GRANT);
+        grant_tx.record_bytes=amend_grant;grant_tx.record_length=(uint32_t)amend_grant_length;
+        CHECK(stn_transaction_encode(&grant_tx,amend_grant_tx,sizeof(amend_grant_tx),
+            &amend_grant_tx_length)==STN_DATA_OK);
+        span.bytes=amend_grant_tx;span.length=(uint32_t)amend_grant_tx_length;
+        CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+        memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
+        memcpy(block.header.previous_hash,accepted.tip_id,32);block.header.height=2u;block.header.timestamp=2u;
+        block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
+        CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
+            block.header.transaction_commitment)==STN_DATA_OK);
+        CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+        report=stn_chain_validate_candidate(&context,&accepted,child_bytes,child_length,&grant_state);
+        CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+        CHECK(grant_state.lifecycle!=NULL && grant_state.lifecycle->grant_count==2u);
+
+        action.action=STN_CONTRACT_ACTION_AMEND;action.sequence=2u;
+        action.canonical_contract=issued_bytes;action.canonical_contract_length=(uint32_t)issued_length;
+        memcpy(action.signature,amend_action_signature,sizeof(amend_action_signature));
+        action.authority_evidence=amend_evidence;action.authority_evidence_length=(uint32_t)amend_evidence_length;
+        CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
+        contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
+        CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+        span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+        CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+        memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
+        memcpy(block.header.previous_hash,grant_state.tip_id,32);block.header.height=3u;block.header.timestamp=3u;
+        block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
+        CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
+            block.header.transaction_commitment)==STN_DATA_OK);
+        CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+        report=stn_chain_validate_candidate(&context,&grant_state,child_bytes,child_length,&review_state);
+        CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+        state=stn_contract_snapshot_state(review_state.contracts);
+        CHECK(state!=NULL && state->entry_count==1u);
+        CHECK(state->entries[0].current.state==STN_CONTRACT_STATE_REVIEW);
+        CHECK(state->entries[0].current.sequence==2u);
+        CHECK(memcmp(state->entries[0].contract_id,address.identifier,STN_ADDRESS_ID_SIZE)==0);
+        CHECK(stn_contract_snapshot_const_state(grant_state.contracts)->entries[0].current.state==
+            STN_CONTRACT_STATE_ISSUED);
+        CHECK(stn_contract_snapshot_const_state(grant_state.contracts)->entries[0].current.sequence==1u);
+
+        stn_chain_state_release(&grant_state);stn_chain_state_release(&review_state);
+    }
 
     stn_chain_state_release(&empty);stn_chain_state_release(&genesis_state);
     stn_chain_state_release(&accepted);stn_chain_state_release(&rejected);
