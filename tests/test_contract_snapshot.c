@@ -43,6 +43,177 @@ static const uint8_t reject_action_signature[64]={0x98,0xa2,0x83,0x64,0xa6,0xf6,
 static const uint8_t execute_grant_signature[64]={0x94,0xce,0x05,0x51,0xa1,0x06,0x48,0xc6,0xae,0xaf,0x99,0x6b,0x48,0x03,0x5a,0xa2,0xef,0x3c,0x29,0x67,0xbd,0x4c,0x21,0x92,0x97,0xf3,0xfd,0xee,0x72,0x16,0x92,0x0f,0x96,0x91,0xf9,0xa7,0xa6,0x7a,0x02,0xfd,0x56,0x80,0x89,0x85,0xe0,0xd5,0x78,0xbf,0x9b,0xfc,0x34,0x0b,0x40,0x30,0xdc,0x0f,0xa6,0x05,0x75,0x1e,0x25,0xcb,0xfe,0x0d};
 static const uint8_t execute_action_signature[64]={0x9c,0x42,0xc4,0xf1,0xc7,0xef,0x07,0x6a,0x50,0xb0,0x0a,0xf6,0xd1,0xfb,0xe4,0xe7,0x18,0xc1,0x82,0x18,0x61,0xa3,0x02,0x64,0x1c,0xcb,0x1a,0xda,0xfe,0x20,0x0e,0x53,0x99,0xf6,0x15,0xbf,0x2c,0xda,0x11,0x59,0xf2,0xd7,0x2c,0x54,0x73,0x5d,0x7c,0xed,0xe7,0x0e,0x69,0x97,0x02,0xe5,0x7a,0x22,0xef,0x91,0x6c,0x58,0x31,0x26,0x2d,0x01};
 
+static void contract_history_majority(void)
+{
+    static const uint8_t terms[]={'T'};
+    stn_contract_participant participants[3]={{0}};
+    stn_contract draft={0},current={0};
+    stn_contract_transaction action={0};
+    stn_transaction tx={0};
+    stn_transaction_span span;
+    stn_block block={0};
+    stn_chain_context context={0};
+    stn_chain_state state={0},next={0},rebuilt={0};
+    stn_chain_report report;
+    stn_hash_provider provider={stn_sha256,NULL};
+    stn_address address;
+    const stn_contract_state_store *contracts;
+    stn_block_span history[8];
+    uint8_t blocks[8][STN_BLOCK_MAX_SIZE];
+    uint32_t block_lengths[8]={0};
+    uint8_t draft_bytes[STN_CONTRACT_MAX_SIZE],current_bytes[STN_CONTRACT_MAX_SIZE];
+    uint8_t authority_action[STN_AUTHORITY_ACTION_SIZE];
+    uint8_t authority_context[STN_AUTHORITY_CONTEXT_SIZE];
+    uint8_t evidence[STN_AUTHORITY_EVIDENCE_SIZE];
+    uint8_t grant[STN_AUTHORITY_GRANT_SIZE];
+    uint8_t action_bytes[STN_CONTRACT_TX_MAX_SIZE];
+    uint8_t tx_bytes[STN_TX_MAX_SIZE],body[STN_BLOCK_MAX_BODY];
+    size_t draft_length=0,current_length=0,evidence_length=0,grant_length=0;
+    size_t action_length=0,tx_length=0,body_length=0,block_length=0;
+    size_t i;
+
+    memcpy(participants[0].identity,chain_root,32);participants[0].role=STN_CONTRACT_ROLE_APPROVER;
+    memcpy(participants[1].identity,approver_two,32);participants[1].role=STN_CONTRACT_ROLE_APPROVER;
+    memcpy(participants[2].identity,approver_three,32);participants[2].role=STN_CONTRACT_ROLE_APPROVER;
+    draft.version=STN_CONTRACT_VERSION;draft.type=STN_CONTRACT_GENERIC;
+    draft.sequence=0u;draft.created_at=1u;draft.state=STN_CONTRACT_STATE_DRAFT;
+    draft.participants=participants;draft.participant_count=3u;
+    draft.terms=terms;draft.terms_length=(uint32_t)sizeof(terms);
+    CHECK(stn_contract_encode(&draft,draft_bytes,sizeof(draft_bytes),&draft_length)==STN_CONTRACT_OK);
+    CHECK(stn_contract_address(draft_bytes,draft_length,&address)==STN_CONTRACT_OK);
+
+#define BUILD_HISTORY_BLOCK(INDEX,HEIGHT,TXCOUNT) do { \
+    CHECK(stn_block_body_encode(&span,(TXCOUNT),body,sizeof(body),&body_length)==STN_DATA_OK); \
+    memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u; \
+    if((HEIGHT)!=0u)memcpy(block.header.previous_hash,state.tip_id,32); \
+    block.header.height=(HEIGHT);block.header.timestamp=(HEIGHT); \
+    block.header.transaction_count=(TXCOUNT);block.header.body_length=(uint32_t)body_length;block.body=body; \
+    CHECK(stn_block_body_commitment(body,body_length,(TXCOUNT),&provider,block.header.transaction_commitment)==STN_DATA_OK); \
+    CHECK(stn_block_encode(&block,blocks[(INDEX)],sizeof(blocks[(INDEX)]),&block_length)==STN_DATA_OK); \
+    block_lengths[(INDEX)]=(uint32_t)block_length; \
+} while(0)
+
+#define ACCEPT_HISTORY_BLOCK(INDEX) do { \
+    report=stn_chain_validate_candidate(&context,&state,blocks[(INDEX)],block_lengths[(INDEX)],&next); \
+    CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT); \
+    stn_chain_state_release(&state);state=next;memset(&next,0,sizeof(next)); \
+} while(0)
+
+    CHECK(stn_contract_authority_action(STN_CONTRACT_ACTION_CREATE,authority_action)==STN_CONTRACT_OK);
+    CHECK(stn_contract_authority_context(draft_bytes,draft_length,authority_context)==STN_CONTRACT_OK);
+    CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
+        evidence,sizeof(evidence),&evidence_length)==STN_AUTHORITY_AUTHORIZED);
+    CHECK(stn_authority_grant_encode(chain_root,evidence,create_grant_signature,
+        grant,sizeof(grant),&grant_length)==STN_AUTHORITY_VALID_GRANT);
+    tx.version=1u;tx.type=STN_TX_AUTHORITY_GRANT;tx.record_bytes=grant;tx.record_length=(uint32_t)grant_length;
+    CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+    span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+    BUILD_HISTORY_BLOCK(0,0u,1u);
+
+    context.network_id[0]=1u;context.genesis_bytes=blocks[0];context.genesis_length=block_lengths[0];
+    context.genesis_authority_roots=chain_root;context.genesis_authority_root_count=1u;
+    context.genesis_initial_identities=chain_root;context.genesis_initial_identity_count=1u;
+    context.hash_provider=provider;
+    CHECK(stn_chain_initialize(&context,&state)==STN_DATA_OK);
+    ACCEPT_HISTORY_BLOCK(0);
+
+    action.version=STN_CONTRACT_TX_VERSION;action.action=STN_CONTRACT_ACTION_CREATE;action.sequence=1u;
+    action.canonical_contract=draft_bytes;action.canonical_contract_length=(uint32_t)draft_length;
+    memcpy(action.actor,chain_root,32);memcpy(action.signature,create_action_signature,64);
+    action.authority_evidence=evidence;action.authority_evidence_length=(uint32_t)evidence_length;
+    CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
+    tx.type=STN_TX_CONTRACT_ACTION;tx.record_bytes=action_bytes;tx.record_length=(uint32_t)action_length;
+    CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+    span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+    BUILD_HISTORY_BLOCK(1,1u,1u);ACCEPT_HISTORY_BLOCK(1);
+
+    contracts=stn_contract_snapshot_const_state(state.contracts);current=contracts->entries[0].current;
+    current.participants=participants;current.participant_bytes=NULL;
+    CHECK(stn_contract_encode(&current,current_bytes,sizeof(current_bytes),&current_length)==STN_CONTRACT_OK);
+    CHECK(stn_contract_authority_action(STN_CONTRACT_ACTION_AMEND,authority_action)==STN_CONTRACT_OK);
+    CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
+        evidence,sizeof(evidence),&evidence_length)==STN_AUTHORITY_AUTHORIZED);
+    CHECK(stn_authority_grant_encode(chain_root,evidence,amend_grant_signature,
+        grant,sizeof(grant),&grant_length)==STN_AUTHORITY_VALID_GRANT);
+    tx.type=STN_TX_AUTHORITY_GRANT;tx.record_bytes=grant;tx.record_length=(uint32_t)grant_length;
+    CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+    span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+    BUILD_HISTORY_BLOCK(2,2u,1u);ACCEPT_HISTORY_BLOCK(2);
+
+    action.action=STN_CONTRACT_ACTION_AMEND;action.sequence=2u;
+    action.canonical_contract=current_bytes;action.canonical_contract_length=(uint32_t)current_length;
+    memcpy(action.actor,chain_root,32);memcpy(action.signature,amend_action_signature,64);
+    action.authority_evidence=evidence;action.authority_evidence_length=(uint32_t)evidence_length;
+    CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
+    tx.type=STN_TX_CONTRACT_ACTION;tx.record_bytes=action_bytes;tx.record_length=(uint32_t)action_length;
+    CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+    span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+    BUILD_HISTORY_BLOCK(3,3u,1u);ACCEPT_HISTORY_BLOCK(3);
+
+    contracts=stn_contract_snapshot_const_state(state.contracts);current=contracts->entries[0].current;
+    current.participants=participants;current.participant_bytes=NULL;
+    CHECK(stn_contract_encode(&current,current_bytes,sizeof(current_bytes),&current_length)==STN_CONTRACT_OK);
+    CHECK(stn_contract_authority_action(STN_CONTRACT_ACTION_APPROVE,authority_action)==STN_CONTRACT_OK);
+    CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
+        evidence,sizeof(evidence),&evidence_length)==STN_AUTHORITY_AUTHORIZED);
+    CHECK(stn_authority_grant_encode(chain_root,evidence,approve_one_grant_signature,
+        grant,sizeof(grant),&grant_length)==STN_AUTHORITY_VALID_GRANT);
+    tx.type=STN_TX_AUTHORITY_GRANT;tx.record_bytes=grant;tx.record_length=(uint32_t)grant_length;
+    CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+    span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+    BUILD_HISTORY_BLOCK(4,4u,1u);ACCEPT_HISTORY_BLOCK(4);
+
+    action.action=STN_CONTRACT_ACTION_APPROVE;action.sequence=3u;
+    action.canonical_contract=current_bytes;action.canonical_contract_length=(uint32_t)current_length;
+    memcpy(action.actor,chain_root,32);memcpy(action.signature,approve_one_action_signature,64);
+    action.authority_evidence=evidence;action.authority_evidence_length=(uint32_t)evidence_length;
+    CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
+    tx.type=STN_TX_CONTRACT_ACTION;tx.record_bytes=action_bytes;tx.record_length=(uint32_t)action_length;
+    CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+    span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+    BUILD_HISTORY_BLOCK(5,5u,1u);ACCEPT_HISTORY_BLOCK(5);
+
+    contracts=stn_contract_snapshot_const_state(state.contracts);current=contracts->entries[0].current;
+    current.participants=participants;current.participant_bytes=NULL;
+    CHECK(stn_contract_encode(&current,current_bytes,sizeof(current_bytes),&current_length)==STN_CONTRACT_OK);
+    CHECK(stn_authority_evidence_encode(approver_two,authority_action,authority_context,
+        evidence,sizeof(evidence),&evidence_length)==STN_AUTHORITY_AUTHORIZED);
+    CHECK(stn_authority_grant_encode(chain_root,evidence,approve_two_grant_signature,
+        grant,sizeof(grant),&grant_length)==STN_AUTHORITY_VALID_GRANT);
+    tx.type=STN_TX_AUTHORITY_GRANT;tx.record_bytes=grant;tx.record_length=(uint32_t)grant_length;
+    CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+    span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+    BUILD_HISTORY_BLOCK(6,6u,1u);ACCEPT_HISTORY_BLOCK(6);
+
+    action.action=STN_CONTRACT_ACTION_APPROVE;action.sequence=4u;
+    action.canonical_contract=current_bytes;action.canonical_contract_length=(uint32_t)current_length;
+    memcpy(action.actor,approver_two,32);memcpy(action.signature,approve_two_action_signature,64);
+    action.authority_evidence=evidence;action.authority_evidence_length=(uint32_t)evidence_length;
+    CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
+    tx.type=STN_TX_CONTRACT_ACTION;tx.record_bytes=action_bytes;tx.record_length=(uint32_t)action_length;
+    CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+    span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+    BUILD_HISTORY_BLOCK(7,7u,1u);ACCEPT_HISTORY_BLOCK(7);
+
+    for(i=0;i<8u;++i){history[i].bytes=blocks[i];history[i].length=block_lengths[i];}
+    report=stn_chain_reconstruct_history(&context,history,8u,&rebuilt);
+    CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    contracts=stn_contract_snapshot_const_state(rebuilt.contracts);
+    CHECK(contracts!=NULL && contracts->entry_count==1u);
+    CHECK(contracts->entries[0].eligible_count==3u);
+    CHECK(contracts->entries[0].required_count==2u);
+    CHECK(contracts->entries[0].vote_count==2u);
+    CHECK(contracts->entries[0].current.state==STN_CONTRACT_STATE_ATTESTATION);
+    CHECK(contracts->entries[0].current.sequence==4u);
+    CHECK(memcmp(contracts->entries[0].contract_id,address.identifier,STN_ADDRESS_ID_SIZE)==0);
+    CHECK(contracts->entries[0].canonical_draft_length==draft_length);
+    CHECK(memcmp(contracts->entries[0].canonical_draft,draft_bytes,draft_length)==0);
+
+    stn_chain_state_release(&rebuilt);stn_chain_state_release(&state);
+#undef ACCEPT_HISTORY_BLOCK
+#undef BUILD_HISTORY_BLOCK
+}
+
 static void contract_chain_create(void)
 {
     static const uint8_t terms[]={'T'};
@@ -803,6 +974,7 @@ int test_contract_snapshot(void)
         CHECK(moved.contracts==NULL);
     }
     contract_chain_create();
+    contract_history_majority();
     printf("Contract snapshot: %u checks, %u failures.\n",checks,failures);
     return failures!=0u;
 }
