@@ -34,9 +34,13 @@ accepted state, and accepted-history reconstruction. Windows x64 and Linux x64
 qualification cover the current Contract scope through majority reconstruction
 to `ATTESTATION/4`, with qualified CREATE, AMEND, APPROVE, EXECUTE, REJECT,
 REVOKE and CLOSE paths. The Contract-capable Chain was installed and restarted
-on the deployed node on 2026-09-22. Phase 18 remains ACTIVE; STNC Contract
-application methods and Phase 19 economics are not claimed complete.
-See [Contracts](docs/CONTRACTS.md) and the [typed address foundation](docs/ADDRESSES.md).
+on the deployed node on 2026-09-22. Phase 18 is now SHELVED / CHAIN SCOPE
+QUALIFIED; application-facing Contract workflow is deferred until STNC Core has
+the GUI/client surface required to use Contracts. Phase 19 (Economics /
+Issuance / Rewards) is ACTIVE and begins with deterministic protocol definition;
+no economic parameters are implied merely by activating the phase.
+See [Contracts](docs/CONTRACTS.md), the [current roadmap](docs/ROADMAP.md), and
+the [typed address foundation](docs/ADDRESSES.md).
 The old Go prototype is not a compatibility requirement.
 
 ## Build
