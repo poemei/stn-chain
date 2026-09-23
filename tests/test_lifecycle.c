@@ -20,12 +20,14 @@ int test_lifecycle(void)
     memcpy(tx_grant,tx_bytes,n);ng=n;
     stn_lifecycle_initialize(&s,grant_store,4,replay_store,8,root);
     CHECK(stn_lifecycle_apply_transaction(&s,&tx,root,1,&p)==STN_LIFECYCLE_OK && s.grant_count==1);
+    CHECK(stn_lifecycle_authority_evidence_active(&s,evidence,sizeof(evidence),root,1,&p)==STN_LIFECYCLE_OK);
     CHECK(stn_lifecycle_apply_transaction(&s,&tx,root,1,&p)==STN_LIFECYCLE_REPLAY && s.grant_count==1);
     CHECK(stn_authority_grant_id(grant,sizeof(grant),&p,id)==STN_DATA_OK);
     CHECK(stn_authority_revocation_encode(root,id,revoke_sig,revoke,sizeof(revoke),&n)==STN_AUTHORITY_VALID_REVOCATION);
     tx.type=STN_TX_AUTHORITY_REVOKE;tx.record_bytes=revoke;tx.record_length=sizeof(revoke);
     CHECK(stn_lifecycle_apply_transaction(&s,&tx,root,1,&p)==STN_LIFECYCLE_OK);
     CHECK(stn_authority_state_is_revoked(&s.authority,id));
+    CHECK(stn_lifecycle_authority_evidence_active(&s,evidence,sizeof(evidence),root,1,&p)==STN_LIFECYCLE_INVALID);
     CHECK(stn_transaction_encode(&tx,tx_revoke,sizeof(tx_revoke),&nr)==STN_DATA_OK); { stn_transaction decoded={0}; CHECK(stn_transaction_decode(tx_revoke,nr,&decoded)==STN_DATA_OK && decoded.type==STN_TX_AUTHORITY_REVOKE && decoded.record_length==129); }
     span.bytes=tx_grant;span.length=(uint32_t)ng;CHECK(stn_block_body_encode(&span,1,body1,sizeof(body1),&n)==STN_DATA_OK);
     memcpy(duplicate_ids,root,32);memcpy(duplicate_ids+32,root,32);block.header.version=1;block.header.transaction_count=1;block.header.body_length=(uint32_t)n;block.body=body1;CHECK(stn_block_body_commitment(body1,n,1,&p,block.header.transaction_commitment)==STN_DATA_OK);CHECK(stn_block_encode(&block,block1,sizeof(block1),&bn1)==STN_DATA_OK);
