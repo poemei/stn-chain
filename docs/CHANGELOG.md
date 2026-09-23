@@ -5,6 +5,24 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 18 shelved; Phase 19 activated - 2026-09-22
+
+- Phase 18 is now SHELVED / CHAIN SCOPE QUALIFIED. The qualified and deployed
+  Chain-side Contract engine remains intact; no Contract consensus code is
+  removed or changed by this status transition.
+- Application-facing Contract workflow is deferred until STNC Core provides the
+  GUI/client surface needed for practical Contract drafting, presentation,
+  signing and actions. Shelving Phase 18 does not claim that Core workflow
+  complete.
+- Phase 19 (Economics / Issuance / Rewards) is now ACTIVE.
+- Phase 19 begins with deterministic protocol definition before implementation.
+  No supply, issuance, reward, balance, transfer, payout or settlement rule is
+  inferred merely from activation of the phase, and no external blockchain
+  economic model is inherited implicitly.
+- No source, consensus, wire-format, storage or mining behavior is changed by
+  this documentation/status update.
+
+
 ### Phase 18 Contract Engine integration and deployment - 2026-09-22
 
 - Activated STNT transaction type 5 for canonical Contract actions and integrated
@@ -40,8 +58,9 @@ are not claims of a published or deployed release.
 - The Contract-capable Chain build was installed and the deployed Chain daemon
   restarted on 2026-09-22. Deployment is recorded separately from the
   cross-platform source qualification above.
-- Phase 18 remains ACTIVE. No EVM, VM, arbitrary bytecode, scripts or gas were
-  introduced. Native economics remain Phase 19.
+- At the time of this integration entry Phase 18 remained ACTIVE. It was later
+  shelved at its qualified Chain-side boundary on 2026-09-22 so Phase 19 could
+  begin. No EVM, VM, arbitrary bytecode, scripts or gas were introduced.
 
 
 ### Windows automatic genesis startup - 2026-09-22
