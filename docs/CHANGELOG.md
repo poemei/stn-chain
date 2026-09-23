@@ -5,6 +5,45 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 18 Contract Engine integration and deployment - 2026-09-22
+
+- Activated STNT transaction type 5 for canonical Contract actions and integrated
+  Contract processing into Chain candidate validation in canonical transaction
+  order. Contract state is derived from accepted Chain evidence; later authority
+  grants cannot retroactively authorize earlier actions in the same candidate.
+- Added deterministic Contract lifecycle enforcement for CREATE, AMEND, APPROVE,
+  REJECT, EXECUTE, REVOKE and CLOSE. Contract actions use the existing identity,
+  Ed25519 signature and scoped-authority foundations rather than a separate
+  Contract authority system.
+- Established the canonical DRAFT as the immutable Contract origin and stable
+  `stnc0_` identity. Mutable sequence/state remains lineage-bound to that origin;
+  changes to version, type, creation value, participants or terms are rejected as
+  a different lineage.
+- Added protocol majority approval. Eligible voters are the unique DRAFT
+  participants with role APPROVER; the threshold is strict majority
+  `floor(N/2) + 1`. One vote per eligible identity is retained for each Contract
+  origin, with bounded deterministic vote/state storage.
+- Added snapshot-owned Contract accepted state with deep-owned canonical DRAFT
+  evidence, copy/share/release semantics and candidate failure atomicity.
+- Qualified real candidate paths on Windows x64 and Linux x64:
+  DRAFT/0 -> CREATE -> ISSUED/1 -> AMEND -> REVIEW/2 -> APPROVE ->
+  APPROVALS/3 -> APPROVE -> ATTESTATION/4 -> EXECUTE -> EXECUTED/5;
+  REVIEW/2 -> REJECTED/3 -> CLOSED/4; and REVIEW/2 -> REVOKED/3.
+- Qualified stale Contract state/sequence rejection, same-block authority
+  ordering, stable Contract identity, snapshot isolation and majority-vote
+  behavior across Windows and Linux.
+- Qualified accepted-history reconstruction through majority approval on both
+  Windows and Linux. Replaying immutable accepted blocks reconstructs the exact
+  canonical DRAFT identity, three eligible approvers, majority threshold two,
+  two accepted votes and ATTESTATION/4 without a separate trusted Contract
+  persistence format.
+- The Contract-capable Chain build was installed and the deployed Chain daemon
+  restarted on 2026-09-22. Deployment is recorded separately from the
+  cross-platform source qualification above.
+- Phase 18 remains ACTIVE. No EVM, VM, arbitrary bytecode, scripts or gas were
+  introduced. Native economics remain Phase 19.
+
+
 ### Windows automatic genesis startup - 2026-09-22
 
 - Windows now starts without required arguments, matching Linux: recover the
