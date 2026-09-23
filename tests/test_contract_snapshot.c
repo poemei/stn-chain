@@ -291,6 +291,23 @@ static void contract_chain_create(void)
             CHECK(stn_contract_snapshot_const_state(approval_one.contracts)->entries[0].current.state==
                 STN_CONTRACT_STATE_APPROVALS);
 
+            action.sequence=4u;action.canonical_contract=approvals_bytes;
+            action.canonical_contract_length=(uint32_t)approvals_length;
+            memcpy(action.actor,chain_root,sizeof(chain_root));
+            memcpy(action.signature,approve_one_action_signature,sizeof(approve_one_action_signature));
+            action.authority_evidence=approve_evidence_one;
+            action.authority_evidence_length=(uint32_t)approve_evidence_one_length;
+            CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
+            contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
+            CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+            span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+            CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
+            memcpy(block.header.previous_hash,approve_grant_two.tip_id,32);block.header.height=7u;block.header.timestamp=7u;
+            block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
+            CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
+                block.header.transaction_commitment)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&approve_grant_two,child_bytes,child_length,&duplicate);
             CHECK(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT);
             CHECK(stn_contract_snapshot_const_state(approve_grant_two.contracts)->entries[0].vote_count==1u);
