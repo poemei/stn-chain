@@ -319,6 +319,7 @@ static void contract_chain_create(void)
             {
                 stn_contract attestation=state->entries[0].current;
                 stn_chain_state execute_grant_state={0},executed_state={0};
+                stn_chain_state_release(&duplicate);
                 uint8_t attestation_bytes[STN_CONTRACT_MAX_SIZE];
                 uint8_t execute_evidence[STN_AUTHORITY_EVIDENCE_SIZE];
                 uint8_t execute_grant[STN_AUTHORITY_GRANT_SIZE];
@@ -381,7 +382,6 @@ static void contract_chain_create(void)
 
             stn_chain_state_release(&approve_grant_one);stn_chain_state_release(&approval_one);
             stn_chain_state_release(&approve_grant_two);stn_chain_state_release(&approval_two);
-            stn_chain_state_release(&duplicate);
         }
 
         stn_chain_state_release(&grant_state);stn_chain_state_release(&review_state);
