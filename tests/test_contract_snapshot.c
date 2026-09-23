@@ -518,12 +518,9 @@ static void contract_chain_create(void)
 
             {
                 stn_chain_state bad_sequence={0};
-                uint8_t saved_signature[64];
                 uint64_t saved_sequence=action.sequence;
 
-                memcpy(saved_signature,action.signature,sizeof(saved_signature));
                 action.sequence=4u;
-                memset(action.signature,0,sizeof(action.signature));
                 CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),
                     &action_length)==STN_CONTRACT_OK);
                 contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
@@ -546,7 +543,6 @@ static void contract_chain_create(void)
                 stn_chain_state_release(&bad_sequence);
 
                 action.sequence=saved_sequence;
-                memcpy(action.signature,saved_signature,sizeof(saved_signature));
                 CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),
                     &action_length)==STN_CONTRACT_OK);
                 contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
