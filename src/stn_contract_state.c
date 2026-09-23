@@ -114,7 +114,14 @@ stn_contract_status stn_contract_state_apply_vote(
      * retain its own stable decoded DRAFT spans so later encoding and lineage
      * checks never depend on a caller's transient current buffer.
      */
-    next.participants=NULL;
+    /*
+     * The registered DRAFT is the store's canonical backing representation.
+     * stn_contract_encode() consumes native participants, while decoded
+     * Contract views expose packed participant_bytes. Re-decode the DRAFT and
+     * materialize its bounded participant set into store-owned entry storage
+     * before publishing mutable state.
+     */
+    next.participants=entry->current.participants;
     next.participant_bytes=entry->current.participant_bytes;
     next.terms=entry->current.terms;
     entry->current=next;
