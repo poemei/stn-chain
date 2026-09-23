@@ -345,6 +345,10 @@ static void contract_chain_create(void)
                     block.header.transaction_commitment)==STN_DATA_OK);
                 CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
                 report=stn_chain_validate_candidate(&context,&approval_two,child_bytes,child_length,&execute_grant_state);
+                if(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT)
+                    printf("EXECUTE GRANT REJECT acceptance=%d reason=%d detail=%d body=%d height=%llu\\n",
+                        (int)report.acceptance,(int)report.reason,(int)report.detail,(int)report.body,
+                        (unsigned long long)block.header.height);
                 CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
 
                 action.action=STN_CONTRACT_ACTION_EXECUTE;action.sequence=5u;
