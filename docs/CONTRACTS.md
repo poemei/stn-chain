@@ -488,11 +488,16 @@ for the current bounded scope:
 The Contract-capable Chain build was installed and the deployed Chain daemon was
 restarted on 2026-09-22.
 
-Phase 18 remains ACTIVE. Application-facing STNC Contract methods are not claimed
-complete by this document. ARM qualification is not claimed.
+Phase 18 is SHELVED / CHAIN SCOPE QUALIFIED. The current Chain-side Contract
+engine is qualified and deployed at its bounded Phase 18 boundary. The
+application-facing Contract workflow is deferred until STNC Core provides the
+GUI/client surface needed to draft, present, sign and act on Contracts. This
+shelving status does not claim that STNC Core workflow complete. ARM
+qualification is not claimed.
 
-Phase 19 remains responsible for native economic semantics. The Contract Engine
-does not introduce balances, issuance, rewards, gas or settlement economics.
+Phase 19 is now ACTIVE and remains responsible for native economic semantics.
+The Contract Engine does not introduce balances, issuance, rewards, gas or
+settlement economics.
 
 No VM, EVM, arbitrary bytecode or arbitrary script execution is introduced.
 
