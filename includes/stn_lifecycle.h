@@ -57,14 +57,6 @@ stn_lifecycle_result stn_lifecycle_check_publication(const stn_lifecycle_state *
     const uint8_t *record, size_t length,
     const stn_hash_provider *provider);
 
-/* Read-only proof that exact scoped authority evidence is backed by an active
- * accepted grant. Evidence alone is never authority. */
-stn_lifecycle_result stn_lifecycle_authority_evidence_active(
-    const stn_lifecycle_state *state,
-    const uint8_t *evidence, size_t evidence_length,
-    const uint8_t *genesis_roots, size_t root_count,
-    const stn_hash_provider *provider);
-
 /* Rebuild from blocks already selected as accepted history, in block order and
  * existing transaction order. Output becomes usable only on success. */
 stn_lifecycle_result stn_lifecycle_rebuild(stn_lifecycle_state *state,
