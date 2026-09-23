@@ -72,6 +72,7 @@ void stn_chain_state_release(stn_chain_state *state)
             if(o->references==0)abort(); /* invalid ownership, never wrap */
             if(--o->references==0)lifecycle_destroy(o);
         }
+        stn_contract_snapshot_release(state->contracts);
         memset(state,0,sizeof(*state));
     }
 }
@@ -84,6 +85,13 @@ stn_data_status stn_chain_state_share(const stn_chain_state *source,stn_chain_st
         if(o->references==0)return STN_DATA_ARGUMENT;
         if(o->references==SIZE_MAX)return STN_DATA_CAPACITY;
         ++o->references;
+    }
+    if(source->contracts!=NULL && stn_contract_snapshot_share(source->contracts)==NULL){
+        if(source->lifecycle!=NULL){
+            stn_chain_lifecycle_owned *o=(stn_chain_lifecycle_owned *)source->lifecycle;
+            if(--o->references==0)lifecycle_destroy(o);
+        }
+        return STN_DATA_CAPACITY;
     }
     *out=*source;return STN_DATA_OK;
 }
@@ -187,7 +195,15 @@ stn_data_status stn_chain_initialize(const stn_chain_context *context, stn_chain
     if (status!=STN_DATA_OK) { return status; }
     status=stn_chain_publication_activation(context,&s.publication_activation_height);
     if(status!=STN_DATA_OK)return status;
-    memcpy(s.network_id,context->network_id,32); {stn_chain_lifecycle_owned *o=lifecycle_new(context);if(o==NULL)return STN_DATA_CAPACITY;s.lifecycle=&o->state;} *out=s;
+    memcpy(s.network_id,context->network_id,32);
+    {
+        stn_chain_lifecycle_owned *o=lifecycle_new(context);
+        if(o==NULL)return STN_DATA_CAPACITY;
+        s.lifecycle=&o->state;
+        s.contracts=stn_contract_snapshot_create();
+        if(s.contracts==NULL){lifecycle_destroy(o);return STN_DATA_CAPACITY;}
+    }
+    *out=s;
     return STN_DATA_OK;
 }
 
