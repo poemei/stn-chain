@@ -335,15 +335,15 @@ static void contract_chain_create(void)
                 STN_CONTRACT_STATE_REVIEW);
             CHECK(stn_contract_snapshot_const_state(review_state.contracts)->entries[0].current.sequence==2u);
             {
-                stn_contract rejected=state->entries[0].current;
+                stn_contract rejected_contract=state->entries[0].current;
                 stn_chain_state close_grant_state={0},closed_state={0};
                 uint8_t rejected_bytes[STN_CONTRACT_MAX_SIZE];
                 uint8_t close_evidence[STN_AUTHORITY_EVIDENCE_SIZE];
                 uint8_t close_grant[STN_AUTHORITY_GRANT_SIZE];
                 size_t rejected_length=0,close_evidence_length=0,close_grant_length=0;
 
-                rejected.participants=participants;rejected.participant_bytes=NULL;
-                CHECK(stn_contract_encode(&rejected,rejected_bytes,sizeof(rejected_bytes),
+                rejected_contract.participants=participants;rejected_contract.participant_bytes=NULL;
+                CHECK(stn_contract_encode(&rejected_contract,rejected_bytes,sizeof(rejected_bytes),
                     &rejected_length)==STN_CONTRACT_OK);
                 CHECK(stn_contract_authority_action(STN_CONTRACT_ACTION_CLOSE,authority_action)==STN_CONTRACT_OK);
                 CHECK(stn_contract_authority_context(draft_bytes,draft_length,authority_context)==STN_CONTRACT_OK);
