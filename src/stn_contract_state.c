@@ -109,6 +109,14 @@ stn_contract_status stn_contract_state_apply_vote(
     status=stn_contract_vote_apply(&current,expected_sequence,
         entry->canonical_draft,entry->canonical_draft_length,actor,&votes,&next);
     if(status!=STN_CONTRACT_OK)return status;
+    /*
+     * next may borrow participants/terms from canonical_current. The store must
+     * retain its own stable decoded DRAFT spans so later encoding and lineage
+     * checks never depend on a caller's transient current buffer.
+     */
+    next.participants=NULL;
+    next.participant_bytes=entry->current.participant_bytes;
+    next.terms=entry->current.terms;
     entry->current=next;
     entry->vote_count=votes.accepted_count;
     return STN_CONTRACT_OK;
