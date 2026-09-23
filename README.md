@@ -26,8 +26,17 @@ operators is not a Phase 17 completion gate. These observations do not constitut
 qualification of all hardware or final production readiness. See the
 [current roadmap](docs/ROADMAP.md) for scope and historical test evidence.
 
-Phase 18 Chunk 1 adds the standalone [typed address foundation](docs/ADDRESSES.md).
-Contract execution and native coin economics are not part of this increment.
+Phase 18 now includes the qualified Contract Engine through canonical Contract
+v1 data, typed `stnc0_` identity, Contract action transactions, deterministic
+lifecycle enforcement, scoped identity/signature/authority validation, strict
+majority approval by eligible approvers, stable DRAFT lineage, snapshot-owned
+accepted state, and accepted-history reconstruction. Windows x64 and Linux x64
+qualification cover the current Contract scope through majority reconstruction
+to `ATTESTATION/4`, with qualified CREATE, AMEND, APPROVE, EXECUTE, REJECT,
+REVOKE and CLOSE paths. The Contract-capable Chain was installed and restarted
+on the deployed node on 2026-09-22. Phase 18 remains ACTIVE; STNC Contract
+application methods and Phase 19 economics are not claimed complete.
+See [Contracts](docs/CONTRACTS.md) and the [typed address foundation](docs/ADDRESSES.md).
 The old Go prototype is not a compatibility requirement.
 
 ## Build
