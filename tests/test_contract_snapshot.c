@@ -59,7 +59,7 @@ static void contract_history_majority(void)
     stn_address address;
     const stn_contract_state_store *contracts;
     stn_block_span history[8];
-    uint8_t blocks[8][STN_BLOCK_MAX_SIZE];
+    uint8_t *blocks;
     uint32_t block_lengths[8]={0};
     uint8_t draft_bytes[STN_CONTRACT_MAX_SIZE],current_bytes[STN_CONTRACT_MAX_SIZE];
     uint8_t authority_action[STN_AUTHORITY_ACTION_SIZE];
@@ -82,6 +82,10 @@ static void contract_history_majority(void)
     CHECK(stn_contract_encode(&draft,draft_bytes,sizeof(draft_bytes),&draft_length)==STN_CONTRACT_OK);
     CHECK(stn_contract_address(draft_bytes,draft_length,&address)==STN_CONTRACT_OK);
 
+    blocks=malloc(8u*STN_BLOCK_MAX_SIZE);
+    CHECK(blocks!=NULL);
+    if(blocks==NULL)return;
+
 #define BUILD_HISTORY_BLOCK(INDEX,HEIGHT,TXCOUNT) do { \
     CHECK(stn_block_body_encode(&span,(TXCOUNT),body,sizeof(body),&body_length)==STN_DATA_OK); \
     memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u; \
@@ -89,12 +93,12 @@ static void contract_history_majority(void)
     block.header.height=(HEIGHT);block.header.timestamp=(HEIGHT); \
     block.header.transaction_count=(TXCOUNT);block.header.body_length=(uint32_t)body_length;block.body=body; \
     CHECK(stn_block_body_commitment(body,body_length,(TXCOUNT),&provider,block.header.transaction_commitment)==STN_DATA_OK); \
-    CHECK(stn_block_encode(&block,blocks[(INDEX)],sizeof(blocks[(INDEX)]),&block_length)==STN_DATA_OK); \
+    CHECK(stn_block_encode(&block,blocks+(INDEX)*STN_BLOCK_MAX_SIZE,STN_BLOCK_MAX_SIZE,&block_length)==STN_DATA_OK); \
     block_lengths[(INDEX)]=(uint32_t)block_length; \
 } while(0)
 
 #define ACCEPT_HISTORY_BLOCK(INDEX) do { \
-    report=stn_chain_validate_candidate(&context,&state,blocks[(INDEX)],block_lengths[(INDEX)],&next); \
+    report=stn_chain_validate_candidate(&context,&state,blocks+(INDEX)*STN_BLOCK_MAX_SIZE,block_lengths[(INDEX)],&next); \
     CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT); \
     stn_chain_state_release(&state);state=next;memset(&next,0,sizeof(next)); \
 } while(0)
@@ -110,7 +114,7 @@ static void contract_history_majority(void)
     span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
     BUILD_HISTORY_BLOCK(0,0u,1u);
 
-    context.network_id[0]=1u;context.genesis_bytes=blocks[0];context.genesis_length=block_lengths[0];
+    context.network_id[0]=1u;context.genesis_bytes=blocks;context.genesis_length=block_lengths[0];
     context.genesis_authority_roots=chain_root;context.genesis_authority_root_count=1u;
     context.genesis_initial_identities=chain_root;context.genesis_initial_identity_count=1u;
     context.hash_provider=provider;
@@ -195,7 +199,7 @@ static void contract_history_majority(void)
     span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
     BUILD_HISTORY_BLOCK(7,7u,1u);ACCEPT_HISTORY_BLOCK(7);
 
-    for(i=0;i<8u;++i){history[i].bytes=blocks[i];history[i].length=block_lengths[i];}
+    for(i=0;i<8u;++i){history[i].bytes=blocks+i*STN_BLOCK_MAX_SIZE;history[i].length=block_lengths[i];}
     report=stn_chain_reconstruct_history(&context,history,8u,&rebuilt);
     CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
     contracts=stn_contract_snapshot_const_state(rebuilt.contracts);
@@ -209,7 +213,7 @@ static void contract_history_majority(void)
     CHECK(contracts->entries[0].canonical_draft_length==draft_length);
     CHECK(memcmp(contracts->entries[0].canonical_draft,draft_bytes,draft_length)==0);
 
-    stn_chain_state_release(&rebuilt);stn_chain_state_release(&state);
+    stn_chain_state_release(&rebuilt);stn_chain_state_release(&state);free(blocks);
 #undef ACCEPT_HISTORY_BLOCK
 #undef BUILD_HISTORY_BLOCK
 }
