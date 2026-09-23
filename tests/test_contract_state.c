@@ -42,12 +42,19 @@ int test_contract_state(void)
     CHECK(entries[0].current.sequence==8u && entries[0].vote_count==1u);
 
     current=entries[0].current;
+    /*
+     * Store state is a decoded-style borrowed view. Canonical wire bytes for
+     * the next action are reconstructed from the immutable DRAFT payload with
+     * only sequence/state changed; participant/terms bytes remain identical.
+     */
+    current.participants=p;
     CHECK(stn_contract_encode(&current,now,sizeof(now),&now_length)==STN_CONTRACT_OK);
     CHECK(stn_contract_state_apply_vote(&store,0,now,now_length,9u,p[1].identity)==STN_CONTRACT_OK);
     CHECK(entries[0].current.state==STN_CONTRACT_STATE_ATTESTATION);
     CHECK(entries[0].current.sequence==9u && entries[0].vote_count==2u);
 
     current=entries[0].current;current.state=STN_CONTRACT_STATE_APPROVALS;
+    current.participants=p;
     CHECK(stn_contract_encode(&current,now,sizeof(now),&now_length)==STN_CONTRACT_OK);
     CHECK(stn_contract_state_apply_vote(&store,0,now,now_length,10u,p[0].identity)==STN_CONTRACT_STATE_ERROR);
     CHECK(entries[0].current.state==STN_CONTRACT_STATE_ATTESTATION &&
