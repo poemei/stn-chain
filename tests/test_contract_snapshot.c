@@ -67,6 +67,7 @@ static void contract_chain_create(void)
     uint8_t tx_bytes[STN_TX_MAX_SIZE];
     uint8_t body[STN_BLOCK_MAX_BODY];
     uint8_t genesis_bytes[STN_BLOCK_MAX_SIZE];
+    uint8_t create_history_bytes[STN_BLOCK_MAX_SIZE];
     uint8_t child_bytes[STN_BLOCK_MAX_SIZE];
     size_t draft_length=0,evidence_length=0,grant_length=0,action_length=0;
     size_t tx_length=0,body_length=0,genesis_length=0,child_length=0;
@@ -132,12 +133,37 @@ static void contract_chain_create(void)
 
     report=stn_chain_validate_candidate(&context,&genesis_state,child_bytes,child_length,&accepted);
     CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    CHECK(child_length<=sizeof(create_history_bytes));
+    memcpy(create_history_bytes,child_bytes,child_length);
     state=stn_contract_snapshot_state(accepted.contracts);
     CHECK(state!=NULL && state->entry_count==1u);
     CHECK(state->entries[0].current.state==STN_CONTRACT_STATE_ISSUED);
     CHECK(state->entries[0].current.sequence==1u);
     CHECK(memcmp(state->entries[0].contract_id,address.identifier,STN_ADDRESS_ID_SIZE)==0);
     CHECK(stn_contract_snapshot_const_state(genesis_state.contracts)->entry_count==0u);
+
+    {
+        stn_chain_state rebuilt={0};
+        stn_block_span history[2];
+        const stn_contract_state_store *rebuilt_contracts;
+
+        history[0].bytes=genesis_bytes;history[0].length=(uint32_t)genesis_length;
+        history[1].bytes=create_history_bytes;history[1].length=(uint32_t)child_length;
+        report=stn_chain_reconstruct_history(&context,history,2u,&rebuilt);
+        CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+        rebuilt_contracts=stn_contract_snapshot_const_state(rebuilt.contracts);
+        CHECK(rebuilt_contracts!=NULL && rebuilt_contracts->entry_count==1u);
+        CHECK(rebuilt_contracts->entries[0].current.state==STN_CONTRACT_STATE_ISSUED);
+        CHECK(rebuilt_contracts->entries[0].current.sequence==1u);
+        CHECK(rebuilt_contracts->entries[0].vote_count==0u);
+        CHECK(memcmp(rebuilt_contracts->entries[0].contract_id,address.identifier,
+            STN_ADDRESS_ID_SIZE)==0);
+        CHECK(rebuilt_contracts->entries[0].canonical_draft_length==draft_length);
+        CHECK(memcmp(rebuilt_contracts->entries[0].canonical_draft,draft_bytes,
+            draft_length)==0);
+        CHECK(rebuilt_contracts->entries[0].canonical_draft!=draft_bytes);
+        stn_chain_state_release(&rebuilt);
+    }
 
     action.signature[0]^=1u;
     CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
