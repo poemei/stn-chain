@@ -290,6 +290,112 @@ stn_data_status stn_chain_required_target(const stn_chain_context *context,
     return stn_target_next(height,context->pow_policy->fixed_target,history,count,target);
 }
 
+static stn_data_status contract_authorized(
+    const stn_lifecycle_state *lifecycle,
+    const stn_contract_transaction *action,
+    const uint8_t *canonical_draft,size_t canonical_draft_length,
+    const stn_hash_provider *provider)
+{
+    size_t i;
+    uint8_t grant_id[32];
+    if(lifecycle==NULL || action==NULL || canonical_draft==NULL || provider==NULL)
+        return STN_DATA_ARGUMENT;
+    if(stn_contract_signature_verify(action->actor,action->action,
+        action->canonical_contract,action->canonical_contract_length,
+        action->sequence,action->signature)!=STN_CONTRACT_OK)
+        return STN_DATA_CONTENT;
+    if(stn_contract_authority_evaluate(action->actor,action->action,
+        canonical_draft,canonical_draft_length,action->authority_evidence,
+        action->authority_evidence_length)!=STN_CONTRACT_OK)
+        return STN_DATA_CONTENT;
+    for(i=0;i<lifecycle->grant_count;++i){
+        const uint8_t *grant=lifecycle->grant_bytes+i*STN_AUTHORITY_GRANT_SIZE;
+        if(memcmp(grant+33,action->authority_evidence,
+            STN_AUTHORITY_EVIDENCE_SIZE)!=0)continue;
+        if(stn_authority_grant_id(grant,STN_AUTHORITY_GRANT_SIZE,
+            provider,grant_id)!=STN_DATA_OK)
+            return STN_DATA_PROVIDER_ERROR;
+        if(!stn_authority_state_is_revoked(&lifecycle->authority,grant_id))
+            return STN_DATA_OK;
+    }
+    return STN_DATA_CONTENT;
+}
+
+static stn_data_status contract_apply_transaction(
+    stn_contract_snapshot *snapshot,const stn_lifecycle_state *lifecycle,
+    const stn_transaction *transaction,const stn_hash_provider *provider)
+{
+    stn_contract_transaction action;
+    stn_contract_state_store *state;
+    stn_contract current,next;
+    stn_contract_status status;
+    size_t i,index=SIZE_MAX;
+    stn_data_status authorized;
+    if(snapshot==NULL || lifecycle==NULL || transaction==NULL || provider==NULL)
+        return STN_DATA_ARGUMENT;
+    status=stn_contract_transaction_decode(transaction->record_bytes,
+        transaction->record_length,&action);
+    if(status!=STN_CONTRACT_OK)return STN_DATA_CONTENT;
+    state=stn_contract_snapshot_state(snapshot);
+    if(state==NULL)return STN_DATA_ARGUMENT;
+
+    if(action.action==STN_CONTRACT_ACTION_CREATE){
+        status=stn_contract_decode(action.canonical_contract,
+            action.canonical_contract_length,&current);
+        if(status!=STN_CONTRACT_OK || current.state!=STN_CONTRACT_STATE_DRAFT ||
+           current.sequence!=0u)return STN_DATA_CONTENT;
+        authorized=contract_authorized(lifecycle,&action,
+            action.canonical_contract,action.canonical_contract_length,provider);
+        if(authorized!=STN_DATA_OK)return authorized;
+        status=stn_contract_snapshot_register(snapshot,action.canonical_contract,
+            action.canonical_contract_length,&index);
+        if(status!=STN_CONTRACT_OK)
+            return status==STN_CONTRACT_CAPACITY ? STN_DATA_CAPACITY : STN_DATA_CONTENT;
+        state=stn_contract_snapshot_state(snapshot);
+        status=stn_contract_apply_action(&state->entries[index].current,
+            action.action,action.sequence,&next);
+        if(status!=STN_CONTRACT_OK)return STN_DATA_CONTENT;
+        next.participants=state->entries[index].current.participants;
+        next.participant_bytes=state->entries[index].current.participant_bytes;
+        next.terms=state->entries[index].current.terms;
+        state->entries[index].current=next;
+        return STN_DATA_OK;
+    }
+
+    for(i=0;i<state->entry_count;++i){
+        if(stn_contract_lineage_validate(state->entries[i].canonical_draft,
+            state->entries[i].canonical_draft_length,action.canonical_contract,
+            action.canonical_contract_length)==STN_CONTRACT_OK){
+            index=i;break;
+        }
+    }
+    if(index==SIZE_MAX)return STN_DATA_CONTENT;
+    status=stn_contract_decode(action.canonical_contract,
+        action.canonical_contract_length,&current);
+    if(status!=STN_CONTRACT_OK ||
+       current.sequence!=state->entries[index].current.sequence ||
+       current.state!=state->entries[index].current.state)
+        return STN_DATA_CONTENT;
+    authorized=contract_authorized(lifecycle,&action,
+        state->entries[index].canonical_draft,
+        state->entries[index].canonical_draft_length,provider);
+    if(authorized!=STN_DATA_OK)return authorized;
+
+    if(action.action==STN_CONTRACT_ACTION_APPROVE){
+        status=stn_contract_state_apply_vote(state,index,action.canonical_contract,
+            action.canonical_contract_length,action.sequence,action.actor);
+        return status==STN_CONTRACT_OK ? STN_DATA_OK :
+            (status==STN_CONTRACT_CAPACITY ? STN_DATA_CAPACITY : STN_DATA_CONTENT);
+    }
+    status=stn_contract_apply_action(&current,action.action,action.sequence,&next);
+    if(status!=STN_CONTRACT_OK)return STN_DATA_CONTENT;
+    next.participants=state->entries[index].current.participants;
+    next.participant_bytes=state->entries[index].current.participant_bytes;
+    next.terms=state->entries[index].current.terms;
+    state->entries[index].current=next;
+    return STN_DATA_OK;
+}
+
 static stn_chain_report validate_candidate(const stn_chain_context *context,
     const stn_chain_state *prior, const uint8_t *bytes, size_t length, stn_chain_state *out,int reconstruct)
 {
@@ -385,10 +491,6 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
     memcpy(next.tip_id,id,32);
     if (!prior->has_tip) { memcpy(next.genesis_id,id,32); }
     if(has_lifecycle) {
-        stn_lifecycle_result result=STN_LIFECYCLE_OK;
-        /* Only a private, disposable reconstruction can mutate its sole owner.
-         * Ordinary candidate validation still preserves independent snapshots
-         * and unchanged-on-failure behavior. Reserve for every transaction. */
         candidate_lifecycle=(stn_chain_lifecycle_owned *)prior->lifecycle;
         if(reconstruct && candidate_lifecycle!=NULL && candidate_lifecycle->references==1 &&
            prior->lifecycle->grant_count<=prior->lifecycle->grant_capacity &&
@@ -396,53 +498,81 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
            b.header.transaction_count<=prior->lifecycle->grant_capacity-prior->lifecycle->grant_count &&
            b.header.transaction_count<=prior->lifecycle->replay.consumed_capacity-prior->lifecycle->replay.consumed_count){
             reused_lifecycle=1;
-        }else{
-            candidate_lifecycle=lifecycle_clone(prior);
-        }
+        }else candidate_lifecycle=lifecycle_clone(prior);
         if(candidate_lifecycle==NULL){r.body=STN_STAGE_ERROR;return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);}
-        offset=0;
-        for(i=0;i<b.header.transaction_count;++i) {
-            stn_transaction tx;uint32_t n=(uint32_t)stn_wire_read(b.body+offset,4);offset+=4;
-            if(stn_transaction_decode(b.body+offset,n,&tx)!=STN_DATA_OK){result=STN_LIFECYCLE_MALFORMED;break;}
-            offset+=n;
-            if(tx.type==STN_TX_CONTRACT_ACTION)continue;
-            if(tx.type==STN_TX_PUBLICATION) {
-                if(b.header.height<prior->publication_activation_height)continue;
-                result=stn_lifecycle_check_publication(&candidate_lifecycle->state,
-                    tx.record_bytes,tx.record_length,&context->hash_provider);
-                if(result!=STN_LIFECYCLE_OK)break;
-            }
-            result=stn_lifecycle_apply_transaction(&candidate_lifecycle->state,&tx,
-                context->genesis_authority_roots,context->genesis_authority_root_count,&context->hash_provider);
-            if(result!=STN_LIFECYCLE_OK)break;
-        }
-        if(result!=STN_LIFECYCLE_OK){
-            stn_data_status failure=result==STN_LIFECYCLE_CAPACITY || result==STN_LIFECYCLE_PROVIDER ? STN_DATA_PROVIDER_ERROR : STN_DATA_CONTENT;
-            if(!reused_lifecycle)lifecycle_destroy(candidate_lifecycle);r.body=stage(failure);return fail(r,STN_CHAIN_BODY,failure);
-        }
-        next.lifecycle=&candidate_lifecycle->state;
     }
     if(has_contracts){
         candidate_contracts=stn_contract_snapshot_clone(prior->contracts);
         if(candidate_contracts==NULL){
             if(has_lifecycle && !reused_lifecycle)lifecycle_destroy(candidate_lifecycle);
-            r.body=STN_STAGE_ERROR;
-            return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);
+            r.body=STN_STAGE_ERROR;return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);
         }
-        next.contracts=candidate_contracts;
     }
-    if(!has_lifecycle){
+    if(has_lifecycle || has_contracts){
+        stn_data_status failure=STN_DATA_OK;
+        offset=0;
+        for(i=0;i<b.header.transaction_count;++i){
+            stn_transaction tx;
+            uint32_t n=(uint32_t)stn_wire_read(b.body+offset,4);
+            offset+=4;
+            if(stn_transaction_decode(b.body+offset,n,&tx)!=STN_DATA_OK){
+                failure=STN_DATA_CONTENT;break;
+            }
+            offset+=n;
+            if(tx.type==STN_TX_CONTRACT_ACTION){
+                const stn_lifecycle_state *authority_state=
+                    has_lifecycle ? &candidate_lifecycle->state : prior->lifecycle;
+                failure=contract_apply_transaction(candidate_contracts,
+                    authority_state,&tx,&context->hash_provider);
+                if(failure!=STN_DATA_OK)break;
+                continue;
+            }
+            if(!has_lifecycle)continue;
+            if(tx.type==STN_TX_PUBLICATION){
+                stn_lifecycle_result result;
+                if(b.header.height<prior->publication_activation_height)continue;
+                result=stn_lifecycle_check_publication(&candidate_lifecycle->state,
+                    tx.record_bytes,tx.record_length,&context->hash_provider);
+                if(result!=STN_LIFECYCLE_OK){
+                    failure=result==STN_LIFECYCLE_CAPACITY || result==STN_LIFECYCLE_PROVIDER ?
+                        STN_DATA_PROVIDER_ERROR : STN_DATA_CONTENT;
+                    break;
+                }
+            }
+            {
+                stn_lifecycle_result result=stn_lifecycle_apply_transaction(
+                    &candidate_lifecycle->state,&tx,
+                    context->genesis_authority_roots,
+                    context->genesis_authority_root_count,&context->hash_provider);
+                if(result!=STN_LIFECYCLE_OK){
+                    failure=result==STN_LIFECYCLE_CAPACITY || result==STN_LIFECYCLE_PROVIDER ?
+                        STN_DATA_PROVIDER_ERROR : STN_DATA_CONTENT;
+                    break;
+                }
+            }
+        }
+        if(failure!=STN_DATA_OK){
+            if(has_contracts)stn_contract_snapshot_release(candidate_contracts);
+            if(has_lifecycle && !reused_lifecycle)lifecycle_destroy(candidate_lifecycle);
+            r.body=stage(failure);return fail(r,STN_CHAIN_BODY,failure);
+        }
+    }
+    {
         stn_chain_state shared;
-        if(stn_chain_state_share(prior,&shared)!=STN_DATA_OK)return fail(r,STN_CHAIN_BODY,STN_DATA_CAPACITY);
-        next.lifecycle=shared.lifecycle; /* transfer retained reference */
-        if(has_contracts)stn_contract_snapshot_release(shared.contracts);
-        else next.contracts=shared.contracts; /* transfer retained reference */
-    } else if(!has_contracts) {
-        next.contracts=stn_contract_snapshot_share(prior->contracts);
-        if(next.contracts==NULL){
-            if(!reused_lifecycle)lifecycle_destroy(candidate_lifecycle);
+        if(stn_chain_state_share(prior,&shared)!=STN_DATA_OK){
+            if(has_contracts)stn_contract_snapshot_release(candidate_contracts);
+            if(has_lifecycle && !reused_lifecycle)lifecycle_destroy(candidate_lifecycle);
             return fail(r,STN_CHAIN_BODY,STN_DATA_CAPACITY);
         }
+        if(has_lifecycle){
+            stn_chain_lifecycle_owned *old=(stn_chain_lifecycle_owned *)shared.lifecycle;
+            if(--old->references==0)lifecycle_destroy(old);
+            next.lifecycle=&candidate_lifecycle->state;
+        }else next.lifecycle=shared.lifecycle;
+        if(has_contracts){
+            stn_contract_snapshot_release(shared.contracts);
+            next.contracts=candidate_contracts;
+        }else next.contracts=shared.contracts;
     }
     if(out==prior && !reused_lifecycle)stn_chain_state_release(out);
     *out=next; /* transfer candidate reference to a fresh output */
