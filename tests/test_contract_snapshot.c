@@ -516,6 +516,44 @@ static void contract_chain_create(void)
                 stn_chain_state_release(&stale_state);
             }
 
+            {
+                stn_chain_state bad_sequence={0};
+                uint8_t saved_signature[64];
+                uint64_t saved_sequence=action.sequence;
+
+                memcpy(saved_signature,action.signature,sizeof(saved_signature));
+                action.sequence=4u;
+                memset(action.signature,0,sizeof(action.signature));
+                CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),
+                    &action_length)==STN_CONTRACT_OK);
+                contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
+                CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+                span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+                CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+                memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
+                memcpy(block.header.previous_hash,approve_grant_one.tip_id,32);block.header.height=5u;block.header.timestamp=5u;
+                block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
+                CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
+                    block.header.transaction_commitment)==STN_DATA_OK);
+                CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+                report=stn_chain_validate_candidate(&context,&approve_grant_one,
+                    child_bytes,child_length,&bad_sequence);
+                CHECK(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT);
+                CHECK(stn_contract_snapshot_const_state(approve_grant_one.contracts)->entries[0].current.state==
+                    STN_CONTRACT_STATE_REVIEW);
+                CHECK(stn_contract_snapshot_const_state(approve_grant_one.contracts)->entries[0].current.sequence==2u);
+                CHECK(stn_contract_snapshot_const_state(approve_grant_one.contracts)->entries[0].vote_count==0u);
+                stn_chain_state_release(&bad_sequence);
+
+                action.sequence=saved_sequence;
+                memcpy(action.signature,saved_signature,sizeof(saved_signature));
+                CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),
+                    &action_length)==STN_CONTRACT_OK);
+                contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
+                CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
+                span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
+            }
+
             approvals=state->entries[0].current;approvals.participants=participants;approvals.participant_bytes=NULL;
             CHECK(stn_contract_encode(&approvals,approvals_bytes,sizeof(approvals_bytes),&approvals_length)==STN_CONTRACT_OK);
             CHECK(stn_authority_evidence_encode(approver_two,authority_action,authority_context,
