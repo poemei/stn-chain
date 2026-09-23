@@ -231,8 +231,6 @@ cl %CFLAGS% %INCLUDES% /DSTN_CONTRACT_SNAPSHOT_TEST_MAIN ^
     src\stn_record.c ^
     src\stn_validation.c ^
     src\stn_pow.c ^
-    src\stn_work.c ^
-    src\stn_target.c ^
     src\stn_lifecycle.c ^
     src\stn_replay.c ^
     src\stn_contract_transaction.c ^
