@@ -2,7 +2,7 @@
 
 Status: proposed sequence with evidence gates, not a release schedule.
 
-## Development Roadmap Status --- Annotated 2026-09-14
+## Development Roadmap Status --- Annotated 2026-09-22
 
 This status register annotates the complete Chain development sequence.
 Detailed qualification evidence remains in the phase sections below and
@@ -111,13 +111,14 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
 														   Additional hardware/backend qualification
 														   may continue independently.
 
-                     18 Contract Engine   **ACTIVE**       Address foundation, canonical
-														   Contract v1 foundation, deterministic
-														   lifecycle transitions, sequencing, and
-														   scoped Phase 14 authority integration
-														   are qualified on Windows x64 and Linux
-														   x64. No VM, EVM, arbitrary bytecode,
-														   scripts or gas.
+                     18 Contract Engine   **SHELVED /    Chain-side Contract protocol,
+                                             CHAIN SCOPE    lifecycle, majority approval,
+                                             QUALIFIED**    accepted-state ownership and
+                                                           history reconstruction are
+                                                           qualified on Windows x64 and
+                                                           Linux x64. Application-facing
+                                                           Contract workflow is deferred
+                                                           to STNC Core/GUI integration.
 
                      19 Economics /       **NOT STARTED**  Native economics, issuance
                         Issuance /                         and reward rules remain
@@ -141,8 +142,8 @@ Phase 16        COMPLETE (Operations status, 2026-09-21)
   Micro-Chunk 1B  COMPLETE / QUALIFIED
   Micro-Chunk 1C  COMPLETE / QUALIFIED
 Phase 17        COMPLETE / QUALIFIED (Operations closeout, 2026-09-21)
-Phase 18        ACTIVE
-Phase 19        NOT STARTED
+Phase 18        SHELVED / CHAIN SCOPE QUALIFIED
+Phase 19        ACTIVE
 Phase 20        NOT STARTED
 
 Historical qualified Phase 16 1C checkpoint: 8a1264a
@@ -924,7 +925,7 @@ will be recorded when operators provide them; their absence does not block
 development, reopen Phase 17, or postpone its completion. Untested hardware is
 not represented as tested or qualified. Phase 20 retains its separate scope.
 
-## Phase 18 --- Contract Engine --- ACTIVE
+## Phase 18 --- Contract Engine --- SHELVED / CHAIN SCOPE QUALIFIED
 
 Phase 18 has progressed beyond the original structural Contract foundation.
 The current Contract Engine scope is qualified on Windows x64 and Linux x64
@@ -1021,19 +1022,32 @@ authority ordering and accepted-history majority reconstruction.
 Operations installed the Contract-capable Chain and restarted the deployed Chain
 daemon on 2026-09-22.
 
-Phase 18 remains ACTIVE. STNC application-facing Contract creation/query/action
-methods are not claimed complete here. ARM remains unqualified for this scope.
+Phase 18 is now SHELVED / CHAIN SCOPE QUALIFIED. The Chain-side Contract engine
+has reached its current bounded qualification boundary and is deployed.
+Application-facing Contract creation, presentation, signing and action workflow
+is deferred until STNC Core has the GUI/client surface required to use it
+meaningfully. Shelving does not claim those application workflows complete.
+ARM remains unqualified for this scope.
+
 No VM, EVM, arbitrary bytecode, arbitrary scripts or gas is authorized.
-Wallet/economic behavior remains Phase 19.
+Economic behavior remains outside Phase 18.
 
-## Phase 19 --- Economics / Issuance / Rewards --- NOT STARTED
+## Phase 19 --- Economics / Issuance / Rewards --- ACTIVE
 
-Production economics have not started. Native-coin issuance, rewards,
-accounting and related economic rules remain deferred until explicit
-Operations/consensus decisions authorize exact behavior.
+Phase 19 is now the active Chain development phase.
 
-No economic rule is inferred from mining participation, hardware class
-or wealth, and no gas model is authorized.
+The first Phase 19 boundary is protocol definition before implementation.
+Native economics must be specified deterministically before consensus-visible C
+code is added. The phase will define the native unit and exact rules for
+issuance/supply behavior, accepted balances or ownership representation,
+transfers, mining/miner compensation, Stratum payout interaction where
+applicable, and the evidence/state transitions by which economic results become
+accepted Chain state.
+
+No Bitcoin-, Ethereum- or other external economic rule is inherited implicitly.
+No gas model is authorized. No issuance schedule, supply ceiling, reward amount,
+transfer format, balance model or payout rule is established merely by Phase 19
+becoming ACTIVE; each requires an explicit protocol decision and qualification.
 
 ## Phase 20 --- Production Qualification --- NOT STARTED
 
