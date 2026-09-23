@@ -132,8 +132,8 @@ stn_contract_status stn_contract_snapshot_register(
     status=stn_contract_state_register(&snapshot->state,grown+old_length,
         canonical_draft_length,index);
     if(status!=STN_CONTRACT_OK){
-        if(old_length!=0u)bind(snapshot,grown);
         snapshot->draft_bytes=old_drafts;snapshot->draft_bytes_length=old_length;
+        if(old_length!=0u && !bind(snapshot,grown))abort();
         free(grown);return status;
     }
     free(old_drafts);
