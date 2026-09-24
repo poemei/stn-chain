@@ -68,7 +68,8 @@ static void contract_history_majority(void)
     uint8_t evidence[STN_AUTHORITY_EVIDENCE_SIZE];
     uint8_t grant[STN_AUTHORITY_GRANT_SIZE];
     uint8_t action_bytes[STN_CONTRACT_TX_MAX_SIZE];
-    uint8_t tx_bytes[STN_TX_MAX_SIZE],body[STN_BLOCK_MAX_BODY];
+    uint8_t tx_bytes[STN_TX_MAX_SIZE];
+    uint8_t *body=NULL;
     size_t draft_length=0,current_length=0,evidence_length=0,grant_length=0;
     size_t action_length=0,tx_length=0,body_length=0,block_length=0;
     size_t i;
@@ -83,12 +84,15 @@ static void contract_history_majority(void)
     CHECK(stn_contract_encode(&draft,draft_bytes,sizeof(draft_bytes),&draft_length)==STN_CONTRACT_OK);
     CHECK(stn_contract_address(draft_bytes,draft_length,&address)==STN_CONTRACT_OK);
 
+    body=malloc(STN_BLOCK_MAX_BODY);
+    CHECK(body!=NULL);
+    if(body==NULL)return;
     blocks=malloc(8u*STN_BLOCK_MAX_SIZE);
     CHECK(blocks!=NULL);
-    if(blocks==NULL)return;
+    if(blocks==NULL){free(body);return;}
 
 #define BUILD_HISTORY_BLOCK(INDEX,HEIGHT,TXCOUNT) do { \
-    CHECK(stn_block_body_encode(&span,(TXCOUNT),body,sizeof(body),&body_length)==STN_DATA_OK); \
+    CHECK(stn_block_body_encode(&span,(TXCOUNT),body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK); \
     memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u; \
     if((HEIGHT)!=0u)memcpy(block.header.previous_hash,state.tip_id,32); \
     block.header.height=(HEIGHT);block.header.timestamp=(HEIGHT); \
@@ -214,7 +218,7 @@ static void contract_history_majority(void)
     CHECK(contracts->entries[0].canonical_draft_length==draft_length);
     CHECK(memcmp(contracts->entries[0].canonical_draft,draft_bytes,draft_length)==0);
 
-    stn_chain_state_release(&rebuilt);stn_chain_state_release(&state);free(blocks);
+    stn_chain_state_release(&rebuilt);stn_chain_state_release(&state);free(blocks);free(body);
 #undef ACCEPT_HISTORY_BLOCK
 #undef BUILD_HISTORY_BLOCK
 }
@@ -241,12 +245,22 @@ static void contract_chain_create(void)
     uint8_t grant[STN_AUTHORITY_GRANT_SIZE];
     uint8_t action_bytes[STN_CONTRACT_TX_MAX_SIZE];
     uint8_t tx_bytes[STN_TX_MAX_SIZE];
-    uint8_t body[STN_BLOCK_MAX_BODY];
-    uint8_t genesis_bytes[STN_BLOCK_MAX_SIZE];
-    uint8_t create_history_bytes[STN_BLOCK_MAX_SIZE];
-    uint8_t child_bytes[STN_BLOCK_MAX_SIZE];
+    uint8_t *body=NULL;
+    uint8_t *genesis_bytes=NULL;
+    uint8_t *create_history_bytes=NULL;
+    uint8_t *child_bytes=NULL;
     size_t draft_length=0,evidence_length=0,grant_length=0,action_length=0;
     size_t tx_length=0,body_length=0,genesis_length=0,child_length=0;
+
+    body=malloc(STN_BLOCK_MAX_BODY);
+    genesis_bytes=malloc(STN_BLOCK_MAX_SIZE);
+    create_history_bytes=malloc(STN_BLOCK_MAX_SIZE);
+    child_bytes=malloc(STN_BLOCK_MAX_SIZE);
+    CHECK(body!=NULL && genesis_bytes!=NULL && create_history_bytes!=NULL && child_bytes!=NULL);
+    if(body==NULL || genesis_bytes==NULL || create_history_bytes==NULL || child_bytes==NULL){
+        free(child_bytes);free(create_history_bytes);free(genesis_bytes);free(body);
+        return;
+    }
 
     memcpy(participants[0].identity,chain_root,sizeof(chain_root));
     participants[0].role=STN_CONTRACT_ROLE_APPROVER;
@@ -271,12 +285,12 @@ static void contract_chain_create(void)
     grant_tx.record_bytes=grant;grant_tx.record_length=(uint32_t)grant_length;
     CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
     span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-    CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+    CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
     block.header.version=1u;block.header.network_id[0]=1u;
     block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
     CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
         block.header.transaction_commitment)==STN_DATA_OK);
-    CHECK(stn_block_encode(&block,genesis_bytes,sizeof(genesis_bytes),&genesis_length)==STN_DATA_OK);
+    CHECK(stn_block_encode(&block,genesis_bytes,STN_BLOCK_MAX_SIZE,&genesis_length)==STN_DATA_OK);
 
     context.network_id[0]=1u;context.genesis_bytes=genesis_bytes;context.genesis_length=genesis_length;
     context.genesis_authority_roots=chain_root;context.genesis_authority_root_count=1u;
@@ -299,17 +313,17 @@ static void contract_chain_create(void)
     contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
     CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
     span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-    CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+    CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
     memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
     memcpy(block.header.previous_hash,genesis_state.tip_id,32);block.header.height=1u;block.header.timestamp=1u;
     block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
     CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
         block.header.transaction_commitment)==STN_DATA_OK);
-    CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+    CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
 
     report=stn_chain_validate_candidate(&context,&genesis_state,child_bytes,child_length,&accepted);
     CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
-    CHECK(child_length<=sizeof(create_history_bytes));
+    CHECK(child_length<=STN_BLOCK_MAX_SIZE);
     memcpy(create_history_bytes,child_bytes,child_length);
     state=stn_contract_snapshot_state(accepted.contracts);
     CHECK(state!=NULL && state->entry_count==1u);
@@ -346,11 +360,11 @@ static void contract_chain_create(void)
     contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
     CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
     span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-    CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+    CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
     block.header.body_length=(uint32_t)body_length;block.body=body;
     CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
         block.header.transaction_commitment)==STN_DATA_OK);
-    CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+    CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
     report=stn_chain_validate_candidate(&context,&genesis_state,child_bytes,child_length,&rejected);
     CHECK(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT);
     CHECK(stn_contract_snapshot_const_state(genesis_state.contracts)->entry_count==0u);
@@ -375,13 +389,13 @@ static void contract_chain_create(void)
         CHECK(stn_transaction_encode(&grant_tx,amend_grant_tx,sizeof(amend_grant_tx),
             &amend_grant_tx_length)==STN_DATA_OK);
         span.bytes=amend_grant_tx;span.length=(uint32_t)amend_grant_tx_length;
-        CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+        CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
         memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
         memcpy(block.header.previous_hash,accepted.tip_id,32);block.header.height=2u;block.header.timestamp=2u;
         block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
         CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
             block.header.transaction_commitment)==STN_DATA_OK);
-        CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+        CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
         report=stn_chain_validate_candidate(&context,&accepted,child_bytes,child_length,&grant_state);
         CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
         CHECK(grant_state.lifecycle!=NULL && grant_state.lifecycle->grant_count==2u);
@@ -400,13 +414,13 @@ static void contract_chain_create(void)
 
             ordered[0].bytes=tx_bytes;ordered[0].length=(uint32_t)tx_length;
             ordered[1].bytes=amend_grant_tx;ordered[1].length=(uint32_t)amend_grant_tx_length;
-            CHECK(stn_block_body_encode(ordered,2u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            CHECK(stn_block_body_encode(ordered,2u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
             memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
             memcpy(block.header.previous_hash,accepted.tip_id,32);block.header.height=2u;block.header.timestamp=2u;
             block.header.transaction_count=2u;block.header.body_length=(uint32_t)body_length;block.body=body;
             CHECK(stn_block_body_commitment(body,body_length,2u,&provider,
                 block.header.transaction_commitment)==STN_DATA_OK);
-            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&accepted,child_bytes,child_length,&wrong_order);
             CHECK(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT);
             CHECK(stn_contract_snapshot_const_state(accepted.contracts)->entries[0].current.state==
@@ -416,13 +430,13 @@ static void contract_chain_create(void)
 
             ordered[0].bytes=amend_grant_tx;ordered[0].length=(uint32_t)amend_grant_tx_length;
             ordered[1].bytes=tx_bytes;ordered[1].length=(uint32_t)tx_length;
-            CHECK(stn_block_body_encode(ordered,2u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            CHECK(stn_block_body_encode(ordered,2u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
             memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
             memcpy(block.header.previous_hash,accepted.tip_id,32);block.header.height=2u;block.header.timestamp=2u;
             block.header.transaction_count=2u;block.header.body_length=(uint32_t)body_length;block.body=body;
             CHECK(stn_block_body_commitment(body,body_length,2u,&provider,
                 block.header.transaction_commitment)==STN_DATA_OK);
-            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&accepted,child_bytes,child_length,&right_order);
             CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
             CHECK(right_order.lifecycle!=NULL && right_order.lifecycle->grant_count==2u);
@@ -436,13 +450,13 @@ static void contract_chain_create(void)
         }
 
         span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-        CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+        CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
         memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
         memcpy(block.header.previous_hash,grant_state.tip_id,32);block.header.height=3u;block.header.timestamp=3u;
         block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
         CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
             block.header.transaction_commitment)==STN_DATA_OK);
-        CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+        CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
         report=stn_chain_validate_candidate(&context,&grant_state,child_bytes,child_length,&review_state);
         CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
         state=stn_contract_snapshot_state(review_state.contracts);
@@ -475,13 +489,13 @@ static void contract_chain_create(void)
             grant_tx.record_bytes=revoke_grant;grant_tx.record_length=(uint32_t)revoke_grant_length;
             CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
             span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-            CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
             memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
             memcpy(block.header.previous_hash,review_state.tip_id,32);block.header.height=4u;block.header.timestamp=4u;
             block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
             CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                 block.header.transaction_commitment)==STN_DATA_OK);
-            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&review_state,child_bytes,child_length,&revoke_grant_state);
             CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
 
@@ -497,13 +511,13 @@ static void contract_chain_create(void)
             contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
             CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
             span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-            CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
             memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
             memcpy(block.header.previous_hash,revoke_grant_state.tip_id,32);block.header.height=5u;block.header.timestamp=5u;
             block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
             CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                 block.header.transaction_commitment)==STN_DATA_OK);
-            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&revoke_grant_state,child_bytes,child_length,&revoked_state);
             CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
             state=stn_contract_snapshot_state(revoked_state.contracts);
@@ -539,13 +553,13 @@ static void contract_chain_create(void)
             grant_tx.record_bytes=reject_grant;grant_tx.record_length=(uint32_t)reject_grant_length;
             CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
             span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-            CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
             memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
             memcpy(block.header.previous_hash,review_state.tip_id,32);block.header.height=4u;block.header.timestamp=4u;
             block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
             CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                 block.header.transaction_commitment)==STN_DATA_OK);
-            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&review_state,child_bytes,child_length,&reject_grant_state);
             CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
 
@@ -561,13 +575,13 @@ static void contract_chain_create(void)
             contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
             CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
             span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-            CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
             memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
             memcpy(block.header.previous_hash,reject_grant_state.tip_id,32);block.header.height=5u;block.header.timestamp=5u;
             block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
             CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                 block.header.transaction_commitment)==STN_DATA_OK);
-            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&reject_grant_state,child_bytes,child_length,&rejected_state);
             CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
             state=stn_contract_snapshot_state(rejected_state.contracts);
@@ -598,13 +612,13 @@ static void contract_chain_create(void)
                 grant_tx.record_bytes=close_grant;grant_tx.record_length=(uint32_t)close_grant_length;
                 CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
                 span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-                CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+                CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
                 memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
                 memcpy(block.header.previous_hash,rejected_state.tip_id,32);block.header.height=6u;block.header.timestamp=6u;
                 block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
                 CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                     block.header.transaction_commitment)==STN_DATA_OK);
-                CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+                CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
                 report=stn_chain_validate_candidate(&context,&rejected_state,child_bytes,child_length,&close_grant_state);
                 CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
 
@@ -620,13 +634,13 @@ static void contract_chain_create(void)
                 contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
                 CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
                 span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-                CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+                CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
                 memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
                 memcpy(block.header.previous_hash,close_grant_state.tip_id,32);block.header.height=7u;block.header.timestamp=7u;
                 block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
                 CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                     block.header.transaction_commitment)==STN_DATA_OK);
-                CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+                CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
                 report=stn_chain_validate_candidate(&context,&close_grant_state,child_bytes,child_length,&closed_state);
                 CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
                 state=stn_contract_snapshot_state(closed_state.contracts);
@@ -667,12 +681,12 @@ static void contract_chain_create(void)
             grant_tx.record_bytes=approve_grant_one_bytes;grant_tx.record_length=(uint32_t)approve_grant_one_length;
             CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
             span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-            CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
             memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
             memcpy(block.header.previous_hash,review_state.tip_id,32);block.header.height=4u;block.header.timestamp=4u;
             block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
             CHECK(stn_block_body_commitment(body,body_length,1u,&provider,block.header.transaction_commitment)==STN_DATA_OK);
-            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&review_state,child_bytes,child_length,&approve_grant_one);
             CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
 
@@ -685,12 +699,12 @@ static void contract_chain_create(void)
             contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
             CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
             span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-            CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
             memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
             memcpy(block.header.previous_hash,approve_grant_one.tip_id,32);block.header.height=5u;block.header.timestamp=5u;
             block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
             CHECK(stn_block_body_commitment(body,body_length,1u,&provider,block.header.transaction_commitment)==STN_DATA_OK);
-            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&approve_grant_one,child_bytes,child_length,&approval_one);
             CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
             state=stn_contract_snapshot_state(approval_one.contracts);
@@ -701,13 +715,13 @@ static void contract_chain_create(void)
 
             {
                 stn_chain_state stale_state={0};
-                CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+                CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
                 memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
                 memcpy(block.header.previous_hash,approval_one.tip_id,32);block.header.height=6u;block.header.timestamp=6u;
                 block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
                 CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                     block.header.transaction_commitment)==STN_DATA_OK);
-                CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+                CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
                 report=stn_chain_validate_candidate(&context,&approval_one,
                     child_bytes,child_length,&stale_state);
                 CHECK(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT);
@@ -728,13 +742,13 @@ static void contract_chain_create(void)
                 contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
                 CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
                 span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-                CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+                CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
                 memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
                 memcpy(block.header.previous_hash,approve_grant_one.tip_id,32);block.header.height=5u;block.header.timestamp=5u;
                 block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
                 CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                     block.header.transaction_commitment)==STN_DATA_OK);
-                CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+                CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
                 report=stn_chain_validate_candidate(&context,&approve_grant_one,
                     child_bytes,child_length,&bad_sequence);
                 CHECK(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT);
@@ -761,12 +775,12 @@ static void contract_chain_create(void)
             grant_tx.record_bytes=approve_grant_two_bytes;grant_tx.record_length=(uint32_t)approve_grant_two_length;
             CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
             span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-            CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
             memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
             memcpy(block.header.previous_hash,approval_one.tip_id,32);block.header.height=6u;block.header.timestamp=6u;
             block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
             CHECK(stn_block_body_commitment(body,body_length,1u,&provider,block.header.transaction_commitment)==STN_DATA_OK);
-            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&approval_one,child_bytes,child_length,&approve_grant_two);
             CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
 
@@ -779,12 +793,12 @@ static void contract_chain_create(void)
             contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
             CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
             span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-            CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
             memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
             memcpy(block.header.previous_hash,approve_grant_two.tip_id,32);block.header.height=7u;block.header.timestamp=7u;
             block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
             CHECK(stn_block_body_commitment(body,body_length,1u,&provider,block.header.transaction_commitment)==STN_DATA_OK);
-            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&approve_grant_two,child_bytes,child_length,&approval_two);
             CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
             state=stn_contract_snapshot_state(approval_two.contracts);
@@ -805,13 +819,13 @@ static void contract_chain_create(void)
             contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
             CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
             span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-            CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+            CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
             memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
             memcpy(block.header.previous_hash,approve_grant_two.tip_id,32);block.header.height=7u;block.header.timestamp=7u;
             block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
             CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                 block.header.transaction_commitment)==STN_DATA_OK);
-            CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+            CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
             report=stn_chain_validate_candidate(&context,&approve_grant_two,child_bytes,child_length,&duplicate);
             CHECK(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT);
             CHECK(stn_contract_snapshot_const_state(approve_grant_two.contracts)->entries[0].vote_count==1u);
@@ -838,13 +852,13 @@ static void contract_chain_create(void)
                 grant_tx.record_bytes=execute_grant;grant_tx.record_length=(uint32_t)execute_grant_length;
                 CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
                 span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-                CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+                CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
                 memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
                 memcpy(block.header.previous_hash,approval_two.tip_id,32);block.header.height=8u;block.header.timestamp=8u;
                 block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
                 CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                     block.header.transaction_commitment)==STN_DATA_OK);
-                CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+                CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
                 report=stn_chain_validate_candidate(&context,&approval_two,child_bytes,child_length,&execute_grant_state);
                 CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
 
@@ -860,13 +874,13 @@ static void contract_chain_create(void)
                 contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
                 CHECK(stn_transaction_encode(&contract_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
                 span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-                CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+                CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
                 memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
                 memcpy(block.header.previous_hash,execute_grant_state.tip_id,32);block.header.height=9u;block.header.timestamp=9u;
                 block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
                 CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                     block.header.transaction_commitment)==STN_DATA_OK);
-                CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+                CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
                 report=stn_chain_validate_candidate(&context,&execute_grant_state,child_bytes,child_length,&executed_state);
                 CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
                 state=stn_contract_snapshot_state(executed_state.contracts);
@@ -887,14 +901,14 @@ static void contract_chain_create(void)
                     grant_tx.record_length=(uint32_t)execute_grant_length;
                     CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
                     span.bytes=tx_bytes;span.length=(uint32_t)tx_length;
-                    CHECK(stn_block_body_encode(&span,1u,body,sizeof(body),&body_length)==STN_DATA_OK);
+                    CHECK(stn_block_body_encode(&span,1u,body,STN_BLOCK_MAX_BODY,&body_length)==STN_DATA_OK);
                     memset(&block,0,sizeof(block));block.header.version=1u;block.header.network_id[0]=1u;
                     memcpy(block.header.previous_hash,approval_two.tip_id,32);
                     block.header.height=8u;block.header.timestamp=8u;
                     block.header.transaction_count=1u;block.header.body_length=(uint32_t)body_length;block.body=body;
                     CHECK(stn_block_body_commitment(body,body_length,1u,&provider,
                         block.header.transaction_commitment)==STN_DATA_OK);
-                    CHECK(stn_block_encode(&block,child_bytes,sizeof(child_bytes),&child_length)==STN_DATA_OK);
+                    CHECK(stn_block_encode(&block,child_bytes,STN_BLOCK_MAX_SIZE,&child_length)==STN_DATA_OK);
                     report=stn_chain_validate_candidate(&context,&approval_two,
                         child_bytes,child_length,&invalid_grant_state);
                     CHECK(report.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT);
@@ -916,6 +930,7 @@ static void contract_chain_create(void)
 
     stn_chain_state_release(&empty);stn_chain_state_release(&genesis_state);
     stn_chain_state_release(&accepted);stn_chain_state_release(&rejected);
+    free(child_bytes);free(create_history_bytes);free(genesis_bytes);free(body);
 }
 
 int test_contract_snapshot(void)
