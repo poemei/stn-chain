@@ -799,7 +799,7 @@ echo STN Chain accepted-state qualification test
 echo Compiler: Microsoft cl.exe
 echo Target:   %TEST_TARGET%
 echo.
-cl %CFLAGS% %INCLUDES% /DSTN_LIFECYCLE_TEST /DSTN_CHAIN_TEST_MAIN ^
+cl %CFLAGS% /experimental:c11atomics %INCLUDES% /DSTN_LIFECYCLE_TEST /DSTN_CHAIN_TEST_MAIN ^
     tests\\test_chain.c ^
     src\\stn_chain.c src\\stn_transaction.c src\\stn_block.c src\\stn_pow.c src\\stn_economy.c src\\stn_record.c src\\stn_validation.c src\\stn_lifecycle.c src\\stn_authority.c ^
     src\\stn_contract.c src\\stn_contract_lineage.c src\\stn_contract_state.c src\\stn_contract_consensus.c src\\stn_contract_snapshot.c src\\stn_contract_transaction.c ^
