@@ -216,13 +216,7 @@ stn_data_status stn_block_body_validate_structure(
 
         offset += 4;
 
-        /*
-         * STN_TX_MIN_SIZE reflects the smallest current transaction class.
-         * Historical canonical transactions can be smaller (notably the
-         * 85-byte Share Evidence v1 transaction accepted before v2).
-         * The transaction decoder is authoritative for type-specific size.
-         */
-        if (n < STN_TX_HEADER_SIZE ||
+        if (n < STN_TX_MIN_SIZE ||
             n > STN_TX_MAX_SIZE ||
             n > length - offset) {
             return STN_DATA_LENGTH;
