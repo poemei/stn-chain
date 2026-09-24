@@ -18,9 +18,9 @@ static int sign_envelope(stn_transfer_envelope *e,const uint8_t pk[32],const uin
 static int make_block(stn_block *b,const stn_hash_provider *p,uint8_t *body,size_t body_capacity,
     uint8_t *wire,size_t wire_capacity,size_t *written,const stn_transaction_span *spans,size_t count){
     size_t n;
-    memset(b,0,sizeof(*b));b->header.version=1;b->header.transaction_count=(uint32_t)count;
+    memset(b,0,sizeof(*b));b->header.version=1;if(count>UINT32_MAX)return -1;b->header.transaction_count=(uint32_t)count;
     if(stn_block_body_encode(spans,count,body,body_capacity,&n)!=STN_DATA_OK)return -1;
-    b->header.body_length=(uint32_t)n;b->body=body;
+    if(n>UINT32_MAX)return -1;b->header.body_length=(uint32_t)n;b->body=body;
     if(stn_block_body_commitment(body,n,count,p,b->header.transaction_commitment)!=STN_DATA_OK)return -1;
     return stn_block_encode(b,wire,wire_capacity,written)==STN_DATA_OK?0:-1;
 }
@@ -32,7 +32,7 @@ static void qualification(void){
     stn_transaction tx={0};stn_transaction_span span;stn_address identity={0};
     uint8_t issue_bytes[STN_ISSUANCE_CANONICAL_SIZE],env_bytes[STN_TRANSFER_ENVELOPE_CANONICAL_SIZE];
     uint8_t tx1[256],tx2[256],body1[512],body2[512],wire1[1024],wire2[1024],genesis_id[32];
-    size_t issue_written=0,env_written=0,n1=0,n2=0,w1=0,w2=0;uint64_t units=0;stn_chain_report report;stn_block_span history[2];
+    size_t header_written=0,n1=0,n2=0,w1=0,w2=0;uint64_t units=0;stn_chain_report report;stn_block_span history[2];
 
     identity.type=STN_ADDRESS_IDENTITY;memcpy(identity.identifier,pk,32);
     CHECK(stn_wallet_derive(&identity,&envelope.transfer.source)==STN_DATA_OK);
@@ -51,13 +51,13 @@ static void qualification(void){
     CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
     CHECK(stn_economic_state_balance(funded.economy,&envelope.transfer.source,&units)==STN_DATA_OK && units==STN_ISSUANCE_BLOCK_UNITS);
 
-    CHECK(stn_transfer_envelope_encode(&envelope,env_bytes,sizeof(env_bytes),&env_written)==STN_DATA_OK && env_written==sizeof(env_bytes));
+    CHECK(stn_transfer_envelope_encode(&envelope,env_bytes)==STN_DATA_OK);
     tx.type=STN_TX_TRANSFER;tx.record_bytes=env_bytes;tx.record_length=sizeof(env_bytes);
     CHECK(stn_transaction_encode(&tx,tx2,sizeof(tx2),&n2)==STN_DATA_OK);span.bytes=tx2;span.length=(uint32_t)n2;
     CHECK(stn_chain_block_id(wire1,w1,&hp,genesis_id)==STN_DATA_OK);
     CHECK(make_block(&transfer_block,&hp,body2,sizeof(body2),wire2,sizeof(wire2),&w2,&span,1)==0);
     transfer_block.header.height=1;transfer_block.header.timestamp=1;memcpy(transfer_block.header.previous_hash,genesis_id,32);
-    CHECK(stn_block_header_encode(&transfer_block.header,wire2,STN_BLOCK_HEADER_SIZE,&env_written)==STN_DATA_OK);
+    CHECK(stn_block_header_encode(&transfer_block.header,wire2,STN_BLOCK_HEADER_SIZE,&header_written)==STN_DATA_OK && header_written==STN_BLOCK_HEADER_SIZE);
 
     report=stn_chain_validate_candidate(&ctx,&funded,wire2,w2,&accepted);
     CHECK(report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
