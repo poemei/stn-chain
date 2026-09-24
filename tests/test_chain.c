@@ -273,15 +273,15 @@ static void transfer_reconstruction(void)
     uint8_t b2[168u+4u+STN_TX_HEADER_SIZE+STN_SHARE_CANONICAL_SIZE];
     uint8_t b3[168u+4u+STN_TX_HEADER_SIZE+STN_ISSUANCE_CANONICAL_SIZE];
     uint8_t b4[168u+4u+STN_TX_HEADER_SIZE+STN_TRANSFER_ENVELOPE_CANONICAL_SIZE];
-    const uint8_t *records[1];uint16_t types[1];uint32_t lengths[1];stn_block_span history[5];stn_hash_provider real={stn_sha256,NULL};stn_block_header wh={0};size_t written=0u;
+    const uint8_t *records[1];uint16_t types[1];uint32_t lengths[1];stn_block_span history[5];stn_block_header wh={0};size_t written=0u;
     CHECK(stn_chain_initialize(&c,&s0)==STN_DATA_OK);r=stn_chain_validate_candidate(&c,&s0,genesis,sizeof(genesis),&s1);CHECK(r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
     map.mining_identity.type=STN_ADDRESS_IDENTITY;memcpy(map.mining_identity.identifier,pk,32u);identity=map.mining_identity;CHECK(stn_wallet_derive(&identity,&map.wallet)==STN_DATA_OK);
     CHECK(stn_compensation_destination_encode(&map,mapwire)==STN_DATA_OK);records[0]=mapwire;types[0]=STN_TX_COMPENSATION_DESTINATION;lengths[0]=sizeof(mapwire);economic_block(b1,sizeof(b1),&s1,records,types,lengths,1u);
     r=stn_chain_validate_candidate(&c,&s1,b1,sizeof(b1),&s2);CHECK(r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
-    share.miner=map.mining_identity;wh.version=STN_POW_BLOCK_VERSION;wh.height=s2.height+1u;wh.timestamp=s2.timestamp;memcpy(wh.previous_hash,s2.tip_id,32u);memset(wh.reserved_target,0xff,32u);
-    CHECK(stn_block_body_commitment(NULL,0u,0u,&real,wh.transaction_commitment)==STN_DATA_OK);CHECK(stn_block_header_encode(&wh,share.template_header,sizeof(share.template_header),&written)==STN_DATA_OK);
-    memcpy(share.body_commitment,wh.transaction_commitment,32u);CHECK(stn_sha256(NULL,(const uint8_t *)"STN-CHAIN:WORK:ID:1",sizeof("STN-CHAIN:WORK:ID:1"),share.template_header,sizeof(share.template_header),share.work_id)==STN_DATA_OK);
-    for(nonce=0u;;++nonce){share.nonce=nonce;if(stn_share_verify_evidence(&share,&real,proof)==STN_DATA_OK)break;CHECK(nonce!=UINT64_MAX);}
+    share.miner=map.mining_identity;wh.version=STN_POW_BLOCK_VERSION;memcpy(wh.network_id,c.network_id,32u);wh.height=s2.height;wh.timestamp=s2.timestamp;memcpy(wh.previous_hash,s1.tip_id,32u);memset(wh.reserved_target,0xff,32u);
+    CHECK(stn_block_body_commitment(NULL,0u,0u,&c.hash_provider,wh.transaction_commitment)==STN_DATA_OK);CHECK(stn_block_header_encode(&wh,share.template_header,sizeof(share.template_header),&written)==STN_DATA_OK);
+    memcpy(share.body_commitment,wh.transaction_commitment,32u);CHECK(c.hash_provider.hash(c.hash_provider.user,(const uint8_t *)"STN-CHAIN:WORK:ID:1",sizeof("STN-CHAIN:WORK:ID:1"),share.template_header,sizeof(share.template_header),share.work_id)==STN_DATA_OK);
+    for(nonce=0u;;++nonce){share.nonce=nonce;if(stn_share_verify_evidence(&share,&c.hash_provider,proof)==STN_DATA_OK)break;CHECK(nonce!=UINT64_MAX);}
     CHECK(stn_share_encode(&share,sharewire)==STN_DATA_OK);records[0]=sharewire;types[0]=STN_TX_SHARE_EVIDENCE;lengths[0]=sizeof(sharewire);economic_block(b2,sizeof(b2),&s2,records,types,lengths,1u);
     r=stn_chain_validate_candidate(&c,&s2,b2,sizeof(b2),&s3);CHECK(r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
     CHECK(stn_share_id(&share,share_id)==STN_DATA_OK);issuance.reason=STN_ISSUANCE_REASON_SHARE;issuance.units=STN_ISSUANCE_SHARE_UNITS;memcpy(issuance.evidence_id,share_id,32u);issuance.destination=map;
