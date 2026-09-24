@@ -302,7 +302,31 @@ stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_stora
         goto done;
     }
 
-    r=stn_chain_validate_candidate(c,&current.state,block,block_length,&next);
+    /*
+     * Validate the append against the same immutable accepted prefix that will
+     * be persisted. Deferred Phase 19 share evidence can refer to work older
+     * than the immediate prior tip; state-only validation deliberately cannot
+     * prove that ancestry.
+     */
+    if(current.count>=UINT32_MAX){
+        s=STN_STORAGE_CAPACITY;
+        goto done;
+    }
+    {
+        stn_block_span *history=(stn_block_span*)calloc(
+            current.count+1u,sizeof(*history));
+        if(history==NULL){
+            s=STN_STORAGE_CAPACITY;
+            goto done;
+        }
+        for(i=0;i<current.count;++i){
+            history[i]=current.blocks[i];
+        }
+        history[current.count].bytes=block;
+        history[current.count].length=block_length;
+        r=stn_chain_reconstruct_history(c,history,current.count+1u,&next);
+        free(history);
+    }
 
     if(r.acceptance==STN_ACCEPTANCE_UNRESOLVED){
         s=STN_STORAGE_UNRESOLVED;
@@ -311,11 +335,6 @@ stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_stora
 
     if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){
         s=STN_STORAGE_VALIDATION;
-        goto done;
-    }
-
-    if(current.count>=UINT32_MAX){
-        s=STN_STORAGE_CAPACITY;
         goto done;
     }
 
@@ -342,8 +361,8 @@ stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_stora
         goto done;
     }
 
-    /* The prefix was validated under this lock. Do not reconstruct and
-     * revalidate a second full history to append one validated candidate. */
+    /* The exact prefix plus candidate was reconstructed and validated under
+     * this lock. Persist those same bytes without a second validation pass. */
     memcpy(w->next_bytes,w->current_bytes,offset);
     stn_wire_write(w->next_bytes+8,4,current.count+1);
     stn_wire_write(w->next_bytes+offset,4,block_length);
