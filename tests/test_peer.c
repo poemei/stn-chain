@@ -10,6 +10,195 @@
 #else
 #include "stn_linux_peer.h"
 #include "stn_linux_storage.h"
+#include <errno.h>
+#include <pthread.h>
+#include <stdarg.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+#include <wchar.h>
+
+typedef stn_linux_peer stn_windows_peer;
+typedef stn_linux_storage stn_windows_storage;
+#define stn_windows_peer_listen stn_linux_peer_listen
+#define stn_windows_peer_accept stn_linux_peer_accept
+#define stn_windows_peer_connect stn_linux_peer_connect
+#define stn_windows_peer_close stn_linux_peer_close
+#define stn_windows_peer_open_candidate stn_linux_peer_open_candidate
+#define stn_windows_peer_close_candidate stn_linux_peer_close_candidate
+
+typedef unsigned long DWORD;
+#define WINAPI
+#define TRUE 1
+#define FALSE 0
+#define WAIT_OBJECT_0 0u
+#define WAIT_TIMEOUT 258u
+
+typedef struct test_handle {
+    int kind;
+    int joined;
+    pthread_t thread;
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    int signaled;
+} *HANDLE;
+
+typedef DWORD (WINAPI *test_thread_proc)(void *);
+
+typedef struct test_thread_start {
+    test_thread_proc proc;
+    void *user;
+} test_thread_start;
+
+static void *test_thread_entry(void *opaque)
+{
+    test_thread_start *start=(test_thread_start *)opaque;
+    test_thread_proc proc=start->proc;
+    void *user=start->user;
+    free(start);
+    (void)proc(user);
+    return NULL;
+}
+
+static HANDLE CreateThread(void *security,size_t stack_size,test_thread_proc proc,void *user,DWORD flags,DWORD *id)
+{
+    HANDLE handle;
+    test_thread_start *start;
+    (void)security;(void)stack_size;(void)flags;(void)id;
+    if(proc==NULL){return NULL;}
+    handle=(HANDLE)calloc(1,sizeof(*handle));
+    start=(test_thread_start *)malloc(sizeof(*start));
+    if(handle==NULL || start==NULL){free(handle);free(start);return NULL;}
+    handle->kind=1;start->proc=proc;start->user=user;
+    if(pthread_create(&handle->thread,NULL,test_thread_entry,start)!=0){free(start);free(handle);return NULL;}
+    return handle;
+}
+
+static HANDLE CreateEventW(void *security,int manual_reset,int initial_state,const wchar_t *name)
+{
+    HANDLE handle;
+    (void)security;(void)manual_reset;(void)name;
+    handle=(HANDLE)calloc(1,sizeof(*handle));
+    if(handle==NULL){return NULL;}
+    handle->kind=2;handle->signaled=initial_state!=0;
+    if(pthread_mutex_init(&handle->mutex,NULL)!=0){free(handle);return NULL;}
+    if(pthread_cond_init(&handle->cond,NULL)!=0){pthread_mutex_destroy(&handle->mutex);free(handle);return NULL;}
+    return handle;
+}
+
+static int SetEvent(HANDLE handle)
+{
+    if(handle==NULL || handle->kind!=2){return 0;}
+    pthread_mutex_lock(&handle->mutex);handle->signaled=1;
+    pthread_cond_broadcast(&handle->cond);pthread_mutex_unlock(&handle->mutex);
+    return 1;
+}
+
+static void test_deadline(struct timespec *deadline,DWORD milliseconds)
+{
+    clock_gettime(CLOCK_REALTIME,deadline);
+    deadline->tv_sec+=(time_t)(milliseconds/1000u);
+    deadline->tv_nsec+=(long)(milliseconds%1000u)*1000000L;
+    if(deadline->tv_nsec>=1000000000L){deadline->tv_sec+=1;deadline->tv_nsec-=1000000000L;}
+}
+
+static DWORD WaitForSingleObject(HANDLE handle,DWORD milliseconds)
+{
+    struct timespec deadline;
+    int result;
+    if(handle==NULL){return WAIT_TIMEOUT;}
+    test_deadline(&deadline,milliseconds);
+    if(handle->kind==1){
+        if(handle->joined){return WAIT_OBJECT_0;}
+        result=pthread_timedjoin_np(handle->thread,NULL,&deadline);
+        if(result==0){handle->joined=1;return WAIT_OBJECT_0;}
+        return WAIT_TIMEOUT;
+    }
+    if(handle->kind==2){
+        pthread_mutex_lock(&handle->mutex);
+        while(!handle->signaled){
+            result=pthread_cond_timedwait(&handle->cond,&handle->mutex,&deadline);
+            if(result==ETIMEDOUT){pthread_mutex_unlock(&handle->mutex);return WAIT_TIMEOUT;}
+            if(result!=0){pthread_mutex_unlock(&handle->mutex);return WAIT_TIMEOUT;}
+        }
+        pthread_mutex_unlock(&handle->mutex);return WAIT_OBJECT_0;
+    }
+    return WAIT_TIMEOUT;
+}
+
+static int CloseHandle(HANDLE handle)
+{
+    if(handle==NULL){return 0;}
+    if(handle->kind==1 && !handle->joined){pthread_join(handle->thread,NULL);handle->joined=1;}
+    if(handle->kind==2){pthread_cond_destroy(&handle->cond);pthread_mutex_destroy(&handle->mutex);}
+    free(handle);return 1;
+}
+
+static uint64_t GetTickCount64(void)
+{
+    struct timespec value;
+    if(clock_gettime(CLOCK_MONOTONIC,&value)!=0){return 0;}
+    return (uint64_t)value.tv_sec*1000u+(uint64_t)value.tv_nsec/1000000u;
+}
+
+static int wide_path(const wchar_t *wide,char *path,size_t capacity)
+{
+    size_t written;
+    if(wide==NULL || path==NULL || capacity==0){return 0;}
+    written=wcstombs(path,wide,capacity);
+    if(written==(size_t)-1 || written>=capacity){return 0;}
+    path[written]='\0';return 1;
+}
+
+static DWORD GetTempPathW(DWORD capacity,wchar_t *out)
+{
+    const wchar_t value[]=L"/tmp/";
+    size_t length=wcslen(value);
+    if(out==NULL || capacity<=length){return 0;}
+    memcpy(out,value,(length+1)*sizeof(*out));return (DWORD)length;
+}
+
+static unsigned GetTempFileNameW(const wchar_t *directory,const wchar_t *prefix,unsigned unique,wchar_t *out)
+{
+    char dir[4096],pattern[4096];int fd;size_t converted;
+    (void)unique;
+    if(!wide_path(directory,dir,sizeof(dir)) || prefix==NULL || out==NULL){return 0;}
+    if(snprintf(pattern,sizeof(pattern),"%s%lc%lc%lcXXXXXX",dir,prefix[0],prefix[1],prefix[2])<0){return 0;}
+    fd=mkstemp(pattern);if(fd<0){return 0;}close(fd);
+    converted=mbstowcs(out,pattern,259);if(converted==(size_t)-1 || converted>=260){unlink(pattern);return 0;}
+    out[converted]=L'\0';return 1;
+}
+
+static int DeleteFileW(const wchar_t *wide)
+{
+    char path[4096];return wide_path(wide,path,sizeof(path)) && unlink(path)==0;
+}
+
+static int CreateDirectoryW(const wchar_t *wide,void *security)
+{
+    char path[4096];(void)security;
+    return wide_path(wide,path,sizeof(path)) && mkdir(path,0700)==0;
+}
+
+static int RemoveDirectoryW(const wchar_t *wide)
+{
+    char path[4096];return wide_path(wide,path,sizeof(path)) && rmdir(path)==0;
+}
+
+static int swprintf_s(wchar_t *out,size_t capacity,const wchar_t *format,...)
+{
+    va_list args;int result;size_t i;
+    va_start(args,format);result=vswprintf(out,capacity,format,args);va_end(args);
+    if(result>0){for(i=0;out[i]!=L'\0';++i){if(out[i]==L'\\'){out[i]=L'/';}}}
+    return result;
+}
+
+static stn_storage_status stn_windows_storage_init(stn_windows_storage *storage,const wchar_t *wide,stn_storage_provider *provider)
+{
+    char path[4096];
+    if(!wide_path(wide,path,sizeof(path))){return STN_STORAGE_ARGUMENT;}
+    return stn_linux_storage_init(storage,path,provider);
+}
 #endif
 #include "stn_sha256.h"
 #include "stn_mining.h"
