@@ -199,7 +199,16 @@ stn_data_status stn_chain_state_share(const stn_chain_state *source,stn_chain_st
         }
         ++o->references;
     }
-    if(source->economy!=NULL){stn_chain_economic_owned *o=(stn_chain_economic_owned *)source->economy;if(o->references==0 || o->references==SIZE_MAX)return o->references==SIZE_MAX?STN_DATA_CAPACITY:STN_DATA_ARGUMENT;++o->references;}
+    if(source->economy!=NULL){
+        stn_chain_economic_owned *o=(stn_chain_economic_owned *)source->economy;
+        if(o->references==0 || o->references==SIZE_MAX){
+            if(source->lifecycle!=NULL){stn_chain_lifecycle_owned *l=(stn_chain_lifecycle_owned *)source->lifecycle;if(--l->references==0)lifecycle_destroy(l);}
+            if(source->shares!=NULL){stn_chain_share_owned *q=(stn_chain_share_owned *)source->shares;if(--q->references==0)share_destroy(q);}
+            if(source->compensation!=NULL){stn_chain_compensation_owned *q=(stn_chain_compensation_owned *)source->compensation;if(--q->references==0)compensation_destroy(q);}
+            return o->references==SIZE_MAX ? STN_DATA_CAPACITY : STN_DATA_ARGUMENT;
+        }
+        ++o->references;
+    }
     if(source->contracts!=NULL && stn_contract_snapshot_share(source->contracts)==NULL){
         if(source->lifecycle!=NULL){
             stn_chain_lifecycle_owned *o=(stn_chain_lifecycle_owned *)source->lifecycle;
@@ -210,6 +219,7 @@ stn_data_status stn_chain_state_share(const stn_chain_state *source,stn_chain_st
             if(--q->references==0)share_destroy(q);
         }
         if(source->compensation!=NULL){stn_chain_compensation_owned *q=(stn_chain_compensation_owned *)source->compensation;if(--q->references==0)compensation_destroy(q);}
+        if(source->economy!=NULL){stn_chain_economic_owned *q=(stn_chain_economic_owned *)source->economy;if(--q->references==0)economic_destroy(q);}
         return STN_DATA_CAPACITY;
     }
     *out=*source;return STN_DATA_OK;
@@ -788,6 +798,8 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
         if(stn_chain_state_share(prior,&shared)!=STN_DATA_OK){
             if(has_contracts)stn_contract_snapshot_release(candidate_contracts);
             if(has_shares)share_destroy(candidate_shares);
+            if(has_compensation)compensation_destroy(candidate_compensation);
+            if(has_issuance)economic_destroy(candidate_economy);
             if(has_lifecycle && !reused_lifecycle)lifecycle_destroy(candidate_lifecycle);
             return fail(r,STN_CHAIN_BODY,STN_DATA_CAPACITY);
         }
