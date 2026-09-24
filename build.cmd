@@ -418,6 +418,7 @@ echo.
 cl %CFLAGS% %INCLUDES% /DSTN_ECONOMIC_STATE_TEST_MAIN ^
     tests\test_economic_state.c ^
     src\stn_economic_state.c ^
+    src\stn_transfer.c ^
     /Fo"%OBJ_DIR%\\" /Fe"%TEST_TARGET%" /link /INCREMENTAL:NO
 if errorlevel 1 goto fail
 echo.
