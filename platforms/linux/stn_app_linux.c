@@ -917,6 +917,103 @@ int stn_linux_app(int argc, char **argv)
             stderr,
             "Storage startup failed: %d (no automatic repair).\n",
             (int)status);
+        if(status == STN_STORAGE_VALIDATION) {
+            stn_storage_status read_status;
+            size_t diagnostic_length = 0u;
+            stn_storage_view diagnostic_view = {0};
+
+            read_status = storage.acquire(storage.user);
+            if(read_status == STN_STORAGE_OK) {
+                read_status = storage.read(
+                    storage.user,
+                    mining.snapshot,
+                    mining.snapshot_capacity,
+                    &diagnostic_length);
+                storage.release(storage.user);
+            }
+
+            if(read_status == STN_STORAGE_OK) {
+                read_status = stn_storage_decode(
+                    &chain,
+                    mining.snapshot,
+                    diagnostic_length,
+                    &diagnostic_view);
+                stn_storage_view_release(&diagnostic_view);
+            }
+
+            /*
+             * Storage decode deliberately exposes only storage status. For a
+             * validation failure, decode the immutable STNS block table here
+             * and replay it once so startup can report the exact consensus
+             * rejection without modifying or repairing accepted history.
+             */
+            if(read_status == STN_STORAGE_VALIDATION &&
+               diagnostic_length >= STN_STORAGE_OVERHEAD &&
+               memcmp(mining.snapshot,"STNS",4) == 0) {
+                uint32_t block_count = read_u32_be(mining.snapshot + 8);
+                stn_block_span *diagnostic_blocks = NULL;
+                size_t diagnostic_offset = STN_STORAGE_HEADER;
+                size_t diagnostic_count = 0u;
+                int diagnostic_shape_ok = block_count != 0u;
+
+                if(diagnostic_shape_ok)
+                    diagnostic_blocks = (stn_block_span *)calloc(
+                        block_count,sizeof(*diagnostic_blocks));
+                if(diagnostic_blocks == NULL)
+                    diagnostic_shape_ok = 0;
+
+                while(diagnostic_shape_ok && diagnostic_count < block_count) {
+                    uint32_t block_length;
+                    if(diagnostic_offset > diagnostic_length - 32u ||
+                       diagnostic_length - 32u - diagnostic_offset < 4u) {
+                        diagnostic_shape_ok = 0;
+                        break;
+                    }
+                    block_length = read_u32_be(mining.snapshot + diagnostic_offset);
+                    diagnostic_offset += 4u;
+                    if(block_length < STN_BLOCK_HEADER_SIZE ||
+                       diagnostic_offset > diagnostic_length - 32u ||
+                       block_length > diagnostic_length - 32u - diagnostic_offset) {
+                        diagnostic_shape_ok = 0;
+                        break;
+                    }
+                    diagnostic_blocks[diagnostic_count].bytes =
+                        mining.snapshot + diagnostic_offset;
+                    diagnostic_blocks[diagnostic_count].length = block_length;
+                    diagnostic_offset += block_length;
+                    ++diagnostic_count;
+                }
+
+                if(diagnostic_shape_ok &&
+                   diagnostic_offset == diagnostic_length - 32u) {
+                    stn_chain_state diagnostic_state = {0};
+                    stn_chain_report report = stn_chain_reconstruct_history(
+                        &chain,
+                        diagnostic_blocks,
+                        diagnostic_count,
+                        &diagnostic_state);
+                    if(report.acceptance != STN_ACCEPTANCE_UNDER_CONTEXT) {
+                        fprintf(
+                            stderr,
+                            "History validation failed: index=%zu height=%llu reason=%d detail=%d"
+                            " structure=%d link=%d body=%d identifier=%d target=%d pow=%d work=%d.\n",
+                            report.failing_index,
+                            (unsigned long long)report.failing_height,
+                            (int)report.reason,
+                            (int)report.detail,
+                            (int)report.structure,
+                            (int)report.link,
+                            (int)report.body,
+                            (int)report.identifier,
+                            (int)report.target,
+                            (int)report.pow,
+                            (int)report.work);
+                    }
+                    stn_chain_state_release(&diagnostic_state);
+                }
+                free(diagnostic_blocks);
+            }
+        }
         goto cleanup;
     }
 
