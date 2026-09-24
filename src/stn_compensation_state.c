@@ -18,7 +18,8 @@ stn_data_status stn_compensation_state_apply(stn_compensation_state *s,
     if(s->count>s->capacity || (s->capacity!=0u && s->entries==NULL))return STN_DATA_ARGUMENT;
     while(at<s->count){
         cmp=memcmp(s->entries[at].mining_identity.identifier,d->mining_identity.identifier,STN_ADDRESS_ID_SIZE);
-        if(cmp>=0)break;\n        ++at;
+        if(cmp>=0)break;
+        ++at;
     }
     if(at<s->count && cmp==0){
         return memcmp(s->entries[at].wallet.identifier,d->wallet.identifier,STN_ADDRESS_ID_SIZE)==0 ?
