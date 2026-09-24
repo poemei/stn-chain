@@ -2,6 +2,10 @@
 #include "stn_chain.h"
 #include "stn_transfer_envelope_authorization.h"
 #include "stn_wallet.h"
+#include "stn_sha256.h"
+#include "stn_issuance.h"
+#include "stn_compensation.h"
+#include "stn_share.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -240,6 +244,60 @@ static void batch(void)
 }
 
 
+static void economic_block(uint8_t *block,size_t block_size,const stn_chain_state *prior,
+    const uint8_t *records[],const uint16_t types[],const uint32_t lengths[],size_t count)
+{
+    size_t i,offset=168u,body=0u;
+    memset(block,0,block_size);memcpy(block,genesis,168u);
+    memcpy(block+40u,prior->tip_id,32u);number(block+72u,prior->height+1u);number(block+80u,prior->timestamp);
+    block[163]=(uint8_t)count;
+    for(i=0;i<count;++i)body+=4u+STN_TX_HEADER_SIZE+lengths[i];
+    block[164]=(uint8_t)(body>>24);block[165]=(uint8_t)(body>>16);block[166]=(uint8_t)(body>>8);block[167]=(uint8_t)body;
+    for(i=0;i<count;++i){
+        stn_transaction tx={0};size_t written=0u;size_t n=STN_TX_HEADER_SIZE+lengths[i];
+        block[offset]=(uint8_t)(n>>24);block[offset+1u]=(uint8_t)(n>>16);block[offset+2u]=(uint8_t)(n>>8);block[offset+3u]=(uint8_t)n;offset+=4u;
+        tx.version=1u;tx.type=types[i];tx.record_bytes=records[i];tx.record_length=lengths[i];
+        CHECK(stn_transaction_encode(&tx,block+offset,block_size-offset,&written)==STN_DATA_OK && written==n);offset+=written;
+    }
+}
+
+static void transfer_reconstruction(void)
+{
+    static const uint8_t sk[32]={0x9d,0x61,0xb1,0x9d,0xef,0xfd,0x5a,0x60,0xba,0x84,0x4a,0xf4,0x92,0xec,0x2c,0xc4,0x44,0x49,0xc5,0x69,0x7b,0x32,0x69,0x19,0x70,0x3b,0xac,0x03,0x1c,0xae,0x7f,0x60};
+    static const uint8_t pk[32]={0xd7,0x5a,0x98,0x01,0x82,0xb1,0x0a,0xb7,0xd5,0x4b,0xfe,0xd3,0xc9,0x64,0x07,0x3a,0x0e,0xe1,0x72,0xf3,0xda,0xa6,0x23,0x25,0xaf,0x02,0x1a,0x68,0xf7,0x07,0x51,0x1a};
+    hash_control hc={STN_DATA_OK,0};stn_chain_context c=context(&hc);stn_chain_state s0={0},s1={0},s2={0},s3={0},s4={0},rebuilt={0};
+    stn_chain_report r;stn_compensation_destination map={0};stn_share_evidence share={0};stn_issuance_record issuance={0};stn_transfer_envelope e={0};
+    stn_address identity={0};uint8_t mapwire[STN_COMPENSATION_DESTINATION_SIZE],sharewire[STN_SHARE_CANONICAL_SIZE],issuewire[STN_ISSUANCE_CANONICAL_SIZE],envwire[STN_TRANSFER_ENVELOPE_CANONICAL_SIZE];
+    uint8_t statement[STN_TRANSFER_ENVELOPE_AUTHORIZATION_STATEMENT_SIZE],share_id[32],proof[32];uint64_t units=0,nonce;
+    uint8_t b1[168u+4u+STN_TX_HEADER_SIZE+STN_COMPENSATION_DESTINATION_SIZE];
+    uint8_t b2[168u+4u+STN_TX_HEADER_SIZE+STN_SHARE_CANONICAL_SIZE];
+    uint8_t b3[168u+4u+STN_TX_HEADER_SIZE+STN_ISSUANCE_CANONICAL_SIZE];
+    uint8_t b4[168u+4u+STN_TX_HEADER_SIZE+STN_TRANSFER_ENVELOPE_CANONICAL_SIZE];
+    const uint8_t *records[1];uint16_t types[1];uint32_t lengths[1];stn_block_span history[5];stn_hash_provider real={stn_sha256,NULL};stn_block_header wh={0};size_t written=0u;
+    CHECK(stn_chain_initialize(&c,&s0)==STN_DATA_OK);r=stn_chain_validate_candidate(&c,&s0,genesis,sizeof(genesis),&s1);CHECK(r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    map.mining_identity.type=STN_ADDRESS_IDENTITY;memcpy(map.mining_identity.identifier,pk,32u);identity=map.mining_identity;CHECK(stn_wallet_derive(&identity,&map.wallet)==STN_DATA_OK);
+    CHECK(stn_compensation_destination_encode(&map,mapwire)==STN_DATA_OK);records[0]=mapwire;types[0]=STN_TX_COMPENSATION_DESTINATION;lengths[0]=sizeof(mapwire);economic_block(b1,sizeof(b1),&s1,records,types,lengths,1u);
+    r=stn_chain_validate_candidate(&c,&s1,b1,sizeof(b1),&s2);CHECK(r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    share.miner=map.mining_identity;wh.version=STN_POW_BLOCK_VERSION;wh.height=s2.height+1u;wh.timestamp=s2.timestamp;memcpy(wh.previous_hash,s2.tip_id,32u);memset(wh.reserved_target,0xff,32u);
+    CHECK(stn_block_body_commitment(NULL,0u,0u,&real,wh.transaction_commitment)==STN_DATA_OK);CHECK(stn_block_header_encode(&wh,share.template_header,sizeof(share.template_header),&written)==STN_DATA_OK);
+    memcpy(share.body_commitment,wh.transaction_commitment,32u);CHECK(stn_sha256(NULL,(const uint8_t *)"STN-CHAIN:WORK:ID:1",sizeof("STN-CHAIN:WORK:ID:1"),share.template_header,sizeof(share.template_header),share.work_id)==STN_DATA_OK);
+    for(nonce=0u;;++nonce){share.nonce=nonce;if(stn_share_verify_evidence(&share,&real,proof)==STN_DATA_OK)break;CHECK(nonce!=UINT64_MAX);}
+    CHECK(stn_share_encode(&share,sharewire)==STN_DATA_OK);records[0]=sharewire;types[0]=STN_TX_SHARE_EVIDENCE;lengths[0]=sizeof(sharewire);economic_block(b2,sizeof(b2),&s2,records,types,lengths,1u);
+    r=stn_chain_validate_candidate(&c,&s2,b2,sizeof(b2),&s3);CHECK(r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    CHECK(stn_share_id(&share,share_id)==STN_DATA_OK);issuance.reason=STN_ISSUANCE_REASON_SHARE;issuance.units=STN_ISSUANCE_SHARE_UNITS;memcpy(issuance.evidence_id,share_id,32u);issuance.destination=map;
+    CHECK(stn_issuance_encode(&issuance,issuewire)==STN_DATA_OK);records[0]=issuewire;types[0]=STN_TX_ISSUANCE;lengths[0]=sizeof(issuewire);economic_block(b3,sizeof(b3),&s3,records,types,lengths,1u);
+    r=stn_chain_validate_candidate(&c,&s3,b3,sizeof(b3),&s4);CHECK(r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    CHECK(stn_economic_state_balance(s4.economy,&map.wallet,&units)==STN_DATA_OK && units==1u);
+    memcpy(e.controller,pk,32u);e.nonce[31]=7u;e.transfer.source=map.wallet;e.transfer.destination.type=STN_ADDRESS_WALLET;memset(e.transfer.destination.identifier,0x66,32u);e.transfer.units=1u;
+    CHECK(stn_transfer_envelope_authorization_statement(&e,statement)==STN_DATA_OK);CHECK(stn_ed25519_sign(statement,sizeof(statement),pk,sk,e.signature)==0);CHECK(stn_transfer_envelope_encode(&e,envwire)==STN_DATA_OK);
+    records[0]=envwire;types[0]=STN_TX_TRANSFER;lengths[0]=sizeof(envwire);economic_block(b4,sizeof(b4),&s4,records,types,lengths,1u);
+    history[0].bytes=genesis;history[0].length=sizeof(genesis);history[1].bytes=b1;history[1].length=sizeof(b1);history[2].bytes=b2;history[2].length=sizeof(b2);history[3].bytes=b3;history[3].length=sizeof(b3);history[4].bytes=b4;history[4].length=sizeof(b4);
+    r=stn_chain_reconstruct_history(&c,history,5u,&rebuilt);CHECK(r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    CHECK(stn_economic_state_balance(rebuilt.economy,&map.wallet,&units)==STN_DATA_OK && units==0u);
+    CHECK(stn_economic_state_balance(rebuilt.economy,&e.transfer.destination,&units)==STN_DATA_OK && units==1u);CHECK(rebuilt.economy->total_supply==1u);
+    stn_chain_state_release(&s0);stn_chain_state_release(&s1);stn_chain_state_release(&s2);stn_chain_state_release(&s3);stn_chain_state_release(&s4);stn_chain_state_release(&rebuilt);
+}
+
 static void transfer_integration(void)
 {
     static const uint8_t sk[32]={0x9d,0x61,0xb1,0x9d,0xef,0xfd,0x5a,0x60,0xba,0x84,0x4a,0xf4,0x92,0xec,0x2c,0xc4,0x44,0x49,0xc5,0x69,0x7b,0x32,0x69,0x19,0x70,0x3b,0xac,0x03,0x1c,0xae,0x7f,0x60};
@@ -284,7 +342,7 @@ int test_chain(void);
 int test_chain(void)
 {
     size_t live=stn_chain_test_live_snapshots();
-    valid_and_atomic(); failures_and_time(); providers_and_inputs(); batch(); transfer_integration();
+    valid_and_atomic(); failures_and_time(); providers_and_inputs(); batch(); transfer_integration(); transfer_reconstruction();
     CHECK(stn_chain_test_live_snapshots()==live);
     printf("Chain context: %u checks, %u failures (test hashing, no consensus).\n",checks,failures);
     return failures==0 ? 0 : 1;
