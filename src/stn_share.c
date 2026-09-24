@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_share.h"
 #include "stn_sha256.h"
+#include "stn_chain.h"
 #include <string.h>
 
 static void write64be(uint8_t out[8],uint64_t value)
@@ -61,6 +62,78 @@ stn_data_status stn_share_id(
         result);
     if(status==STN_DATA_OK){
         memcpy(id,result,sizeof(result));
+    }
+    return status;
+}
+
+
+stn_data_status stn_share_verify(
+    const stn_share_evidence *share,
+    const uint8_t *canonical_template,
+    size_t template_length,
+    const stn_hash_provider *provider,
+    uint8_t digest[32])
+{
+    static const uint8_t work_domain[]="STN-CHAIN:WORK:ID:1";
+    uint8_t work_id[32],share_target[32],hash[32];
+    uint8_t block[STN_BLOCK_MAX_SIZE];
+    stn_block decoded;
+    stn_data_status status;
+    size_t written=0;
+
+    if(share==NULL || canonical_template==NULL || provider==NULL ||
+       provider->hash==NULL || digest==NULL){
+        return STN_DATA_ARGUMENT;
+    }
+    if(share->miner.type!=STN_ADDRESS_IDENTITY){
+        return STN_DATA_TYPE;
+    }
+    if(template_length<STN_BLOCK_HEADER_SIZE ||
+       template_length>STN_BLOCK_MAX_SIZE){
+        return STN_DATA_LENGTH;
+    }
+
+    status=stn_block_decode(canonical_template,template_length,&decoded);
+    if(status!=STN_DATA_OK){return status;}
+    if(decoded.header.version!=STN_POW_BLOCK_VERSION){
+        return STN_DATA_VERSION;
+    }
+
+    status=provider->hash(
+        provider->user,
+        work_domain,
+        sizeof(work_domain),
+        canonical_template,
+        template_length,
+        work_id);
+    if(status!=STN_DATA_OK){
+        return status==STN_DATA_UNRESOLVED ? status : STN_DATA_PROVIDER_ERROR;
+    }
+    if(memcmp(work_id,share->work_id,32)!=0){
+        return STN_DATA_CONTENT;
+    }
+
+    status=stn_economy_share_target(
+        decoded.header.reserved_target,
+        share_target);
+    if(status!=STN_DATA_OK){return status;}
+
+    memcpy(block,canonical_template,template_length);
+    decoded.header.reserved_work_nonce=share->nonce;
+    decoded.body=block+STN_BLOCK_HEADER_SIZE;
+    status=stn_block_header_encode(
+        &decoded.header,
+        block,
+        STN_BLOCK_HEADER_SIZE,
+        &written);
+    if(status!=STN_DATA_OK){return status;}
+    if(written!=STN_BLOCK_HEADER_SIZE){return STN_DATA_CONTENT;}
+
+    status=stn_chain_block_id(block,template_length,provider,hash);
+    if(status!=STN_DATA_OK){return status;}
+    status=stn_pow_compare(hash,share_target);
+    if(status==STN_DATA_OK){
+        memcpy(digest,hash,32);
     }
     return status;
 }
