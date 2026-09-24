@@ -406,7 +406,7 @@ $(BUILD_DIR)/test-transfer-envelope-acceptance: tests/test_transfer_envelope_acc
 test-transfer-transaction: $(BUILD_DIR)/test-transfer-transaction
 	$(BUILD_DIR)/test-transfer-transaction
 
-TRANSFER_TRANSACTION_SOURCES := src/stn_transaction.c src/stn_transfer_envelope.c src/stn_transfer.c src/stn_record.c src/stn_contract_transaction.c src/stn_contract.c src/stn_contract_lineage.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_vote.c src/stn_share.c src/stn_compensation.c src/stn_issuance.c src/stn_sentinel_intelligence.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c
+TRANSFER_TRANSACTION_SOURCES := src/stn_transaction.c src/stn_transfer_envelope.c src/stn_transfer.c src/stn_record.c src/stn_contract_transaction.c src/stn_contract.c src/stn_contract_lineage.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_share.c src/stn_compensation.c src/stn_issuance.c src/stn_sentinel_intelligence.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c
 
 $(BUILD_DIR)/test-transfer-transaction: tests/test_transfer_transaction.c $(TRANSFER_TRANSACTION_SOURCES) includes/stn_transaction.h
 	@mkdir -p $(BUILD_DIR)
