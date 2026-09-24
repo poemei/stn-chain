@@ -35,6 +35,36 @@ stn_data_status stn_share_encode(
     return STN_DATA_OK;
 }
 
+stn_data_status stn_share_decode(
+    const uint8_t canonical[STN_SHARE_CANONICAL_SIZE],
+    size_t length,
+    stn_share_evidence *out)
+{
+    stn_share_evidence share={0};
+    size_t i;
+
+    if(canonical==NULL || out==NULL){
+        return STN_DATA_ARGUMENT;
+    }
+    if(length!=STN_SHARE_CANONICAL_SIZE){
+        return STN_DATA_LENGTH;
+    }
+    if(canonical[0]!=(uint8_t)STN_SHARE_VERSION){
+        return STN_DATA_VERSION;
+    }
+
+    memcpy(share.work_id,canonical+1,STN_SHARE_WORK_ID_SIZE);
+    share.miner.type=STN_ADDRESS_IDENTITY;
+    memcpy(share.miner.identifier,canonical+33,STN_ADDRESS_ID_SIZE);
+
+    for(i=0;i<STN_SHARE_NONCE_SIZE;++i){
+        share.nonce=(share.nonce<<8)|canonical[65u+i];
+    }
+
+    *out=share;
+    return STN_DATA_OK;
+}
+
 stn_data_status stn_share_id(
     const stn_share_evidence *share,
     uint8_t id[STN_SHARE_ID_SIZE])
