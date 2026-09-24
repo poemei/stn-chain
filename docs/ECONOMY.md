@@ -225,19 +225,22 @@ The canonical accepted share record is self-contained:
     mining identity identifier[32]
     nonce[8] big-endian
     canonical zero-nonce mining header[168]
+    committed candidate-body digest[32]
 
 Total:
 
-    241 bytes
+    273 bytes
 
-The retained mining header is consensus evidence, not telemetry. It allows every
-compliant node to reproduce the Work ID, derive the Share Target from the
-historical Chain target, insert the submitted nonce, reproduce the proof hash,
-and independently verify the qualifying share during normal acceptance,
-restart reconstruction, synchronization, and reorganization.
+The retained mining header and candidate-body digest are consensus evidence,
+not telemetry. They allow every compliant node to reproduce the Work ID, derive
+the Share Target from the historical Chain target, insert the submitted nonce,
+reproduce the proof hash, and independently verify the qualifying share during
+normal acceptance, restart reconstruction, synchronization, and reorganization.
 
-The Work ID is derived from the exact retained 168-byte zero-nonce header. The
-header commits to candidate body content through its transaction commitment.
+The Work ID remains derived from the exact retained 168-byte zero-nonce header.
+The retained candidate-body digest MUST equal the transaction commitment carried
+by that header. This preserves the established Work ID while making the
+historical candidate commitment explicit in accepted share evidence.
 
 A share record whose Work ID does not reproduce from its retained header, whose
 header does not describe the applicable Chain work context, or whose reproduced
