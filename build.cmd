@@ -767,7 +767,6 @@ cl %CFLAGS% %INCLUDES% /DSTN_TRANSFER_TRANSACTION_TEST_MAIN ^
     src\stn_contract_lineage.c ^
     src\stn_contract_state.c ^
     src\stn_contract_consensus.c ^
-    src\stn_contract_vote.c ^
     src\stn_share.c ^
     src\stn_compensation.c ^
     src\stn_issuance.c ^
