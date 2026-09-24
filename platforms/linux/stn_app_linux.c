@@ -950,7 +950,7 @@ int stn_linux_app(int argc, char **argv)
             if(read_status == STN_STORAGE_VALIDATION &&
                diagnostic_length >= STN_STORAGE_OVERHEAD &&
                memcmp(mining.snapshot,"STNS",4) == 0) {
-                uint32_t block_count = read_u32_be(mining.snapshot + 8);
+                uint32_t block_count = (uint32_t)stn_wire_read(mining.snapshot + 8,4);
                 stn_block_span *diagnostic_blocks = NULL;
                 size_t diagnostic_offset = STN_STORAGE_HEADER;
                 size_t diagnostic_count = 0u;
@@ -969,7 +969,7 @@ int stn_linux_app(int argc, char **argv)
                         diagnostic_shape_ok = 0;
                         break;
                     }
-                    block_length = read_u32_be(mining.snapshot + diagnostic_offset);
+                    block_length = (uint32_t)stn_wire_read(mining.snapshot + diagnostic_offset,4);
                     diagnostic_offset += 4u;
                     if(block_length < STN_BLOCK_HEADER_SIZE ||
                        diagnostic_offset > diagnostic_length - 32u ||
