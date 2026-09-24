@@ -8,18 +8,15 @@
 
 static stn_rpc_code snapshot(const stn_node_service *s,stn_chain_state *state)
 {
-    stn_chain_state current;stn_chain_report r;size_t i;
+    stn_chain_report r;
     if(s->chain==NULL || s->chain->pow_policy==NULL || s->blocks==NULL || s->count==0){return STN_RPC_UNAVAILABLE;}
-    if(stn_chain_initialize(s->chain,&current)!=STN_DATA_OK){return STN_RPC_REJECTED;}
-    for(i=0;i<s->count;++i){
-        r=stn_chain_validate_candidate(s->chain,&current,s->blocks[i].bytes,s->blocks[i].length,&current);
-        if(r.acceptance==STN_ACCEPTANCE_UNRESOLVED){stn_chain_state_release(&current);return STN_RPC_UNAVAILABLE;}
-        if(r.acceptance==STN_ACCEPTANCE_ERROR){stn_chain_state_release(&current);return STN_RPC_PROVIDER;}
-        if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){stn_chain_state_release(&current);return STN_RPC_REJECTED;}
-
-    }
-    *state=current;return STN_RPC_OK;
+    r=stn_chain_reconstruct_history(s->chain,s->blocks,s->count,state);
+    if(r.acceptance==STN_ACCEPTANCE_UNRESOLVED){return STN_RPC_UNAVAILABLE;}
+    if(r.acceptance==STN_ACCEPTANCE_ERROR){return STN_RPC_PROVIDER;}
+    if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){return STN_RPC_REJECTED;}
+    return STN_RPC_OK;
 }
+
 static stn_rpc_code handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t cap,size_t *written,stn_chain_state *state)
 {
     const stn_node_service *s=user;stn_rpc_code code;size_t index;

@@ -5,7 +5,8 @@
 #include "stn_chain.h"
 /* Node-owned immutable snapshot held for the complete dispatch. Caller owns
  * synchronization/lifetime; no persistence paths or cached work are exposed.
- * Each supported query independently validates full history incrementally.
+ * State-bearing queries reconstruct the complete immutable accepted history so
+ * validation has the historical evidence required by consensus rules.
  * GET_ACCEPTED_RECORD reconstructs historical production eligibility and
  * returns exact canonical transaction evidence; pending is never consulted.
  * Intelligence context is a separate existing staged-validation snapshot. */
