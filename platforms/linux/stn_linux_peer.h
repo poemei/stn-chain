@@ -9,6 +9,8 @@ typedef struct stn_linux_peer {
     unsigned io_timeout_ms;
     int opened;
     uint64_t operation_deadline_ms;
+    int last_errno;
+    int last_operation;
 } stn_linux_peer;
 
 /*
@@ -53,5 +55,15 @@ stn_peer_status stn_linux_peer_open_candidate(
     stn_peer_transport *transport);
 
 void stn_linux_peer_close_candidate(void *user);
+
+/* Observational diagnostics only; never consensus-visible. */
+enum {
+    STN_LINUX_PEER_OP_NONE = 0,
+    STN_LINUX_PEER_OP_CONNECT,
+    STN_LINUX_PEER_OP_SEND,
+    STN_LINUX_PEER_OP_RECEIVE,
+    STN_LINUX_PEER_OP_POLL
+};
+const char *stn_linux_peer_operation_name(int operation);
 
 #endif
