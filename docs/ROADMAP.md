@@ -120,7 +120,7 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
                                                            Contract workflow is deferred
                                                            to STNC Core/GUI integration.
 
-                     19 Economics /       **NOT STARTED**  Native economics, issuance
+                     19 Economics /       **ACTIVE**  Native economics, issuance
                         Issuance /                         and reward rules remain
                         Rewards                            deferred pending explicit
                                                            Operations/consensus
