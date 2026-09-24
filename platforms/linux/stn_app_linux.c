@@ -622,10 +622,20 @@ static void *outbound_thread(void *user)
             } else if(step_due && !was_connected &&
                       !runtime->manager.connected &&
                       peer_status != STN_PEER_RETAINED) {
-                report_event(
-                    STN_REPORT_PEER,
-                    "Connection/sync failed status=%d",
-                    (int)peer_status);
+                if(peer_status == STN_PEER_IO && runtime->socket.last_errno != 0) {
+                    report_event(
+                        STN_REPORT_PEER,
+                        "Connection/sync failed status=%d operation=%s errno=%d (%s)",
+                        (int)peer_status,
+                        stn_linux_peer_operation_name(runtime->socket.last_operation),
+                        runtime->socket.last_errno,
+                        strerror(runtime->socket.last_errno));
+                } else {
+                    report_event(
+                        STN_REPORT_PEER,
+                        "Connection/sync failed status=%d",
+                        (int)peer_status);
+                }
             } else if(was_connected && !runtime->manager.connected) {
                 report_event(STN_REPORT_PEER, "Disconnected status=%d", (int)peer_status);
             }
