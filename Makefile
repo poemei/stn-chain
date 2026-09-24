@@ -372,6 +372,6 @@ $(BUILD_DIR)/test-transfer-envelope: tests/test_transfer_envelope.c src/stn_tran
 test-transfer-envelope-replay: $(BUILD_DIR)/test-transfer-envelope-replay
 	$(BUILD_DIR)/test-transfer-envelope-replay
 
-$(BUILD_DIR)/test-transfer-envelope-replay: tests/test_transfer_envelope_replay.c src/stn_transfer_envelope_replay.c src/stn_replay.c src/stn_record.c src/stn_identity.c includes/stn_transfer_envelope_replay.h
+$(BUILD_DIR)/test-transfer-envelope-replay: tests/test_transfer_envelope_replay.c src/stn_transfer_envelope_replay.c src/stn_replay.c src/stn_record.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c includes/stn_transfer_envelope_replay.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_REPLAY_TEST_MAIN tests/test_transfer_envelope_replay.c src/stn_transfer_envelope_replay.c src/stn_replay.c src/stn_record.c src/stn_identity.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_REPLAY_TEST_MAIN tests/test_transfer_envelope_replay.c src/stn_transfer_envelope_replay.c src/stn_replay.c src/stn_record.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c -o $@ $(LDLIBS)
