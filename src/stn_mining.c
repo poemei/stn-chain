@@ -400,7 +400,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         static const uint8_t work_domain[]="STN-CHAIN:WORK:ID:1";
         stn_data_status verified;
 
-        if(q->payload==NULL || q->length!=277u ||
+        if(q->payload==NULL || q->length!=STN_RPC_SHARE_SUBMISSION_SIZE ||
            stn_address_decode((const char *)(q->payload+32),STN_MINING_IDENTITY_SIZE,&miner)!=STN_DATA_OK ||
            miner.type!=STN_ADDRESS_IDENTITY){
             code=STN_RPC_INVALID;
@@ -411,7 +411,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         memcpy(evidence.work_id,q->payload,32u);
         evidence.miner=miner;
         evidence.nonce=stn_wire_read(q->payload+101,8u);
-        memcpy(evidence.template_header,q->payload+109u,STN_BLOCK_HEADER_SIZE);
+        memcpy(evidence.template_header,q->payload+STN_RPC_SHARE_SUBMISSION_PREFIX,STN_BLOCK_HEADER_SIZE);
 
         if(stn_block_header_decode(evidence.template_header,
                 STN_BLOCK_HEADER_SIZE,&work_header)!=STN_DATA_OK ||
