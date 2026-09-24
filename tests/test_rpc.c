@@ -62,11 +62,14 @@ static void codecs(void)
     for(s.mode=1;s.mode<=3;++s.mode){r=call(STN_RPC_INFO,NULL,0,STN_RPC_READ,&service);CHECK(r.code==(s.mode==3?STN_RPC_REJECTED:STN_RPC_PROVIDER) && r.length==0);}
     r=call(STN_RPC_INFO,NULL,0,STN_RPC_READ,NULL);CHECK(r.code==STN_RPC_UNAVAILABLE);
     /* Maximum request payload, fixed nested length, and exact wire round trip. */
-    memset(large,0,sizeof(large));large[64]=(uint8_t)(STN_BLOCK_MAX_SIZE>>24);large[65]=(uint8_t)(STN_BLOCK_MAX_SIZE>>16);
+    memset(large,0,sizeof(large));
+    large[64]=(uint8_t)(STN_BLOCK_MAX_SIZE>>24);large[65]=(uint8_t)(STN_BLOCK_MAX_SIZE>>16);
     large[66]=(uint8_t)((STN_BLOCK_MAX_SIZE>>8)&255u);large[67]=(uint8_t)(STN_BLOCK_MAX_SIZE&255u);
-    q=before;q.method=STN_RPC_SUBMIT_WORK;q.payload=large;q.length=sizeof(large);
-    CHECK(stn_rpc_encode(&q,request,sizeof(request),&n)==STN_RPC_OK && n==STN_RPC_MAX_FRAME);
-    CHECK(stn_rpc_decode(request,n,&r)==STN_RPC_OK && r.length==sizeof(large));
+    memcpy(large+68,"stn0_0000000000000000000000000000000000000000000000000000000000000000",STN_RPC_MINER_IDENTITY_SIZE);
+    q=before;q.method=STN_RPC_SUBMIT_WORK;q.payload=large;
+    q.length=STN_RPC_MINING_SUBMISSION_PREFIX+STN_BLOCK_MAX_SIZE;
+    CHECK(stn_rpc_encode(&q,request,sizeof(request),&n)==STN_RPC_OK && n==STN_RPC_HEADER_SIZE+q.length);
+    CHECK(stn_rpc_decode(request,n,&r)==STN_RPC_OK && r.length==q.length);
     CHECK(stn_rpc_encode(&r,response,sizeof(response),&w)==STN_RPC_OK && w==n && memcmp(request,response,n)==0);
     CHECK(stn_rpc_decode(request,n-1,&r)==STN_RPC_INVALID);CHECK(stn_rpc_decode(request,n+1,&r)==STN_RPC_INVALID);
     request[24+67]^=1;CHECK(stn_rpc_decode(request,n,&r)==STN_RPC_INVALID);
