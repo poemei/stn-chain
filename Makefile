@@ -55,6 +55,7 @@ CORE_SOURCES := \
 	src/stn_issuance.c \
 	src/stn_economic_state.c \
 	src/stn_compensation_state.c \
+	src/stn_issuance_binding.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -273,3 +274,12 @@ test-compensation-state: $(BUILD_DIR)/test-compensation-state
 $(BUILD_DIR)/test-compensation-state: tests/test_compensation_state.c src/stn_compensation_state.c includes/stn_compensation_state.h includes/stn_compensation.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_COMPENSATION_STATE_TEST_MAIN tests/test_compensation_state.c src/stn_compensation_state.c -o $@ $(LDLIBS)
+
+
+.PHONY: test-issuance-binding
+test-issuance-binding: $(BUILD_DIR)/test-issuance-binding
+	$(BUILD_DIR)/test-issuance-binding
+
+$(BUILD_DIR)/test-issuance-binding: tests/test_issuance_binding.c $(CORE_SOURCES)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_ISSUANCE_BINDING_TEST_MAIN tests/test_issuance_binding.c $(CORE_SOURCES) -o $@ $(LDLIBS)
