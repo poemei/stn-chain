@@ -70,6 +70,7 @@ size_t stn_chain_test_clone_count(void);
 void stn_chain_test_fail_after(size_t budget);
 /* Test-only counter boundary injection; restore the true count before release. */
 size_t stn_chain_test_references(stn_chain_state *state,size_t references);
+stn_data_status stn_chain_test_seed_balance(stn_chain_state *state,const stn_address *wallet,uint64_t units);
 #endif
 
 typedef enum stn_chain_reason {
