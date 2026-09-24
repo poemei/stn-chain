@@ -369,6 +369,8 @@ echo.
 cl %CFLAGS% %INCLUDES% /DSTN_SHARE_REPLAY_TEST_MAIN ^
     tests\test_share_replay.c ^
     src\stn_share_replay.c ^
+    src\crypto\ed25519_donna\ed25519_provider.c ^
+    platforms\windows\stn_sha256.c ^
     /Fo"%OBJ_DIR%\\" /Fe"%TEST_TARGET%" /link /INCREMENTAL:NO
 if errorlevel 1 goto fail
 echo.
@@ -462,9 +464,8 @@ cl %CFLAGS% %INCLUDES% /DSTN_ISSUANCE_BINDING_TEST_MAIN ^
     src\stn_transaction.c ^
     src\stn_compensation.c ^
     src\stn_issuance.c ^
-    src\stn_sha256.c ^
+    src\stn_economic_state.c ^
     src\stn_pow.c ^
-    src\stn_work.c ^
     src\stn_address.c ^
     src\stn_contract_snapshot.c ^
     src\stn_contract_transaction.c ^
@@ -473,7 +474,6 @@ cl %CFLAGS% %INCLUDES% /DSTN_ISSUANCE_BINDING_TEST_MAIN ^
     src\stn_authority.c ^
     src\stn_record.c ^
     src\stn_validation.c ^
-    src\stn_crypto.c ^
     src\stn_identity.c ^
     src\stn_replay.c ^
     src\stn_share_replay.c ^
@@ -487,7 +487,7 @@ exit /b 0
 
 :test_fail
 echo.
-echo CONTRACT TEST FAILED
+echo ISSUANCE BINDING TEST FAILED
 exit /b 1
 
 :clean
