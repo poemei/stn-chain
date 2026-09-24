@@ -50,6 +50,7 @@ CORE_SOURCES := \
 	src/stn_authority.c \
 	src/stn_block.c \
 	src/stn_chain.c \
+	src/stn_economy.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -206,3 +207,13 @@ test-contract-snapshot: $(BUILD_DIR)/test-contract-snapshot
 $(BUILD_DIR)/test-contract-snapshot: tests/test_contract_snapshot.c src/stn_chain.c src/stn_block.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_pow.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract_snapshot.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_CONTRACT_SNAPSHOT_TEST_MAIN tests/test_contract_snapshot.c src/stn_chain.c src/stn_block.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_pow.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+
+
+# Phase 19 deterministic economy primitive qualification.
+.PHONY: test-economy
+test-economy: $(BUILD_DIR)/test-economy
+	$(BUILD_DIR)/test-economy
+
+$(BUILD_DIR)/test-economy: tests/test_economy.c src/stn_economy.c src/stn_pow.c includes/stn_economy.h includes/stn_pow.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_ECONOMY_TEST_MAIN tests/test_economy.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
