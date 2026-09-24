@@ -30,6 +30,16 @@ stn_pending_result stn_pending_insert(stn_pending *p,const uint8_t *bytes,
     if(p==NULL || id==NULL){return STN_PENDING_INVALID;}
     if(stn_transaction_decode(bytes,length,&tx)!=STN_DATA_OK){return STN_PENDING_INVALID;}
     if(tx.type==STN_TX_PUBLICATION){if(stn_record_decode(tx.record_bytes,tx.record_length,&record)!=STN_RECORD_OK)return STN_PENDING_INVALID;memcpy(entry.signer,record.signer_public_key,32);memcpy(entry.nonce,record.nonce,32);}
+    else if(tx.type==STN_TX_SHARE_EVIDENCE){
+        stn_share_evidence share;
+        if(stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK)return STN_PENDING_INVALID;
+        memcpy(entry.signer,share.miner.identifier,32);
+        memcpy(entry.nonce,share.work_id,24);
+        {
+            size_t i;
+            for(i=0;i<8u;++i){entry.nonce[24u+i]=(uint8_t)(share.nonce>>(56u-8u*i));}
+        }
+    }
     else {const uint8_t *signer=tx.record_bytes+1;if(tx.type==STN_TX_AUTHORITY_GRANT){if(stn_authority_grant_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_GRANT)return STN_PENDING_INVALID;}
         else if(tx.type==STN_TX_AUTHORITY_REVOKE){if(stn_authority_revocation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_REVOCATION)return STN_PENDING_INVALID;}
         else if(tx.type==STN_TX_IDENTITY_ROTATE){if(stn_identity_rotation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_ROTATION)return STN_PENDING_INVALID;}
@@ -103,8 +113,18 @@ static stn_data_status scan(const stn_pending *p,const stn_storage_view *v,uint8
         for(j=0;j<b.header.transaction_count;++j){
             size_t n=(size_t)stn_wire_read(b.body+offset,4);
             if(stn_transaction_decode(b.body+offset+4,n,&tx)!=STN_DATA_OK){return STN_DATA_CONTENT;}
-            lifecycle=tx.type!=STN_TX_PUBLICATION;
-            if(!lifecycle){if(stn_record_decode(tx.record_bytes,tx.record_length,&r)!=STN_RECORD_OK)return STN_DATA_CONTENT;memcpy(signer,r.signer_public_key,32);memcpy(nonce,r.nonce,32);}
+            lifecycle=tx.type!=STN_TX_PUBLICATION && tx.type!=STN_TX_SHARE_EVIDENCE;
+            if(tx.type==STN_TX_SHARE_EVIDENCE){
+                stn_share_evidence share;
+                if(stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK)return STN_DATA_CONTENT;
+                memcpy(signer,share.miner.identifier,32);
+                memcpy(nonce,share.work_id,24);
+                {
+                    size_t z;
+                    for(z=0;z<8u;++z){nonce[24u+z]=(uint8_t)(share.nonce>>(56u-8u*z));}
+                }
+            }
+            else if(!lifecycle){if(stn_record_decode(tx.record_bytes,tx.record_length,&r)!=STN_RECORD_OK)return STN_DATA_CONTENT;memcpy(signer,r.signer_public_key,32);memcpy(nonce,r.nonce,32);}
             else {memcpy(signer,tx.record_bytes+1,32);if(hash!=NULL){if(tx.type==STN_TX_AUTHORITY_GRANT){if(stn_authority_grant_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_GRANT)return STN_DATA_CONTENT;}else if(tx.type==STN_TX_AUTHORITY_REVOKE){if(stn_authority_revocation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_REVOCATION)return STN_DATA_CONTENT;}else if(tx.type==STN_TX_IDENTITY_ROTATE){if(stn_identity_rotation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_ROTATION)return STN_DATA_CONTENT;}else return STN_DATA_CONTENT;if(stn_lifecycle_replay_nonce(tx.type,statement,written,hash,nonce)!=STN_LIFECYCLE_OK)return STN_DATA_CONTENT;}}
             if(!replay && stn_transaction_id(b.body+offset+4,n,hash,id)!=STN_DATA_OK){return STN_DATA_PROVIDER_ERROR;}
             for(k=0;k<p->count;++k){if(replay ? (lifecycle ? (p->entries[k].length==n && memcmp(p->entries[k].transaction,b.body+offset,n)==0) : same_nonce(&p->entries[k],signer,nonce)) : memcmp(p->entries[k].id,id,32)==0){mask[k]=1;}}
