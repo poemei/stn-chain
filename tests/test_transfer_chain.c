@@ -19,9 +19,9 @@ static int make_block(stn_block *b,const stn_hash_provider *p,uint8_t *body,size
     uint8_t *wire,size_t wire_capacity,size_t *written,const stn_transaction_span *spans,size_t count){
     size_t n;
     memset(b,0,sizeof(*b));b->header.version=1;if(count>UINT32_MAX)return -1;b->header.transaction_count=(uint32_t)count;
-    if(stn_block_body_encode(spans,count,body,body_capacity,&n)!=STN_DATA_OK)return -1;
-    if(n>UINT32_MAX)return -1;b->header.body_length=(uint32_t)n;b->body=body;
-    if(stn_block_body_commitment(body,n,count,p,b->header.transaction_commitment)!=STN_DATA_OK)return -1;
+    if(count>UINT32_MAX)return -1;\n    if(stn_block_body_encode(spans,(uint32_t)count,body,body_capacity,&n)!=STN_DATA_OK)return -1;
+    if(n>UINT32_MAX)return -1;\n    b->header.body_length=(uint32_t)n;\n    b->body=body;
+    if(stn_block_body_commitment(body,n,(uint32_t)count,p,b->header.transaction_commitment)!=STN_DATA_OK)return -1;
     return stn_block_encode(b,wire,wire_capacity,written)==STN_DATA_OK?0:-1;
 }
 static void qualification(void){
