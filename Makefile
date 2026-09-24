@@ -280,6 +280,8 @@ $(BUILD_DIR)/test-compensation-state: tests/test_compensation_state.c src/stn_co
 test-issuance-binding: $(BUILD_DIR)/test-issuance-binding
 	$(BUILD_DIR)/test-issuance-binding
 
-$(BUILD_DIR)/test-issuance-binding: tests/test_issuance_binding.c $(CORE_SOURCES)
+ISSUANCE_BINDING_SOURCES := $(filter-out src/main.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) platforms/linux/stn_sha256.c
+
+$(BUILD_DIR)/test-issuance-binding: tests/test_issuance_binding.c $(ISSUANCE_BINDING_SOURCES)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_ISSUANCE_BINDING_TEST_MAIN tests/test_issuance_binding.c $(CORE_SOURCES) -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_ISSUANCE_BINDING_TEST_MAIN tests/test_issuance_binding.c $(ISSUANCE_BINDING_SOURCES) -o $@ $(LDLIBS)
