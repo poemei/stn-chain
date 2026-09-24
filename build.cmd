@@ -267,6 +267,17 @@ cl %CFLAGS% %INCLUDES% /DSTN_CONTRACT_SNAPSHOT_TEST_MAIN ^
     tests\test_contract_snapshot.c ^
     src\stn_chain.c ^
     src\stn_compensation_state.c ^
+    src\stn_compensation.c ^
+    src\stn_issuance.c ^
+    src\stn_economic_state.c ^
+    src\stn_issuance_binding.c ^
+    src\stn_economy.c ^
+    src\stn_transfer.c ^
+    src\stn_wallet.c ^
+    src\stn_transfer_envelope.c ^
+    src\stn_transfer_envelope_replay.c ^
+    src\stn_transfer_envelope_authorization.c ^
+    src\stn_transfer_envelope_acceptance.c ^
     src\stn_share.c ^
     src\stn_share_replay.c ^
     src\stn_block.c ^
