@@ -477,6 +477,8 @@ cl %CFLAGS% %INCLUDES% /DSTN_ISSUANCE_BINDING_TEST_MAIN ^
     src\stn_identity.c ^
     src\stn_replay.c ^
     src\stn_share_replay.c ^
+    src\crypto\ed25519_donna\ed25519_provider.c ^
+    platforms\windows\stn_sha256.c ^
     /Fo"%OBJ_DIR%\\" /Fe"%TEST_TARGET%" /link /INCREMENTAL:NO bcrypt.lib
 if errorlevel 1 goto fail
 "%TEST_TARGET%"
