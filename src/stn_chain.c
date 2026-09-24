@@ -71,6 +71,36 @@ static stn_chain_share_owned *share_clone(const stn_chain_state *s)
 }
 static void share_destroy(stn_chain_share_owned *o){free(o);}
 
+typedef struct stn_chain_compensation_owned {
+    stn_compensation_state state;
+    size_t references;
+    stn_compensation_destination entries[];
+} stn_chain_compensation_owned;
+
+static stn_chain_compensation_owned *compensation_new(void)
+{
+    stn_chain_compensation_owned *o=(stn_chain_compensation_owned *)calloc(1,sizeof(*o));
+    if(o==NULL)return NULL;
+    o->references=1;
+    stn_compensation_state_initialize(&o->state,NULL,0u);
+    return o;
+}
+static stn_chain_compensation_owned *compensation_clone(const stn_chain_state *s)
+{
+    stn_chain_compensation_owned *o;size_t capacity,bytes;
+    if(s->compensation==NULL || s->compensation->count>s->compensation->capacity ||
+       s->compensation->count>SIZE_MAX-STN_BLOCK_MAX_TRANSACTIONS)return NULL;
+    capacity=s->compensation->count+STN_BLOCK_MAX_TRANSACTIONS;
+    if(capacity>SIZE_MAX/sizeof(stn_compensation_destination))return NULL;
+    bytes=capacity*sizeof(stn_compensation_destination);
+    if(bytes>SIZE_MAX-sizeof(*o))return NULL;
+    o=(stn_chain_compensation_owned *)calloc(1,sizeof(*o)+bytes);if(o==NULL)return NULL;
+    o->references=1;stn_compensation_state_initialize(&o->state,o->entries,capacity);
+    if(s->compensation->count!=0u){memcpy(o->entries,s->compensation->entries,s->compensation->count*sizeof(*o->entries));o->state.count=s->compensation->count;}
+    return o;
+}
+static void compensation_destroy(stn_chain_compensation_owned *o){free(o);}
+
 
 #ifdef STN_LIFECYCLE_TEST
 #include <stdatomic.h>
@@ -119,6 +149,11 @@ void stn_chain_state_release(stn_chain_state *state)
             if(o->references==0)abort();
             if(--o->references==0)share_destroy(o);
         }
+        if(state->compensation!=NULL){
+            stn_chain_compensation_owned *o=(stn_chain_compensation_owned *)state->compensation;
+            if(o->references==0)abort();
+            if(--o->references==0)compensation_destroy(o);
+        }
         memset(state,0,sizeof(*state));
     }
 }
@@ -143,6 +178,15 @@ stn_data_status stn_chain_state_share(const stn_chain_state *source,stn_chain_st
         }
         ++o->references;
     }
+    if(source->compensation!=NULL){
+        stn_chain_compensation_owned *o=(stn_chain_compensation_owned *)source->compensation;
+        if(o->references==0 || o->references==SIZE_MAX){
+            if(source->lifecycle!=NULL){stn_chain_lifecycle_owned *l=(stn_chain_lifecycle_owned *)source->lifecycle;if(--l->references==0)lifecycle_destroy(l);}
+            if(source->shares!=NULL){stn_chain_share_owned *q=(stn_chain_share_owned *)source->shares;if(--q->references==0)share_destroy(q);}
+            return o->references==SIZE_MAX ? STN_DATA_CAPACITY : STN_DATA_ARGUMENT;
+        }
+        ++o->references;
+    }
     if(source->contracts!=NULL && stn_contract_snapshot_share(source->contracts)==NULL){
         if(source->lifecycle!=NULL){
             stn_chain_lifecycle_owned *o=(stn_chain_lifecycle_owned *)source->lifecycle;
@@ -152,6 +196,7 @@ stn_data_status stn_chain_state_share(const stn_chain_state *source,stn_chain_st
             stn_chain_share_owned *q=(stn_chain_share_owned *)source->shares;
             if(--q->references==0)share_destroy(q);
         }
+        if(source->compensation!=NULL){stn_chain_compensation_owned *q=(stn_chain_compensation_owned *)source->compensation;if(--q->references==0)compensation_destroy(q);}
         return STN_DATA_CAPACITY;
     }
     *out=*source;return STN_DATA_OK;
@@ -267,6 +312,11 @@ stn_data_status stn_chain_initialize(const stn_chain_context *context, stn_chain
             stn_chain_share_owned *q=share_new();
             if(q==NULL){stn_contract_snapshot_release(s.contracts);lifecycle_destroy(o);return STN_DATA_CAPACITY;}
             s.shares=&q->state;
+            {
+                stn_chain_compensation_owned *m=compensation_new();
+                if(m==NULL){share_destroy(q);stn_contract_snapshot_release(s.contracts);lifecycle_destroy(o);return STN_DATA_CAPACITY;}
+                s.compensation=&m->state;
+            }
         }
     }
     *out=s;
@@ -471,7 +521,8 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
     stn_chain_state next;stn_chain_lifecycle_owned *candidate_lifecycle=NULL;
     stn_contract_snapshot *candidate_contracts=NULL;
     stn_chain_share_owned *candidate_shares=NULL;
-    int has_lifecycle=0,has_contracts=0,has_shares=0,reused_lifecycle=0;
+    stn_chain_compensation_owned *candidate_compensation=NULL;
+    int has_lifecycle=0,has_contracts=0,has_shares=0,has_compensation=0,reused_lifecycle=0;
     stn_data_status status;
     uint8_t id[32];
     uint32_t i;
@@ -528,6 +579,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
         }
         if(tx.type==STN_TX_CONTRACT_ACTION){has_contracts=1;}
         else if(tx.type==STN_TX_SHARE_EVIDENCE){has_shares=1;}
+        else if(tx.type==STN_TX_COMPENSATION_DESTINATION){has_compensation=1;}
         else if(tx.type!=STN_TX_PUBLICATION){has_lifecycle=1;}
         else {
             if (memcmp(record.network_id,context->network_id,32)!=0) {
@@ -578,6 +630,14 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             r.body=STN_STAGE_ERROR;return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);
         }
     }
+    if(has_compensation){
+        candidate_compensation=compensation_clone(prior);
+        if(candidate_compensation==NULL){
+            if(has_lifecycle && !reused_lifecycle)lifecycle_destroy(candidate_lifecycle);
+            if(has_shares)share_destroy(candidate_shares);
+            r.body=STN_STAGE_ERROR;return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);
+        }
+    }
     if(has_contracts){
         candidate_contracts=stn_contract_snapshot_clone(prior->contracts);
         if(candidate_contracts==NULL){
@@ -585,7 +645,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             r.body=STN_STAGE_ERROR;return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);
         }
     }
-    if(has_lifecycle || has_contracts || has_shares){
+    if(has_lifecycle || has_contracts || has_shares || has_compensation){
         stn_data_status failure=STN_DATA_OK;
         offset=0;
         for(i=0;i<b.header.transaction_count;++i){
@@ -596,6 +656,13 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
                 failure=STN_DATA_CONTENT;break;
             }
             offset+=n;
+            if(tx.type==STN_TX_COMPENSATION_DESTINATION){
+                stn_compensation_destination destination;
+                if(stn_compensation_destination_decode(tx.record_bytes,tx.record_length,&destination)!=STN_DATA_OK){failure=STN_DATA_CONTENT;break;}
+                failure=stn_compensation_state_apply(&candidate_compensation->state,&destination);
+                if(failure!=STN_DATA_OK)break;
+                continue;
+            }
             if(tx.type==STN_TX_CONTRACT_ACTION){
                 const stn_lifecycle_state *authority_state=
                     has_lifecycle ? &candidate_lifecycle->state : prior->lifecycle;
@@ -685,6 +752,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
         if(failure!=STN_DATA_OK){
             if(has_contracts)stn_contract_snapshot_release(candidate_contracts);
             if(has_shares)share_destroy(candidate_shares);
+            if(has_compensation)compensation_destroy(candidate_compensation);
             if(has_lifecycle && !reused_lifecycle)lifecycle_destroy(candidate_lifecycle);
             r.body=stage(failure);return fail(r,STN_CHAIN_BODY,failure);
         }
@@ -706,6 +774,11 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             stn_contract_snapshot_release(shared.contracts);
             next.contracts=candidate_contracts;
         }else next.contracts=shared.contracts;
+        if(has_compensation){
+            stn_chain_compensation_owned *old=(stn_chain_compensation_owned *)shared.compensation;
+            if(--old->references==0)compensation_destroy(old);
+            next.compensation=&candidate_compensation->state;
+        }else next.compensation=shared.compensation;
         if(has_shares){
             stn_chain_share_owned *old=(stn_chain_share_owned *)shared.shares;
             if(--old->references==0)share_destroy(old);
