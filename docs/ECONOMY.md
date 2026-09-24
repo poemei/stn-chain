@@ -1,7 +1,7 @@
 # STNC Economic Model — Chain Development Handoff
 
-**Status:** Economic design direction  
-**Date:** September 23, 2026  
+**Status:** Phase 19 active — historical share evidence primitive cross-platform x64 qualified  
+**Date:** September 24, 2026  
 **Audience:** STN Chain development  
 **Scope:** Native currency, mining compensation, qualifying-share definition, issuance authority, and deterministic economic state
 
@@ -210,7 +210,7 @@ Share identity must deterministically bind the proof to the relevant work and mi
     Mining Identity
     Nonce
 
-The final canonical share identifier and serialization belong to the Chain protocol implementation and must be defined before issuance activation.
+The canonical share identifier and serialization are now defined by the Phase 19 Chain implementation. The accepted replay identity binds the full Work ID, mining identity identifier, and nonce.
 
 Reconnecting a miner, resubmitting the same proof, submitting it through another Stratum instance, or replaying previously accepted evidence MUST NOT create additional issuance.
 
@@ -246,6 +246,48 @@ A share record whose Work ID does not reproduce from its retained header, whose
 header does not describe the applicable Chain work context, or whose reproduced
 proof exceeds the Share Target is invalid economic evidence and creates no
 issuance.
+
+### 10.2 Historical Share Verification Qualification
+
+Historical share evidence is no longer accepted merely because Stratum previously
+classified the submission as qualifying.
+
+Chain independently validates canonical Share Evidence v2 using the evidence
+retained in accepted history. Validation includes:
+
+- exact canonical 273-byte share serialization;
+- canonical `stn0_` mining identity type;
+- Work ID reproduction from the retained zero-nonce mining header;
+- retained candidate-body digest equality with the header transaction commitment;
+- historical Chain target validation;
+- deterministic Share Target derivation;
+- canonical 64-bit big-endian nonce insertion;
+- independent Proof-of-Work hash reproduction;
+- `hash <= Share Target`;
+- deterministic Share ID derivation;
+- full replay identity using Work ID + mining identity + nonce.
+
+The same validation primitive is available to accepted-history validation so
+restart reconstruction, synchronization, and reorganization do not depend on a
+transient Stratum decision.
+
+The Phase 19 Share Evidence v2 primitive was qualified on September 24, 2026:
+
+    Windows x64
+        75 checks
+        0 failures
+
+    Linux x64
+        75 checks
+        0 failures
+
+This qualifies the canonical historical share evidence/proof primitive across
+the current Windows/Linux x64 implementations.
+
+It does not by itself activate STNC issuance.
+
+Accepted-history, restart, synchronization, and reorganization integration
+remain subject to their own Chain-level qualification before economic activation.
 
 ---
 
@@ -401,11 +443,11 @@ This handoff intentionally does not invent the remaining protocol formats.
 
 Before STNC issuance is activated, Chain development must define and test at least:
 
-1. Canonical qualifying-share evidence and identifier.
-2. The STNC message path by which qualifying evidence reaches Chain.
-3. Deterministic 256-bit Share Target derivation with saturation at `MAX_TARGET`.
-4. Deterministic proof verification independent of Stratum trust.
-5. Replay and duplicate state.
+1. Canonical qualifying-share evidence and identifier. **IMPLEMENTED / PRIMITIVE QUALIFIED**
+2. The STNC message path by which qualifying evidence reaches Chain. **IMPLEMENTED**
+3. Deterministic 256-bit Share Target derivation with saturation at `MAX_TARGET`. **IMPLEMENTED / QUALIFIED**
+4. Deterministic proof verification independent of Stratum trust. **IMPLEMENTED / PRIMITIVE QUALIFIED**
+5. Replay and duplicate state. **IMPLEMENTED / REPLAY PRIMITIVE QUALIFIED**
 6. The explicit relationship between compensated `stn0_` mining identity and `stnw0_` wallet destination.
 7. Canonical economic record representation.
 8. Integer balance and total-supply reconstruction.
