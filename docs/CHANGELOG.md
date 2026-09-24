@@ -5,6 +5,38 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 19 historical qualifying-share evidence qualification - 2026-09-24
+
+- Defined canonical Share Evidence v2 as a self-contained 273-byte consensus
+  record containing version, Work ID, canonical `stn0_` mining identity
+  identifier, 64-bit big-endian nonce, exact 168-byte zero-nonce mining header
+  and the committed 32-byte candidate-body digest.
+- Preserved the established Work ID derivation over the exact retained
+  zero-nonce mining header. The retained body digest must equal the transaction
+  commitment carried by that header; mismatched evidence is rejected as
+  non-canonical content.
+- Added independent historical qualifying-share verification. Chain can
+  reproduce Work ID, validate the historical Chain target, derive the
+  deterministic Share Target, insert the submitted nonce, reproduce the
+  Proof-of-Work hash and require `hash <= Share Target` without trusting
+  transient Stratum state.
+- Accepted-history share handling now has the evidence required for deterministic
+  restart, synchronization and reorganization validation. Full replay identity
+  remains Work ID + mining identity identifier + nonce.
+- Share Evidence v2 qualification passed on Windows x64 and Linux x64 with
+  identical results: **75 checks, 0 failures** on each platform.
+- The dedicated accepted-share replay primitive remains qualified on Windows
+  x64 and Linux x64 at **26 checks, 0 failures** on each platform.
+- Phase 19 target derivation, identity-bound submission, canonical share
+  evidence, independent proof verification and replay primitives are now
+  implemented at their current bounded qualification boundaries.
+- STNC issuance remains inactive. No balance, supply, wallet-credit or transfer
+  state is created by this increment. Accepted-history/restart/reorganization
+  integration still requires its Chain-level qualification before economic
+  activation.
+- ARM remains unqualified for this Phase 19 scope.
+
+
 ### Phase 18 shelved; Phase 19 activated - 2026-09-22
 
 - Phase 18 is now SHELVED / CHAIN SCOPE QUALIFIED. The qualified and deployed
