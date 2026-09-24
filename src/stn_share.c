@@ -13,22 +13,25 @@ static void write64be(uint8_t out[8],uint64_t value)
     }
 }
 
-static stn_data_status work_id_from_header(
-    const uint8_t header[STN_SHARE_TEMPLATE_HEADER_SIZE],
+static stn_data_status work_id_from_evidence(
+    const stn_share_evidence *share,
     const stn_hash_provider *provider,
     uint8_t work_id[32])
 {
     static const uint8_t domain[]="STN-CHAIN:WORK:ID:1";
+    uint8_t bytes[STN_SHARE_TEMPLATE_HEADER_SIZE+STN_SHARE_BODY_COMMITMENT_SIZE];
     stn_data_status status;
-    if(header==NULL || provider==NULL || provider->hash==NULL || work_id==NULL){
+    if(share==NULL || provider==NULL || provider->hash==NULL || work_id==NULL){
         return STN_DATA_ARGUMENT;
     }
+    memcpy(bytes,share->template_header,STN_SHARE_TEMPLATE_HEADER_SIZE);
+    memcpy(bytes+STN_SHARE_TEMPLATE_HEADER_SIZE,share->body_commitment,
+        STN_SHARE_BODY_COMMITMENT_SIZE);
     status=provider->hash(provider->user,domain,sizeof(domain),
-        header,STN_SHARE_TEMPLATE_HEADER_SIZE,work_id);
+        bytes,sizeof(bytes),work_id);
     if(status==STN_DATA_OK || status==STN_DATA_UNRESOLVED){return status;}
     return STN_DATA_PROVIDER_ERROR;
 }
-
 stn_data_status stn_share_encode(
     const stn_share_evidence *share,
     uint8_t canonical[STN_SHARE_CANONICAL_SIZE])
@@ -49,6 +52,7 @@ stn_data_status stn_share_encode(
     memcpy(result+33,share->miner.identifier,STN_ADDRESS_ID_SIZE);
     write64be(result+65,share->nonce);
     memcpy(result+73,share->template_header,STN_SHARE_TEMPLATE_HEADER_SIZE);
+    memcpy(result+241,share->body_commitment,STN_SHARE_BODY_COMMITMENT_SIZE);
 
     memcpy(canonical,result,sizeof(result));
     return STN_DATA_OK;
@@ -74,9 +78,12 @@ stn_data_status stn_share_decode(
         share.nonce=(share.nonce<<8)|canonical[65u+i];
     }
     memcpy(share.template_header,canonical+73,STN_SHARE_TEMPLATE_HEADER_SIZE);
+    memcpy(share.body_commitment,canonical+241,STN_SHARE_BODY_COMMITMENT_SIZE);
     if(stn_block_header_decode(share.template_header,
         STN_SHARE_TEMPLATE_HEADER_SIZE,&header)!=STN_DATA_OK ||
-       header.version!=STN_POW_BLOCK_VERSION){
+       header.version!=STN_POW_BLOCK_VERSION ||
+       memcmp(header.transaction_commitment,share.body_commitment,
+           STN_SHARE_BODY_COMMITMENT_SIZE)!=0){
         return STN_DATA_CONTENT;
     }
 
@@ -122,7 +129,7 @@ stn_data_status stn_share_verify_evidence(
     if(status!=STN_DATA_OK){return status;}
     if(header.version!=STN_POW_BLOCK_VERSION){return STN_DATA_VERSION;}
 
-    status=work_id_from_header(share->template_header,provider,work_id);
+    status=work_id_from_evidence(share,provider,work_id);
     if(status!=STN_DATA_OK){return status;}
     if(memcmp(work_id,share->work_id,32)!=0){return STN_DATA_CONTENT;}
 
