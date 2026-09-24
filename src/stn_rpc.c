@@ -48,10 +48,10 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_SUBMIT_INTELLIGENCE:return n>=STN_RECORD_OVERHEAD && n<=STN_RECORD_MAX_SIZE;
     case STN_RPC_SUBMIT_SHARE:{
         stn_address miner;
-        return n==277u &&
+        return n==STN_RPC_SHARE_SUBMISSION_SIZE &&
             stn_address_decode((const char *)(p+32),STN_RPC_MINER_IDENTITY_SIZE,&miner)==STN_DATA_OK &&
             miner.type==STN_ADDRESS_IDENTITY &&
-            stn_block_header_validate_structure(p+109,STN_BLOCK_HEADER_SIZE)==STN_DATA_OK;
+            stn_block_header_validate_structure(p+STN_RPC_SHARE_SUBMISSION_PREFIX,STN_BLOCK_HEADER_SIZE)==STN_DATA_OK;
     }
     case STN_RPC_SUBMIT_WORK:{
         stn_address miner;
