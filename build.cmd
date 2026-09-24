@@ -678,7 +678,8 @@ cl %CFLAGS% %INCLUDES% /DSTN_TRANSFER_ENVELOPE_REPLAY_TEST_MAIN ^
     src\stn_replay.c ^
     src\stn_record.c ^
     src\stn_identity.c ^
-    /Fo"%OBJ_DIR%\\" /Fe"%TEST_TARGET%" /link /INCREMENTAL:NO
+    src\crypto\ed25519_donna\ed25519_provider.c ^
+    /Fo"%OBJ_DIR%\\" /Fe"%TEST_TARGET%" /link /INCREMENTAL:NO bcrypt.lib
 if errorlevel 1 goto fail
 "%TEST_TARGET%"
 if errorlevel 1 goto test_fail
