@@ -24,6 +24,7 @@ static void vectors(void)
     CHECK(canonical[0]==STN_SHARE_VERSION);
     CHECK(memcmp(canonical+1,s.work_id,32)==0);
     CHECK(memcmp(canonical+33,s.miner.identifier,32)==0);
+    CHECK(STN_SHARE_CANONICAL_SIZE==73u);
     CHECK(canonical[65]==1 && canonical[66]==2 && canonical[67]==3 &&
           canonical[68]==4 && canonical[69]==5 && canonical[70]==6 &&
           canonical[71]==7 && canonical[72]==8);
