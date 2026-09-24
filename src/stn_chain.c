@@ -33,6 +33,45 @@ typedef struct stn_chain_lifecycle_owned {
 
 } stn_chain_lifecycle_owned;
 
+typedef struct stn_chain_share_owned {
+    stn_share_replay_state state;
+    size_t references;
+    uint8_t bytes[];
+} stn_chain_share_owned;
+
+static stn_chain_share_owned *share_new(void)
+{
+    stn_chain_share_owned *o=(stn_chain_share_owned *)calloc(1,sizeof(*o));
+    if(o==NULL)return NULL;
+    o->references=1;
+    stn_share_replay_initialize(&o->state,NULL,0);
+    return o;
+}
+static stn_chain_share_owned *share_clone(const stn_chain_state *s)
+{
+    stn_chain_share_owned *o;
+    size_t capacity,bytes;
+    if(s->shares==NULL ||
+       s->shares->consumed_count>s->shares->consumed_capacity ||
+       s->shares->consumed_count>SIZE_MAX-STN_BLOCK_MAX_TRANSACTIONS)return NULL;
+    capacity=s->shares->consumed_count+STN_BLOCK_MAX_TRANSACTIONS;
+    if(capacity>SIZE_MAX/STN_SHARE_REPLAY_KEY_SIZE)return NULL;
+    bytes=capacity*STN_SHARE_REPLAY_KEY_SIZE;
+    if(bytes>SIZE_MAX-sizeof(*o))return NULL;
+    o=(stn_chain_share_owned *)calloc(1,sizeof(*o)+bytes);
+    if(o==NULL)return NULL;
+    o->references=1;
+    stn_share_replay_initialize(&o->state,o->bytes,capacity);
+    if(s->shares->consumed_count!=0){
+        memcpy(o->bytes,s->shares->consumed,
+            s->shares->consumed_count*STN_SHARE_REPLAY_KEY_SIZE);
+        o->state.consumed_count=s->shares->consumed_count;
+    }
+    return o;
+}
+static void share_destroy(stn_chain_share_owned *o){free(o);}
+
+
 #ifdef STN_LIFECYCLE_TEST
 #include <stdatomic.h>
 static atomic_size_t lifecycle_live;
@@ -75,6 +114,11 @@ void stn_chain_state_release(stn_chain_state *state)
             if(--o->references==0)lifecycle_destroy(o);
         }
         stn_contract_snapshot_release(state->contracts);
+        if(state->shares!=NULL){
+            stn_chain_share_owned *o=(stn_chain_share_owned *)state->shares;
+            if(o->references==0)abort();
+            if(--o->references==0)share_destroy(o);
+        }
         memset(state,0,sizeof(*state));
     }
 }
@@ -88,10 +132,25 @@ stn_data_status stn_chain_state_share(const stn_chain_state *source,stn_chain_st
         if(o->references==SIZE_MAX)return STN_DATA_CAPACITY;
         ++o->references;
     }
+    if(source->shares!=NULL){
+        stn_chain_share_owned *o=(stn_chain_share_owned *)source->shares;
+        if(o->references==0 || o->references==SIZE_MAX){
+            if(source->lifecycle!=NULL){
+                stn_chain_lifecycle_owned *l=(stn_chain_lifecycle_owned *)source->lifecycle;
+                if(--l->references==0)lifecycle_destroy(l);
+            }
+            return o->references==SIZE_MAX ? STN_DATA_CAPACITY : STN_DATA_ARGUMENT;
+        }
+        ++o->references;
+    }
     if(source->contracts!=NULL && stn_contract_snapshot_share(source->contracts)==NULL){
         if(source->lifecycle!=NULL){
             stn_chain_lifecycle_owned *o=(stn_chain_lifecycle_owned *)source->lifecycle;
             if(--o->references==0)lifecycle_destroy(o);
+        }
+        if(source->shares!=NULL){
+            stn_chain_share_owned *q=(stn_chain_share_owned *)source->shares;
+            if(--q->references==0)share_destroy(q);
         }
         return STN_DATA_CAPACITY;
     }
@@ -204,6 +263,11 @@ stn_data_status stn_chain_initialize(const stn_chain_context *context, stn_chain
         s.lifecycle=&o->state;
         s.contracts=stn_contract_snapshot_create();
         if(s.contracts==NULL){lifecycle_destroy(o);return STN_DATA_CAPACITY;}
+        {
+            stn_chain_share_owned *q=share_new();
+            if(q==NULL){stn_contract_snapshot_release(s.contracts);lifecycle_destroy(o);return STN_DATA_CAPACITY;}
+            s.shares=&q->state;
+        }
     }
     *out=s;
     return STN_DATA_OK;
@@ -405,7 +469,8 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
     stn_block b;
     stn_chain_state next;stn_chain_lifecycle_owned *candidate_lifecycle=NULL;
     stn_contract_snapshot *candidate_contracts=NULL;
-    int has_lifecycle=0,has_contracts=0,reused_lifecycle=0;
+    stn_chain_share_owned *candidate_shares=NULL;
+    int has_lifecycle=0,has_contracts=0,has_shares=0,reused_lifecycle=0;
     stn_data_status status;
     uint8_t id[32];
     uint32_t i;
@@ -461,7 +526,8 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             r.body=STN_STAGE_REJECT; return fail(r,STN_CHAIN_BODY,STN_DATA_CONTENT);
         }
         if(tx.type==STN_TX_CONTRACT_ACTION){has_contracts=1;}
-        else if(tx.type!=STN_TX_PUBLICATION && tx.type!=STN_TX_SHARE_EVIDENCE){has_lifecycle=1;}
+        else if(tx.type==STN_TX_SHARE_EVIDENCE){has_shares=1;}
+        else if(tx.type!=STN_TX_PUBLICATION){has_lifecycle=1;}
         else {
             if (memcmp(record.network_id,context->network_id,32)!=0) {
                 r.body=STN_STAGE_REJECT; return fail(r,STN_CHAIN_NETWORK,STN_DATA_CONTENT);
@@ -503,6 +569,14 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
         }else candidate_lifecycle=lifecycle_clone(prior);
         if(candidate_lifecycle==NULL){r.body=STN_STAGE_ERROR;return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);}
     }
+    if(has_shares){
+        candidate_shares=share_clone(prior);
+        if(candidate_shares==NULL){
+            if(has_lifecycle && !reused_lifecycle)lifecycle_destroy(candidate_lifecycle);
+            if(has_shares)share_destroy(candidate_shares);
+            r.body=STN_STAGE_ERROR;return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);
+        }
+    }
     if(has_contracts){
         candidate_contracts=stn_contract_snapshot_clone(prior->contracts);
         if(candidate_contracts==NULL){
@@ -510,7 +584,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             r.body=STN_STAGE_ERROR;return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);
         }
     }
-    if(has_lifecycle || has_contracts){
+    if(has_lifecycle || has_contracts || has_shares){
         stn_data_status failure=STN_DATA_OK;
         offset=0;
         for(i=0;i<b.header.transaction_count;++i){
@@ -531,31 +605,16 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             }
             if(tx.type==STN_TX_SHARE_EVIDENCE){
                 stn_share_evidence share;
-                size_t bi,bo=0;
+                stn_share_replay_result replay;
                 if(stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK){
                     failure=STN_DATA_CONTENT;break;
                 }
-                for(bi=0;bi<i && failure==STN_DATA_OK;++bi){
-                    stn_transaction prior_tx;
-                    uint32_t prior_n=(uint32_t)stn_wire_read(b.body+bo,4);
-                    bo+=4;
-                    if(stn_transaction_decode(b.body+bo,prior_n,&prior_tx)!=STN_DATA_OK){
-                        failure=STN_DATA_CONTENT;break;
-                    }
-                    if(prior_tx.type==STN_TX_SHARE_EVIDENCE){
-                        stn_share_evidence prior_share;
-                        if(stn_share_decode(prior_tx.record_bytes,prior_tx.record_length,&prior_share)!=STN_DATA_OK){
-                            failure=STN_DATA_CONTENT;break;
-                        }
-                        if(memcmp(prior_share.miner.identifier,share.miner.identifier,32)==0 &&
-                           memcmp(prior_share.work_id,share.work_id,32)==0 &&
-                           prior_share.nonce==share.nonce){
-                            failure=STN_DATA_DUPLICATE;break;
-                        }
-                    }
-                    bo+=prior_n;
+                replay=stn_share_replay_consume(&candidate_shares->state,&share);
+                if(replay!=STN_SHARE_REPLAY_FRESH){
+                    failure=replay==STN_SHARE_REPLAY_CAPACITY ?
+                        STN_DATA_CAPACITY : STN_DATA_DUPLICATE;
+                    break;
                 }
-                if(failure!=STN_DATA_OK)break;
                 continue;
             }
             if(!has_lifecycle)continue;
@@ -584,6 +643,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
         }
         if(failure!=STN_DATA_OK){
             if(has_contracts)stn_contract_snapshot_release(candidate_contracts);
+            if(has_shares)share_destroy(candidate_shares);
             if(has_lifecycle && !reused_lifecycle)lifecycle_destroy(candidate_lifecycle);
             r.body=stage(failure);return fail(r,STN_CHAIN_BODY,failure);
         }
@@ -592,6 +652,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
         stn_chain_state shared;
         if(stn_chain_state_share(prior,&shared)!=STN_DATA_OK){
             if(has_contracts)stn_contract_snapshot_release(candidate_contracts);
+            if(has_shares)share_destroy(candidate_shares);
             if(has_lifecycle && !reused_lifecycle)lifecycle_destroy(candidate_lifecycle);
             return fail(r,STN_CHAIN_BODY,STN_DATA_CAPACITY);
         }
@@ -604,6 +665,11 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             stn_contract_snapshot_release(shared.contracts);
             next.contracts=candidate_contracts;
         }else next.contracts=shared.contracts;
+        if(has_shares){
+            stn_chain_share_owned *old=(stn_chain_share_owned *)shared.shares;
+            if(--old->references==0)share_destroy(old);
+            next.shares=&candidate_shares->state;
+        }else next.shares=shared.shares;
     }
     if(out==prior && !reused_lifecycle)stn_chain_state_release(out);
     *out=next; /* transfer candidate reference to a fresh output */
