@@ -34,8 +34,9 @@ if /i "%~1"=="test-transfer-envelope-replay" goto setup
 if /i "%~1"=="test-transfer-envelope-authorization" goto setup
 if /i "%~1"=="test-transfer-envelope-acceptance" goto setup
 if /i "%~1"=="test-transfer-transaction" goto setup
+if /i "%~1"=="test-transfer-chain" goto setup
 if not "%~1"=="" (
-    echo Usage: build.cmd [clean^|test-contract^|test-contract-consensus^|test-contract-lineage^|test-contract-state^|test-contract-snapshot^|test-economy^|test-share^|test-share-replay^|test-issuance^|test-economic-state^|test-compensation-state^|test-issuance-binding^|test-wallet^|test-transfer^|test-transfer-replay^|test-transfer-binding^|test-transfer-authorization^|test-transfer-acceptance^|test-transfer-envelope^|test-transfer-envelope-replay^|test-transfer-envelope-authorization^|test-transfer-envelope-acceptance^|test-transfer-transaction]
+    echo Usage: build.cmd [clean^|test-contract^|test-contract-consensus^|test-contract-lineage^|test-contract-state^|test-contract-snapshot^|test-economy^|test-share^|test-share-replay^|test-issuance^|test-economic-state^|test-compensation-state^|test-issuance-binding^|test-wallet^|test-transfer^|test-transfer-replay^|test-transfer-binding^|test-transfer-authorization^|test-transfer-acceptance^|test-transfer-envelope^|test-transfer-envelope-replay^|test-transfer-envelope-authorization^|test-transfer-envelope-acceptance^|test-transfer-transaction^|test-transfer-chain]
     exit /b 1
 )
 
@@ -97,6 +98,7 @@ if /i "%~1"=="test-transfer-envelope-replay" goto test_transfer_envelope_replay
 if /i "%~1"=="test-transfer-envelope-authorization" goto test_transfer_envelope_authorization
 if /i "%~1"=="test-transfer-envelope-acceptance" goto test_transfer_envelope_acceptance
 if /i "%~1"=="test-transfer-transaction" goto test_transfer_transaction
+if /i "%~1"=="test-transfer-chain" goto test_transfer_chain
 
 echo.
 echo STN Chain Windows x64 build
