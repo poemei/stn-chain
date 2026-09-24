@@ -1108,36 +1108,33 @@ Qualification recorded to date:
 
 ARM remains unqualified.
 
-### Next Phase 19 work
+### Current Phase 19 completion boundary
 
-Development proceeds in bounded consensus increments:
+The original bounded Phase 19 development sequence has now been implemented
+through the accepted Chain path. The current qualification state is:
 
-1. Qualify accepted-history share validation against the real Chain candidate
-   path.
-2. Qualify restart reconstruction of historical share verification and replay
-   state.
-3. Qualify synchronization and reorganization so economic share/replay state is
-   derived only from the selected accepted branch.
-4. Resolve the current-work/candidate interaction so multiple qualifying shares
-   for one assigned Work ID can be accepted without the first pending share
-   invalidating otherwise valid shares from the same work interval.
-5. Define and qualify the deterministic `stn0_` mining-identity to `stnw0_`
-   compensation relationship.
-6. Add canonical mining reward/issuance records:
-   1 unit per accepted qualifying share and 100 additional units for an accepted
-   block solution.
-7. Add integer wallet balances and total accepted supply reconstructed from
-   accepted Chain history.
-8. Add the initial no-fee wallet transfer foundation with sender control,
-   sequence and replay validation.
-9. Qualify persistence, restart, P2P synchronization and reorganization of the
-   resulting economic state.
-10. Complete applicable cross-platform qualification before economic activation.
+1. Accepted-history share validation: **IMPLEMENTED / QUALIFIED**.
+2. Historical share verification and replay reconstruction: **IMPLEMENTED**.
+3. Synchronization and selected-branch economic reconstruction:
+   **IMPLEMENTED — Windows x64 qualified; Linux peer harness remains pending**.
+4. Multiple qualifying shares for assigned work: **IMPLEMENTED** through
+   canonical self-contained Share Evidence v2 and accepted replay identity.
+5. Deterministic `stn0_` mining-identity to `stnw0_` compensation
+   relationship: **IMPLEMENTED / QUALIFIED**.
+6. Canonical mining reward/issuance records: **IMPLEMENTED / QUALIFIED**.
+7. Integer wallet balances and total accepted supply: **IMPLEMENTED / CHAIN
+   ACCEPTANCE QUALIFIED**.
+8. Initial no-fee wallet transfer foundation with sender control and replay
+   validation: **IMPLEMENTED / QUALIFIED**.
+9. Economic persistence/restart primitive: **IMPLEMENTED / PRIMITIVE
+   QUALIFIED**. P2P history reconstruction is implemented; reorganization now
+   derives economic state through authoritative full-history reconstruction.
+10. Cross-platform qualification: **ACTIVE**. Windows/Linux x64 transfer
+    acceptance is qualified. Linux peer-harness portability and final
+    fork/reorganization qualification remain open evidence items.
 
-STNC issuance remains **INACTIVE** until the required accepted-history economic
-state is implemented and qualified. Current qualifying-share evidence does not
-create spendable STNC merely because it is structurally or cryptographically
-valid.
+STNC issuance remains **INACTIVE** until the remaining qualification evidence
+above is closed. Implementation status alone does not activate spendable STNC.
 
 The governing Phase 19 rule is:
 
