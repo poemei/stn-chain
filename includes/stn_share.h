@@ -9,7 +9,7 @@
 #define STN_SHARE_WORK_ID_SIZE 32u
 #define STN_SHARE_ID_SIZE 32u
 #define STN_SHARE_NONCE_SIZE 8u
-#define STN_SHARE_CANONICAL_SIZE 72u
+#define STN_SHARE_CANONICAL_SIZE 73u
 
 typedef struct stn_share_evidence {
     uint8_t work_id[STN_SHARE_WORK_ID_SIZE];
