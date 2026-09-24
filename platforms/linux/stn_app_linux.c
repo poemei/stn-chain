@@ -665,6 +665,13 @@ static void *inbound_thread(void *user)
                         &request_length);
 
                     if(status != STN_PEER_OK) {
+                        if(status != STN_PEER_DISCONNECTED &&
+                           status != STN_PEER_TIMEOUT) {
+                            report_event(
+                                STN_REPORT_PEER,
+                                "Inbound receive failed status=%d",
+                                (int)status);
+                        }
                         break;
                     }
 
@@ -679,11 +686,24 @@ static void *inbound_thread(void *user)
                         STN_PEER_MAX_FRAME,
                         &response_length);
 
-                    if(status != STN_PEER_OK ||
-                       transport.send(
-                           transport.user,
-                           response,
-                           response_length) != STN_PEER_OK) {
+                    if(status != STN_PEER_OK) {
+                        report_event(
+                            STN_REPORT_PEER,
+                            "Inbound request rejected status=%d",
+                            (int)status);
+                        break;
+                    }
+
+                    status = transport.send(
+                        transport.user,
+                        response,
+                        response_length);
+
+                    if(status != STN_PEER_OK) {
+                        report_event(
+                            STN_REPORT_PEER,
+                            "Inbound response failed status=%d",
+                            (int)status);
                         break;
                     }
                 }
