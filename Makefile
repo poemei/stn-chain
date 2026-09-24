@@ -411,3 +411,15 @@ TRANSFER_TRANSACTION_SOURCES := src/stn_transaction.c src/stn_transfer_envelope.
 $(BUILD_DIR)/test-transfer-transaction: tests/test_transfer_transaction.c $(TRANSFER_TRANSACTION_SOURCES) includes/stn_transaction.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_TRANSFER_TRANSACTION_TEST_MAIN tests/test_transfer_transaction.c $(TRANSFER_TRANSACTION_SOURCES) -o $@ $(LDLIBS)
+
+
+# Phase 19 accepted transfer Chain qualification.
+.PHONY: test-transfer-chain
+test-transfer-chain: $(BUILD_DIR)/test-transfer-chain
+	$(BUILD_DIR)/test-transfer-chain
+
+TRANSFER_CHAIN_SOURCES := src/stn_chain.c src/stn_transaction.c src/stn_block.c src/stn_pow.c src/stn_economy.c src/stn_record.c src/stn_lifecycle.c src/stn_authority.c src/stn_contract.c src/stn_contract_lineage.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_snapshot.c src/stn_contract_transaction.c src/stn_share.c src/stn_share_replay.c src/stn_compensation.c src/stn_compensation_state.c src/stn_issuance.c src/stn_issuance_binding.c src/stn_economic_state.c src/stn_transfer.c src/stn_transfer_envelope.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope_acceptance.c src/stn_wallet.c src/stn_address.c src/stn_replay.c src/stn_identity.c src/stn_sentinel_intelligence.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c
+
+$(BUILD_DIR)/test-transfer-chain: tests/test_transfer_chain.c $(TRANSFER_CHAIN_SOURCES) includes/stn_chain.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_CHAIN_TEST_MAIN tests/test_transfer_chain.c $(TRANSFER_CHAIN_SOURCES) -o $@ $(LDLIBS)
