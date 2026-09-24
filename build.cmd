@@ -768,7 +768,7 @@ cl %CFLAGS% %INCLUDES% /DSTN_TRANSFER_TRANSACTION_TEST_MAIN ^
     src\stn_block.c ^
     src\stn_economy.c ^
     src\stn_pow.c ^
-    src\stn_chain.c ^
+    tests\stn_pow_block_id_stub.c ^
     src\stn_contract.c ^
     src\stn_contract_lineage.c ^
     src\stn_contract_state.c ^
