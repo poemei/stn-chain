@@ -232,6 +232,36 @@ stn_pending_result stn_pending_admit_transaction(stn_pending *p,const uint8_t *b
         }
         return STN_PENDING_INVALID;
     }
+    if(tx.type==STN_TX_SHARE_EVIDENCE){
+        stn_share_evidence share;
+        stn_share_replay_result replay;
+        if(p==NULL || active==NULL || hash==NULL || active->state.shares==NULL){
+            report->acceptance=STN_ACCEPTANCE_UNRESOLVED;
+            return STN_PENDING_UNAVAILABLE;
+        }
+        if(stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK){
+            report->structure=STN_STAGE_REJECT;
+            report->acceptance=STN_ACCEPTANCE_REJECTED;
+            return STN_PENDING_INVALID;
+        }
+        replay=stn_share_replay_check(active->state.shares,&share);
+        if(replay==STN_SHARE_REPLAY_DUPLICATE){
+            report->acceptance=STN_ACCEPTANCE_REJECTED;
+            return STN_PENDING_REPLAY;
+        }
+        if(replay!=STN_SHARE_REPLAY_FRESH){
+            report->acceptance=STN_ACCEPTANCE_ERROR;
+            return replay==STN_SHARE_REPLAY_CAPACITY ?
+                STN_PENDING_CAPACITY : STN_PENDING_PROVIDER;
+        }
+        lifecycle_result=stn_pending_insert(p,bytes,length,hash,id);
+        if(lifecycle_result==STN_PENDING_ACCEPTED){
+            report->acceptance=STN_ACCEPTANCE_UNDER_CONTEXT;
+            return lifecycle_result;
+        }
+        report->acceptance=STN_ACCEPTANCE_REJECTED;
+        return lifecycle_result;
+    }
     if(tx.type!=STN_TX_PUBLICATION){
         if(c==NULL || active==NULL || memcmp(c->expected_network,active->state.network_id,32)!=0){report->acceptance=STN_ACCEPTANCE_UNRESOLVED;return STN_PENDING_UNAVAILABLE;}
         lifecycle_result=stn_pending_insert(p,bytes,length,hash,id);
