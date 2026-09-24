@@ -34,18 +34,16 @@ static stn_fork_report history(const stn_chain_context *c,const stn_block_span *
         r.validation.detail=STN_DATA_LENGTH;
         return failure(r,side,STN_DATA_LENGTH);
     }
-    status=stn_chain_initialize(c,state);
-    if(status!=STN_DATA_OK) {
-        r.validation.detail=status; r.validation.reason=STN_CHAIN_CONTEXT;
-        return failure(r,0,status);
-    }
-    for(i=0;i<count;++i) {
-        r.validation=stn_chain_validate_candidate(c,state,blocks[i].bytes,blocks[i].length,state);
-        if(r.validation.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT) {
-            r.validation.failing_index=i;
-            return failure(r,side,r.validation.detail);
-        }
-
+    /*
+     * Fork choice must derive every consensus-visible state from the complete
+     * accepted history. This includes Phase 19 balances and transfer replay;
+     * no cached economic state from either peer is authoritative.
+     */
+    r.validation=stn_chain_reconstruct_history(c,blocks,count,state);
+    if(r.validation.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT) {
+        i=r.validation.failing_index;
+        (void)i;
+        return failure(r,side,r.validation.detail);
     }
     r.result=STN_FORK_TIE;
     return r;
