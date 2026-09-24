@@ -5,6 +5,25 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 20 production qualification completed - 2026-09-24
+
+- Completed the bounded Phase 20 Windows x64/Linux x64 production-qualification
+  scope.
+- Final matching cross-platform results: `test-chain` **1,243 checks, 0
+  failures**; `test-contract-snapshot` **337 checks, 0 failures**; and
+  `test-peer` **2,867 checks, 0 failures** on both Windows x64 and Linux x64.
+- Corrected the Windows qualification runner to require an exact zero executable
+  exit status, closing the false-success path for exception exits.
+- Corrected Linux snapshot build dependencies and ported the existing peer
+  qualification harness to the existing Linux peer/storage backends.
+- Linux production build, installation and deployed-service restart also passed
+  during Phase 20.
+- These qualification corrections changed build/test harnesses only; no
+  production consensus, protocol, serialization, economic, mining or P2P
+  behavior was changed.
+- Phase 20 is COMPLETE for the bounded Windows x64/Linux x64 scope. ARM and
+  other architectures are not included in this qualification claim.
+
 ### Phase 20 production qualification opened - 2026-09-24
 
 - Phase 19 is closed and Phase 20 Production Qualification is ACTIVE. Phase 20
