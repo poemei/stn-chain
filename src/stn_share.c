@@ -39,7 +39,9 @@ stn_data_status stn_share_encode(
     if(share->miner.type!=STN_ADDRESS_IDENTITY){return STN_DATA_TYPE;}
     if(stn_block_header_decode(share->template_header,
         STN_SHARE_TEMPLATE_HEADER_SIZE,&header)!=STN_DATA_OK ||
-       header.version!=STN_POW_BLOCK_VERSION){
+       header.version!=STN_POW_BLOCK_VERSION ||
+       memcmp(header.transaction_commitment,share->body_commitment,
+           STN_SHARE_BODY_COMMITMENT_SIZE)!=0){
         return STN_DATA_CONTENT;
     }
 
