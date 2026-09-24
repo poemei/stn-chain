@@ -1,7 +1,11 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_chain.h"
+#include "stn_transfer_envelope_authorization.h"
+#include "stn_wallet.h"
 #include <stdio.h>
 #include <string.h>
+
+int stn_ed25519_sign(const uint8_t *message,size_t message_length,const uint8_t public_key[32],const uint8_t private_key[32],uint8_t signature[64]);
 
 static unsigned checks, failures;
 #define CHECK(expr) do { ++checks; if (!(expr)) { ++failures; \
@@ -235,12 +239,48 @@ static void batch(void)
     stn_chain_state_release(&empty);stn_chain_state_release(&s);stn_chain_state_release(&out);
 }
 
+
+static void transfer_integration(void)
+{
+    static const uint8_t sk[32]={0x9d,0x61,0xb1,0x9d,0xef,0xfd,0x5a,0x60,0xba,0x84,0x4a,0xf4,0x92,0xec,0x2c,0xc4,0x44,0x49,0xc5,0x69,0x7b,0x32,0x69,0x19,0x70,0x3b,0xac,0x03,0x1c,0xae,0x7f,0x60};
+    static const uint8_t pk[32]={0xd7,0x5a,0x98,0x01,0x82,0xb1,0x0a,0xb7,0xd5,0x4b,0xfe,0xd3,0xc9,0x64,0x07,0x3a,0x0e,0xe1,0x72,0xf3,0xda,0xa6,0x23,0x25,0xaf,0x02,0x1a,0x68,0xf7,0x07,0x51,0x1a};
+    hash_control h={STN_DATA_OK,0};stn_chain_context c=context(&h);stn_chain_state empty={0},funded={0},accepted={0},rejected={0};
+    stn_chain_report r;stn_transfer_envelope e={0};stn_address identity={0};uint8_t statement[STN_TRANSFER_ENVELOPE_AUTHORIZATION_STATEMENT_SIZE];
+    uint8_t envelope[STN_TX_TRANSFER_SIZE],txwire[STN_TX_HEADER_SIZE+STN_TX_TRANSFER_SIZE],block[168u+4u+STN_TX_HEADER_SIZE+STN_TX_TRANSFER_SIZE];
+    stn_transaction tx={0};size_t tx_written=0;uint64_t units=0;uint32_t tx_length=(uint32_t)sizeof(txwire);size_t i;
+    CHECK(stn_chain_initialize(&c,&empty)==STN_DATA_OK);
+    r=stn_chain_validate_candidate(&c,&empty,genesis,sizeof(genesis),&funded);CHECK(r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    identity.type=STN_ADDRESS_IDENTITY;memcpy(identity.identifier,pk,32u);memcpy(e.controller,pk,32u);e.nonce[31]=1u;
+    CHECK(stn_wallet_derive(&identity,&e.transfer.source)==STN_DATA_OK);e.transfer.destination.type=STN_ADDRESS_WALLET;memset(e.transfer.destination.identifier,0x55,32u);e.transfer.units=25u;
+    CHECK(stn_chain_test_seed_balance(&funded,&e.transfer.source,100u)==STN_DATA_OK);
+    CHECK(stn_transfer_envelope_authorization_statement(&e,statement)==STN_DATA_OK);
+    CHECK(stn_ed25519_sign(statement,sizeof(statement),pk,sk,e.signature)==0);
+    CHECK(stn_transfer_envelope_encode(&e,envelope)==STN_DATA_OK);
+    tx.version=1u;tx.type=STN_TX_TRANSFER;tx.record_bytes=envelope;tx.record_length=sizeof(envelope);
+    CHECK(stn_transaction_encode(&tx,txwire,sizeof(txwire),&tx_written)==STN_DATA_OK && tx_written==sizeof(txwire));
+    memset(block,0,sizeof(block));memcpy(block,genesis,168u);memcpy(block+40u,funded.tip_id,32u);number(block+72u,funded.height+1u);number(block+80u,funded.timestamp);
+    block[163]=1u;block[166]=(uint8_t)((4u+tx_length)>>8);block[167]=(uint8_t)(4u+tx_length);block[168]=(uint8_t)(tx_length>>24);block[169]=(uint8_t)(tx_length>>16);block[170]=(uint8_t)(tx_length>>8);block[171]=(uint8_t)tx_length;memcpy(block+172u,txwire,sizeof(txwire));
+    r=stn_chain_validate_candidate(&c,&funded,block,sizeof(block),&accepted);CHECK(r.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    CHECK(stn_economic_state_balance(accepted.economy,&e.transfer.source,&units)==STN_DATA_OK && units==75u);
+    CHECK(stn_economic_state_balance(accepted.economy,&e.transfer.destination,&units)==STN_DATA_OK && units==25u);
+    CHECK(accepted.economy->total_supply==100u);
+    memcpy(block+40u,accepted.tip_id,32u);number(block+72u,accepted.height+1u);number(block+80u,accepted.timestamp);
+    r=stn_chain_validate_candidate(&c,&accepted,block,sizeof(block),&rejected);CHECK(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT && r.detail==STN_DATA_DUPLICATE);
+    for(i=0;i<32u;++i)CHECK(funded.economy->balances[0].wallet_id[i]==e.transfer.source.identifier[i]);
+    CHECK(funded.economy->balances[0].units==100u && funded.economy->total_supply==100u);
+    stn_chain_state_release(&empty);stn_chain_state_release(&funded);stn_chain_state_release(&accepted);stn_chain_state_release(&rejected);
+}
+
 int test_chain(void);
 int test_chain(void)
 {
     size_t live=stn_chain_test_live_snapshots();
-    valid_and_atomic(); failures_and_time(); providers_and_inputs(); batch();
+    valid_and_atomic(); failures_and_time(); providers_and_inputs(); batch(); transfer_integration();
     CHECK(stn_chain_test_live_snapshots()==live);
     printf("Chain context: %u checks, %u failures (test hashing, no consensus).\n",checks,failures);
     return failures==0 ? 0 : 1;
 }
+
+#ifdef STN_CHAIN_TEST_MAIN
+int main(void){return test_chain();}
+#endif
