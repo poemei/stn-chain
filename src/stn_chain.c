@@ -2,6 +2,7 @@
 #include "stn_chain.h"
 #include "stn_wire_internal.h"
 #include "stn_share.h"
+#include "stn_issuance.h"
 #include <string.h>
 #include <stdlib.h>
 #include "stn_sha256.h"
@@ -580,6 +581,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
         if(tx.type==STN_TX_CONTRACT_ACTION){has_contracts=1;}
         else if(tx.type==STN_TX_SHARE_EVIDENCE){has_shares=1;}
         else if(tx.type==STN_TX_COMPENSATION_DESTINATION){has_compensation=1;}
+        else if(tx.type==STN_TX_ISSUANCE){has_lifecycle=1;}
         else if(tx.type!=STN_TX_PUBLICATION){has_lifecycle=1;}
         else {
             if (memcmp(record.network_id,context->network_id,32)!=0) {
@@ -656,6 +658,12 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
                 failure=STN_DATA_CONTENT;break;
             }
             offset+=n;
+            if(tx.type==STN_TX_ISSUANCE){
+                /* Issuance is structurally canonical but is not consensus-active
+                 * until its evidence binding is validated below. */
+                failure=STN_DATA_UNRESOLVED;
+                break;
+            }
             if(tx.type==STN_TX_COMPENSATION_DESTINATION){
                 stn_compensation_destination destination;
                 if(stn_compensation_destination_decode(tx.record_bytes,tx.record_length,&destination)!=STN_DATA_OK){failure=STN_DATA_CONTENT;break;}
