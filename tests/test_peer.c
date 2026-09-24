@@ -10,6 +10,9 @@
 #else
 #include "stn_linux_peer.h"
 #include "stn_linux_storage.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -442,7 +445,7 @@ static void localhost(stn_chain_context *c)
     CHECK(stn_windows_peer_accept(&args.listener,10,&connection,&t)==STN_PEER_TIMEOUT);
     stn_windows_peer_close(&args.listener);
     CHECK(stn_windows_peer_connect("127.0.0.1",port,100,&connection,&t)!=STN_PEER_OK);
-    CHECK(DeleteFileW(path));CHECK(DeleteFileW(disk.lock_path));CHECK(RemoveDirectoryW(directory));
+    CHECK(DeleteFileW(path));CHECK(unlink(disk.lock_path)==0);CHECK(RemoveDirectoryW(directory));
     stn_storage_view_release(&loaded);stn_peer_report_release(&r);stn_chain_state_release(&active);
 }
 typedef struct partial_args {stn_windows_peer listener;HANDLE entered;stn_peer_status status;uint8_t bytes[4];} partial_args;
@@ -626,7 +629,7 @@ static void convergence(void)
             CHECK(convergence_rpc(&mining,STN_RPC_SUBMIT_WORK,stale,n,out,&w)==STN_RPC_STALE && w==0);
             CHECK(convergence_rpc(&mining,STN_RPC_MINING_TEMPLATE,NULL,0,fresh,&w)==STN_RPC_OK && memcmp(fresh+188,target[0],32)==0 && memcmp(fresh+32,stale+32,32)!=0);
         }
-        for(j=0;j<2;++j){CHECK(DeleteFileW(paths[j]));CHECK(DeleteFileW(disks[j].lock_path));}CHECK(RemoveDirectoryW(directory));
+        for(j=0;j<2;++j){CHECK(DeleteFileW(paths[j]));CHECK(unlink(disks[j].lock_path)==0);}CHECK(RemoveDirectoryW(directory));
     }
     printf("Difficulty network convergence: %u targeted checks (real sockets/NTFS; high-work hash fixture separately).\n",checks-initial_checks);
     stn_chain_state_release(&states[0]);stn_chain_state_release(&states[1]);stn_chain_state_release(&mining.active);stn_peer_report_release(&report);stn_reorg_plan_release(&plan);
