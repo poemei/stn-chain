@@ -29,10 +29,13 @@ typedef struct stn_mining_service {
     int owns_buffers; /* Opt in only for malloc/realloc-owned scratch. */
 } stn_mining_service;
 #define STN_MINING_PREFIX 68u
+#define STN_MINING_IDENTITY_SIZE STN_RPC_MINER_IDENTITY_SIZE
+#define STN_MINING_SUBMISSION_PREFIX STN_RPC_MINING_SUBMISSION_PREFIX
 #define STN_MINING_NONCE_OFFSET 152u
 #define STN_MINING_NONCE_SIZE 8u
-/* Same 68-byte prefix + block for template response and solved request.
- * Only block bytes 152..159 may change: unsigned big-endian nonce. */
+/* Template response remains 68-byte prefix + block. Solved submission is
+ * parent[32] + work ID[32] + block length[4] + canonical stn0_ identity[69]
+ * + block. Only block bytes 152..159 may change: unsigned big-endian nonce. */
 stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *request,
     uint8_t *payload,size_t capacity,size_t *written);
 #endif
