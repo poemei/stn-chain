@@ -37,6 +37,21 @@ can leave the existing state directory/history inaccessible after a reboot or
 service reinstall. systemd creates the state directory. Logs are available with
 `journalctl -u stn-chain`.
 
+For a deployed peer, persist its outbound peer argument in `/etc/default/stn-chain`.
+The service reads this optional file at startup; the same service template is used
+for standalone and peered nodes.
+
+```sh
+sudo sh -c 'printf "%s\\n" "STN_CHAIN_ARGS=--peer chain01.stn-labz.org:18474" > /etc/default/stn-chain'
+sudo systemctl daemon-reload
+sudo systemctl restart stn-chain
+sudo systemctl status stn-chain
+```
+
+The peer still exposes its own STNP listener on port 18474 by default, while the
+configured `--peer` supplies the upstream synchronization candidate. DNS or
+literal IPv4 `host:port` forms are accepted.
+
 The executable path follows Makefile BINDIR (default `/usr/local/bin`). Service
 state uses the fixed path above independently of Makefile DATADIR; use a systemd
 override to select another history or explicit genesis. Stop any old node first.
