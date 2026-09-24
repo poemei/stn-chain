@@ -180,6 +180,83 @@ static void share_restart_replay(stn_chain_context *c)
     stn_storage_view_release(&view);
 }
 
+
+static void share_reorg_replay(stn_chain_context *c)
+{
+    static const uint8_t work_domain[]="STN-CHAIN:WORK:ID:1";
+    stn_share_evidence detached={0};
+    stn_transaction tx={0};
+    stn_chain_state detached_state={0},replacement_state={0};
+    stn_block_span detached_history[3],replacement_history[3];
+    uint8_t canonical[STN_SHARE_CANONICAL_SIZE];
+    uint8_t transaction[STN_TX_HEADER_SIZE+STN_SHARE_CANONICAL_SIZE];
+    uint8_t share_block[STN_BLOCK_HEADER_SIZE+4u+STN_TX_HEADER_SIZE+STN_SHARE_CANONICAL_SIZE];
+    size_t transaction_length=0u;
+    size_t body_length=4u+STN_TX_HEADER_SIZE+STN_SHARE_CANONICAL_SIZE;
+
+    memcpy(detached.template_header,a[1],STN_SHARE_TEMPLATE_HEADER_SIZE);
+    detached.miner.type=STN_ADDRESS_IDENTITY;
+    memset(detached.miner.identifier,0x6b,sizeof(detached.miner.identifier));
+    detached.nonce=2u;
+    memcpy(detached.body_commitment,detached.template_header+88u,32u);
+    CHECK(c->hash_provider.hash(c->hash_provider.user,
+        work_domain,sizeof(work_domain),
+        detached.template_header,STN_SHARE_TEMPLATE_HEADER_SIZE,
+        detached.work_id)==STN_DATA_OK);
+    CHECK(stn_share_verify_evidence(&detached,&c->hash_provider,canonical)==STN_DATA_OK);
+    CHECK(stn_share_encode(&detached,canonical)==STN_DATA_OK);
+
+    tx.version=1u;
+    tx.type=STN_TX_SHARE_EVIDENCE;
+    tx.record_bytes=canonical;
+    tx.record_length=STN_SHARE_CANONICAL_SIZE;
+    CHECK(stn_transaction_encode(&tx,transaction,sizeof(transaction),
+        &transaction_length)==STN_DATA_OK);
+
+    memcpy(share_block,a[2],STN_BLOCK_HEADER_SIZE);
+    share_block[162]=0u;share_block[163]=1u;
+    share_block[164]=(uint8_t)(body_length>>24);
+    share_block[165]=(uint8_t)(body_length>>16);
+    share_block[166]=(uint8_t)(body_length>>8);
+    share_block[167]=(uint8_t)body_length;
+    share_block[168]=(uint8_t)(transaction_length>>24);
+    share_block[169]=(uint8_t)(transaction_length>>16);
+    share_block[170]=(uint8_t)(transaction_length>>8);
+    share_block[171]=(uint8_t)transaction_length;
+    memcpy(share_block+172u,transaction,transaction_length);
+    CHECK(stn_block_body_commitment(share_block+168u,body_length,1u,
+        &c->hash_provider,share_block+88u)==STN_DATA_OK);
+
+    detached_history[0]=as[0];
+    detached_history[1]=as[1];
+    detached_history[2].bytes=share_block;
+    detached_history[2].length=sizeof(share_block);
+    CHECK(stn_chain_reconstruct_history(c,detached_history,3u,
+        &detached_state).acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    CHECK(detached_state.shares!=NULL);
+    CHECK(stn_share_replay_check(detached_state.shares,
+        &detached)==STN_SHARE_REPLAY_DUPLICATE);
+
+    /*
+     * Reconstruct an alternate accepted branch from the common genesis.
+     * Replay state must be derived only from that branch; evidence consumed
+     * exclusively by the detached branch cannot survive the reorg.
+     */
+    branch(b,bs,1u);
+    replacement_history[0]=bs[0];
+    replacement_history[1]=bs[1];
+    replacement_history[2]=bs[2];
+    CHECK(stn_chain_reconstruct_history(c,replacement_history,3u,
+        &replacement_state).acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    CHECK(replacement_state.shares!=NULL);
+    CHECK(replacement_state.shares->consumed_count==0u);
+    CHECK(stn_share_replay_check(replacement_state.shares,
+        &detached)==STN_SHARE_REPLAY_FRESH);
+
+    stn_chain_state_release(&detached_state);
+    stn_chain_state_release(&replacement_state);
+}
+
 typedef struct memory_store { uint8_t data[CAP],stage[CAP];size_t n;int exists,locked,failure; } memory_store;
 static memory_store mem;
 static stn_storage_status acquire(void *u){memory_store *m=u;if(m->failure==1 || m->locked){return STN_STORAGE_BUSY;}m->locked=1;return STN_STORAGE_OK;}
@@ -318,7 +395,7 @@ int test_storage(void)
     stn_chain_context c={0};stn_pow_policy policy;
     branch(a,as,99);branch(b,bs,1);memcpy(policy.fixed_target,a[0]+120,32);
     c.network_id[0]=1;c.genesis_bytes=a[0];c.genesis_length=364;c.pow_policy=&policy;c.hash_provider.hash=test_hash;
-    codecs(&c);share_restart_replay(&c);application(&c);windows_disk(&c);publication_activation_boundary();
+    codecs(&c);share_restart_replay(&c);share_reorg_replay(&c);application(&c);windows_disk(&c);publication_activation_boundary();
     CHECK(stn_chain_test_live_snapshots()==ownership_baseline);
     printf("Persistence/application: %u checks, %u failures.\n",checks,failures);
     return failures==0 ? 0 : 1;
