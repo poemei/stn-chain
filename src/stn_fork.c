@@ -26,8 +26,6 @@ static stn_fork_report history(const stn_chain_context *c,const stn_block_span *
     size_t count,int side,stn_chain_state *state)
 {
     stn_fork_report r={0};
-    stn_data_status status;
-    size_t i;
     r.validation.failing_index=SIZE_MAX;
     if(blocks==NULL || count==0) {
         r.validation.reason=STN_CHAIN_BATCH_LIMIT;
@@ -41,8 +39,6 @@ static stn_fork_report history(const stn_chain_context *c,const stn_block_span *
      */
     r.validation=stn_chain_reconstruct_history(c,blocks,count,state);
     if(r.validation.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT) {
-        i=r.validation.failing_index;
-        (void)i;
         return failure(r,side,r.validation.detail);
     }
     r.result=STN_FORK_TIE;
