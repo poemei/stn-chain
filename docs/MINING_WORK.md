@@ -731,6 +731,54 @@ Chain decides.
 
 ---
 
+# Phase 19 Historical Share Evidence
+
+Qualifying-share evidence submitted through the Phase 19 STNC path is retained
+in a self-contained canonical Share Evidence v2 record.
+
+The accepted canonical record is:
+
+```text
+version[1]
+work_id[32]
+mining identity identifier[32]
+nonce[8] big-endian
+canonical zero-nonce mining header[168]
+committed candidate-body digest[32]
+```
+
+Total:
+
+```text
+273 bytes
+```
+
+The Work ID remains derived from the exact 168-byte zero-nonce mining header.
+The retained body digest MUST equal the transaction commitment in that header.
+
+Chain can therefore independently reproduce the historical work context,
+derive the Share Target from the historical Chain target, insert the submitted
+nonce, reproduce the Proof-of-Work hash, and verify that the proof satisfies
+the Share Target without trusting transient Stratum state.
+
+Historical share verification applies to accepted-history reconstruction,
+including restart, synchronization, and reorganization paths. Replay identity
+uses the full Work ID + mining identity identifier + nonce.
+
+The Share Evidence v2 primitive is qualified on Windows x64 and Linux x64 as of
+September 24, 2026:
+
+```text
+Windows x64: 75 checks, 0 failures
+Linux x64:   75 checks, 0 failures
+```
+
+This qualification does not activate STNC issuance. Economic activation still
+requires the remaining accepted-history/economic-state qualification defined
+by the Phase 19 economy work.
+
+---
+
 # Shares and Chain Acceptance
 
 Miner-facing shares and Chain blocks are different concepts.
@@ -1128,6 +1176,7 @@ Mining-related work still outside the Chain consensus implementation may include
 - miner performance work;
 - pool share accounting;
 - payout accounting;
+- remaining Phase 19 accepted-history/economic-state qualification;
 - issuance and rewards;
 - treasury behavior;
 - wallet integration;
