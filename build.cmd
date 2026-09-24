@@ -792,6 +792,20 @@ exit /b 0
 
 
 
+:test_economic_persistence
+set "TEST_TARGET=%BUILD_DIR%\\test-economic-persistence.exe"
+echo.
+echo STN Chain Phase 19 economic persistence qualification test
+cl %CFLAGS% %INCLUDES% /DSTN_ECONOMIC_PERSISTENCE_TEST_MAIN ^
+    tests\\test_economic_persistence.c src\\stn_economic_persistence.c src\\stn_economic_state.c src\\stn_transfer.c ^
+    /Fo"%OBJ_DIR%\\\\" /Fe"%TEST_TARGET%" /link /INCREMENTAL:NO
+if errorlevel 1 goto fail
+"%TEST_TARGET%"
+if errorlevel 1 goto test_fail
+echo.
+echo ECONOMIC PERSISTENCE TEST SUCCESSFUL
+exit /b 0
+
 :test_chain
 set "TEST_TARGET=%BUILD_DIR%\\test-chain.exe"
 echo.
