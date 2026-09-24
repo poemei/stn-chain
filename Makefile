@@ -65,6 +65,7 @@ CORE_SOURCES := \
 	src/stn_transfer_envelope.c \
 	src/stn_transfer_envelope_replay.c \
 	src/stn_transfer_envelope_authorization.c \
+	src/stn_transfer_envelope_acceptance.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -386,3 +387,15 @@ test-transfer-envelope-authorization: $(BUILD_DIR)/test-transfer-envelope-author
 $(BUILD_DIR)/test-transfer-envelope-authorization: tests/test_transfer_envelope_authorization.c src/stn_transfer_envelope_authorization.c src/stn_transfer.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_transfer_envelope_authorization.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_AUTHORIZATION_TEST_MAIN tests/test_transfer_envelope_authorization.c src/stn_transfer_envelope_authorization.c src/stn_transfer.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+
+
+# Phase 19 nonce-aware authorized transfer acceptance qualification.
+.PHONY: test-transfer-envelope-acceptance
+test-transfer-envelope-acceptance: $(BUILD_DIR)/test-transfer-envelope-acceptance
+	$(BUILD_DIR)/test-transfer-envelope-acceptance
+
+TRANSFER_ENVELOPE_ACCEPTANCE_SOURCES := src/stn_transfer_envelope_acceptance.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_replay.c src/stn_transfer.c src/stn_economic_state.c src/stn_wallet.c src/stn_address.c src/stn_replay.c src/stn_record.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c
+
+$(BUILD_DIR)/test-transfer-envelope-acceptance: tests/test_transfer_envelope_acceptance.c $(TRANSFER_ENVELOPE_ACCEPTANCE_SOURCES) includes/stn_transfer_envelope_acceptance.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_ACCEPTANCE_TEST_MAIN tests/test_transfer_envelope_acceptance.c $(TRANSFER_ENVELOPE_ACCEPTANCE_SOURCES) -o $@ $(LDLIBS)
