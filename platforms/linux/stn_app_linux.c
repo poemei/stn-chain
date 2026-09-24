@@ -5,9 +5,11 @@
 #include "stn_mining.h"
 #include "stn_sha256.h"
 #include "../../src/stn_wire_internal.h"
+#include "stn_report.h"
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -29,6 +31,47 @@
 #define APP_RPC_IO_TIMEOUT_MS 60000u
 
 static volatile sig_atomic_t stopping;
+
+static pthread_mutex_t report_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void report_event(stn_report_event event, const char *format, ...)
+{
+    char message[512];
+    char line[640];
+    char timestamp[32];
+    time_t now;
+    struct tm utc;
+    FILE *log;
+    va_list args;
+
+    va_start(args, format);
+    (void)vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
+
+    if(!stn_report_format(event, message, line, sizeof(line))) {
+        return;
+    }
+
+    pthread_mutex_lock(&report_lock);
+
+    puts(line);
+    fflush(stdout);
+
+    log = fopen("/var/log/stn-chain/stn-chain.log", "a");
+    if(log != NULL) {
+        now = time(NULL);
+        if(now != (time_t)-1 && gmtime_r(&now, &utc) != NULL &&
+           strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", &utc) != 0) {
+            fprintf(log, "%s %s\n", timestamp, line);
+        } else {
+            fprintf(log, "%s\n", line);
+        }
+        (void)fclose(log);
+    }
+
+    pthread_mutex_unlock(&report_lock);
+}
+
 
 static uint64_t monotonic_ms(void)
 {
@@ -539,19 +582,39 @@ static void *outbound_thread(void *user)
             break;
         }
 
-        pthread_mutex_lock(runtime->lock);
+        {
+            int was_connected = runtime->manager.connected;
+            uint64_t before_height = runtime->mining->active.height;
+            stn_peer_status peer_status;
 
-        runtime->socket.operation_deadline_ms = now + 5000u;
+            pthread_mutex_lock(runtime->lock);
 
-        (void)stn_peer_outbound_step(
-            &runtime->manager,
-            now,
-            runtime->mining->chain,
-            runtime->mining->storage,
-            &runtime->workspace,
-            &runtime->mining->active);
+            runtime->socket.operation_deadline_ms = now + 5000u;
 
-        pthread_mutex_unlock(runtime->lock);
+            peer_status = stn_peer_outbound_step(
+                &runtime->manager,
+                now,
+                runtime->mining->chain,
+                runtime->mining->storage,
+                &runtime->workspace,
+                &runtime->mining->active);
+
+            if(!was_connected && runtime->manager.connected) {
+                report_event(STN_REPORT_PEER, "Connected");
+            } else if(was_connected && !runtime->manager.connected) {
+                report_event(STN_REPORT_PEER, "Disconnected status=%d", (int)peer_status);
+            }
+
+            if(runtime->mining->active.height != before_height) {
+                report_event(
+                    STN_REPORT_SYNC,
+                    "Accepted height %llu -> %llu",
+                    (unsigned long long)before_height,
+                    (unsigned long long)runtime->mining->active.height);
+            }
+
+            pthread_mutex_unlock(runtime->lock);
+        }
 
         sleep_ms(100);
     }
@@ -1110,8 +1173,9 @@ int stn_linux_app(int argc, char **argv)
 
     lock_ready = 1;
 
-    printf(
-        "STN Chain node; RPC 0.0.0.0:%u; height %llu\n",
+    report_event(
+        STN_REPORT_START,
+        "RPC 0.0.0.0:%u height=%llu",
         (unsigned)bound,
         (unsigned long long)mining.active.height);
 
@@ -1279,6 +1343,10 @@ int stn_linux_app(int argc, char **argv)
 
 shutdown:
     stopping = 1;
+    report_event(
+        STN_REPORT_STOP,
+        "height=%llu",
+        (unsigned long long)mining.active.height);
 
     /*
      * Close listener before joining workers so no new RPC sessions may enter
