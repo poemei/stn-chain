@@ -432,3 +432,13 @@ test-economic-persistence: $(BUILD_DIR)/test-economic-persistence
 $(BUILD_DIR)/test-economic-persistence: tests/test_economic_persistence.c src/stn_economic_persistence.c src/stn_economic_state.c src/stn_transfer.c
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_ECONOMIC_PERSISTENCE_TEST_MAIN tests/test_economic_persistence.c src/stn_economic_persistence.c src/stn_economic_state.c src/stn_transfer.c -o $@ $(LDLIBS)
+
+
+# Existing P2P synchronization/recovery qualification, including Phase 19 history reconstruction.
+.PHONY: test-peer
+test-peer: $(BUILD_DIR)/test-peer
+	$(BUILD_DIR)/test-peer
+
+$(BUILD_DIR)/test-peer: tests/test_peer.c $(filter-out src/main.c platforms/linux/stn_app_linux.c,$(SOURCES))
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(PLATFORM_CFLAGS) -DSTN_LIFECYCLE_TEST -DSTN_PEER_TEST_MAIN tests/test_peer.c $(filter-out src/main.c platforms/linux/stn_app_linux.c,$(SOURCES)) -o $@ $(LDLIBS)
