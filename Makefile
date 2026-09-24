@@ -422,3 +422,13 @@ CHAIN_TEST_SOURCES := src/stn_chain.c src/stn_transaction.c src/stn_block.c src/
 $(BUILD_DIR)/test-chain: tests/test_chain.c $(CHAIN_TEST_SOURCES) includes/stn_chain.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_LIFECYCLE_TEST -DSTN_CHAIN_TEST_MAIN tests/test_chain.c $(CHAIN_TEST_SOURCES) -o $@ $(LDLIBS)
+
+
+# Phase 19 deterministic economic persistence qualification.
+.PHONY: test-economic-persistence
+test-economic-persistence: $(BUILD_DIR)/test-economic-persistence
+	$(BUILD_DIR)/test-economic-persistence
+
+$(BUILD_DIR)/test-economic-persistence: tests/test_economic_persistence.c src/stn_economic_persistence.c src/stn_economic_state.c src/stn_transfer.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_ECONOMIC_PERSISTENCE_TEST_MAIN tests/test_economic_persistence.c src/stn_economic_persistence.c src/stn_economic_state.c src/stn_transfer.c -o $@ $(LDLIBS)
