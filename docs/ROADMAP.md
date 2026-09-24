@@ -1034,20 +1034,114 @@ Economic behavior remains outside Phase 18.
 
 ## Phase 19 --- Economics / Issuance / Rewards --- ACTIVE
 
-Phase 19 is now the active Chain development phase.
+Phase 19 is the active Chain development phase.
 
-The first Phase 19 boundary is protocol definition before implementation.
-Native economics must be specified deterministically before consensus-visible C
-code is added. The phase will define the native unit and exact rules for
-issuance/supply behavior, accepted balances or ownership representation,
-transfers, mining/miner compensation, Stratum payout interaction where
-applicable, and the evidence/state transitions by which economic results become
-accepted Chain state.
+The native economic model is now defined:
 
-No Bitcoin-, Ethereum- or other external economic rule is inherited implicitly.
-No gas model is authorized. No issuance schedule, supply ceiling, reward amount,
-transfer format, balance model or payout rule is established merely by Phase 19
-becoming ACTIVE; each requires an explicit protocol decision and qualification.
+    Native unit: STNC
+    Smallest consensus unit: 0.01 STNC
+    Qualifying share reward: 1 unit
+    Accepted block reward: 100 units
+    Block-solving share total: 101 units
+    SHARE_FACTOR: 10
+    Share Target: min(MAX_TARGET, Chain Target x 10)
+    Consensus accounting: integer only
+    HASH_PROGRESS: telemetry only
+    Gas: none
+    Initial transfer fee: none
+
+Mining identity (`stn0_`) and wallet identity (`stnw0_`) remain distinct.
+Chain, not Stratum, owns accepted issuance, replay state, balances and total
+supply.
+
+### Current Phase 19 qualification boundary
+
+The following deterministic foundations are implemented:
+
+- Share Target derivation with bounded 256-bit integer arithmetic.
+- Identity-bound mining submission from Stratum to Chain.
+- Canonical Share Evidence v2 and deterministic Share ID.
+- Independent Chain qualifying-share Proof-of-Work verification.
+- STNC `SUBMIT_SHARE = 0x2004`.
+- Deterministic accepted-share replay identity.
+- Share evidence integration with canonical transaction and pending paths.
+- Accepted Chain state ownership for share replay state.
+- Self-contained historical share proof evidence.
+
+Canonical Share Evidence v2 is exactly:
+
+    version[1]
+    work_id[32]
+    mining identity identifier[32]
+    nonce[8] big-endian
+    canonical zero-nonce mining header[168]
+    committed candidate-body digest[32]
+
+Total:
+
+    273 bytes
+
+The retained body digest must equal the mining header transaction commitment.
+The Work ID remains derived from the exact 168-byte zero-nonce mining header.
+
+A compliant Chain node can use this evidence to independently reproduce and
+validate the historical qualifying proof rather than trusting a prior Stratum
+classification.
+
+Qualification recorded to date:
+
+    Share Target / economy primitive
+        Windows x64: qualified
+        Linux x64: qualified
+
+    Share Evidence v2 / independent proof verification
+        Windows x64: 75 checks, 0 failures
+        Linux x64:   75 checks, 0 failures
+
+    Accepted-share replay primitive
+        Windows x64: 26 checks, 0 failures
+        Linux x64:   26 checks, 0 failures
+
+    Stratum Phase 19 submission path
+        Windows x64: build qualified
+        Linux x64:   build qualified
+
+ARM remains unqualified.
+
+### Next Phase 19 work
+
+Development proceeds in bounded consensus increments:
+
+1. Qualify accepted-history share validation against the real Chain candidate
+   path.
+2. Qualify restart reconstruction of historical share verification and replay
+   state.
+3. Qualify synchronization and reorganization so economic share/replay state is
+   derived only from the selected accepted branch.
+4. Resolve the current-work/candidate interaction so multiple qualifying shares
+   for one assigned Work ID can be accepted without the first pending share
+   invalidating otherwise valid shares from the same work interval.
+5. Define and qualify the deterministic `stn0_` mining-identity to `stnw0_`
+   compensation relationship.
+6. Add canonical mining reward/issuance records:
+   1 unit per accepted qualifying share and 100 additional units for an accepted
+   block solution.
+7. Add integer wallet balances and total accepted supply reconstructed from
+   accepted Chain history.
+8. Add the initial no-fee wallet transfer foundation with sender control,
+   sequence and replay validation.
+9. Qualify persistence, restart, P2P synchronization and reorganization of the
+   resulting economic state.
+10. Complete applicable cross-platform qualification before economic activation.
+
+STNC issuance remains **INACTIVE** until the required accepted-history economic
+state is implemented and qualified. Current qualifying-share evidence does not
+create spendable STNC merely because it is structurally or cryptographically
+valid.
+
+The governing Phase 19 rule is:
+
+> **Mining produces economic evidence. Consensus determines accepted issuance.**
 
 ## Phase 20 --- Production Qualification --- NOT STARTED
 
