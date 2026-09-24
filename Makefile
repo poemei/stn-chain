@@ -60,6 +60,7 @@ CORE_SOURCES := \
 	src/stn_transfer.c \
 	src/stn_transfer_replay.c \
 	src/stn_transfer_binding.c \
+	src/stn_transfer_authorization.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -329,3 +330,13 @@ test-transfer-binding: $(BUILD_DIR)/test-transfer-binding
 $(BUILD_DIR)/test-transfer-binding: tests/test_transfer_binding.c src/stn_transfer_binding.c src/stn_transfer_replay.c src/stn_transfer.c src/stn_economic_state.c includes/stn_transfer_binding.h includes/stn_transfer_replay.h includes/stn_transfer.h includes/stn_economic_state.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_TRANSFER_BINDING_TEST_MAIN tests/test_transfer_binding.c src/stn_transfer_binding.c src/stn_transfer_replay.c src/stn_transfer.c src/stn_economic_state.c -o $@ $(LDLIBS)
+
+
+# Phase 19 deterministic source-wallet transfer authorization qualification.
+.PHONY: test-transfer-authorization
+test-transfer-authorization: $(BUILD_DIR)/test-transfer-authorization
+	$(BUILD_DIR)/test-transfer-authorization
+
+$(BUILD_DIR)/test-transfer-authorization: tests/test_transfer_authorization.c src/stn_transfer_authorization.c src/stn_transfer.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_transfer_authorization.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_AUTHORIZATION_TEST_MAIN tests/test_transfer_authorization.c src/stn_transfer_authorization.c src/stn_transfer.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
