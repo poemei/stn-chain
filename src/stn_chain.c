@@ -639,9 +639,16 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
                        memcmp(parent_id,work_header.previous_hash,32u)!=0){
                         failure=STN_DATA_CONTENT;break;
                     }
-                }else if(work_header.height+1u==b.header.height &&
-                         memcmp(work_header.previous_hash,prior->tip_id,32u)!=0){
-                    failure=STN_DATA_CONTENT;break;
+                }else{
+                    /*
+                     * State-only validation can prove only the immediately
+                     * preceding Work ID. Older deferred evidence requires the
+                     * immutable accepted prefix and therefore fails closed here.
+                     */
+                    if(work_header.height+1u!=b.header.height ||
+                       memcmp(work_header.previous_hash,prior->tip_id,32u)!=0){
+                        failure=STN_DATA_UNRESOLVED;break;
+                    }
                 }
                 replay=stn_share_replay_consume(&candidate_shares->state,&share);
                 if(replay!=STN_SHARE_REPLAY_FRESH){
