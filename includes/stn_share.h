@@ -31,4 +31,19 @@ stn_data_status stn_share_id(
     const stn_share_evidence *share,
     uint8_t id[STN_SHARE_ID_SIZE]);
 
+/* Independently verify qualifying-share PoW against an exact canonical mining
+ * template. work_id must equal SHA256("STN-CHAIN:WORK:ID:1" including NUL ||
+ * the unmodified template). The template's canonical nonce is replaced only
+ * in a local copy with share->nonce. Its declared Chain target is multiplied
+ * by STN_SHARE_FACTOR using stn_economy_share_target(), then the resulting
+ * block hash must be <= that Share Target. digest is the reproduced PoW hash.
+ * No accepted-state, freshness, duplicate/replay, reward, balance or issuance
+ * decision is made here. Output is unchanged on failure. */
+stn_data_status stn_share_verify(
+    const stn_share_evidence *share,
+    const uint8_t *canonical_template,
+    size_t template_length,
+    const stn_hash_provider *provider,
+    uint8_t digest[32]);
+
 #endif
