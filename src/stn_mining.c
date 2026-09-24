@@ -115,7 +115,27 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
 
     for(i=0;i<transaction_count;++i){
         size_t n=(size_t)stn_wire_read(body+offset,4);
-        if(memcmp(body+offset+4+20,s->chain->network_id,32)!=0){return STN_RPC_REJECTED;}
+        stn_transaction tx;
+        if(stn_transaction_decode(body+offset+4,n,&tx)!=STN_DATA_OK){
+            return STN_RPC_REJECTED;
+        }
+        /*
+         * Publication records carry their network ID at record offset 8.
+         * Lifecycle records carry it at their canonical record offset 8.
+         * Contract actions carry their own typed canonical structure.
+         * Phase 19 share evidence deliberately carries no duplicate network
+         * field: its Work ID binds it to the exact Chain mining template.
+         * Do not interpret share bytes as a lifecycle/publication record.
+         */
+        if(tx.type==STN_TX_PUBLICATION ||
+           tx.type==STN_TX_AUTHORITY_GRANT ||
+           tx.type==STN_TX_AUTHORITY_REVOKE ||
+           tx.type==STN_TX_IDENTITY_ROTATE){
+            if(n<52u ||
+               memcmp(body+offset+4+20,s->chain->network_id,32)!=0){
+                return STN_RPC_REJECTED;
+            }
+        }
         offset+=4+n;
     }
 
