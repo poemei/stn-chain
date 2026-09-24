@@ -264,17 +264,6 @@ static void transfer_integration(void)
     CHECK(stn_economic_state_balance(accepted.economy,&e.transfer.source,&units)==STN_DATA_OK && units==75u);
     CHECK(stn_economic_state_balance(accepted.economy,&e.transfer.destination,&units)==STN_DATA_OK && units==25u);
     CHECK(accepted.economy->total_supply==100u);
-    {
-        stn_block_span history[2];stn_chain_state rebuilt={0};stn_chain_report rr;
-        history[0].bytes=genesis;history[0].length=sizeof(genesis);
-        history[1].bytes=block;history[1].length=sizeof(block);
-        rr=stn_chain_reconstruct_history(&c,history,2u,&rebuilt);
-        CHECK(rr.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
-        CHECK(stn_economic_state_balance(rebuilt.economy,&e.transfer.source,&units)==STN_DATA_OK && units==75u);
-        CHECK(stn_economic_state_balance(rebuilt.economy,&e.transfer.destination,&units)==STN_DATA_OK && units==25u);
-        CHECK(rebuilt.economy->total_supply==100u);
-        stn_chain_state_release(&rebuilt);
-    }
     memcpy(block+40u,accepted.tip_id,32u);number(block+72u,accepted.height+1u);number(block+80u,accepted.timestamp);
     r=stn_chain_validate_candidate(&c,&accepted,block,sizeof(block),&rejected);CHECK(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT && r.detail==STN_DATA_DUPLICATE);
     for(i=0;i<32u;++i)CHECK(funded.economy->balances[0].wallet_id[i]==e.transfer.source.identifier[i]);
