@@ -31,6 +31,28 @@ static void vectors(void)
           canonical[68]==4 && canonical[69]==5 && canonical[70]==6 &&
           canonical[71]==7 && canonical[72]==8);
 
+    {
+        stn_share_evidence decoded={0};
+        stn_share_evidence saved_decoded;
+        memset(&saved_decoded,0x5a,sizeof(saved_decoded));
+
+        CHECK(stn_share_decode(canonical,sizeof(canonical),&decoded)==STN_DATA_OK);
+        CHECK(memcmp(decoded.work_id,s.work_id,32)==0);
+        CHECK(decoded.miner.type==STN_ADDRESS_IDENTITY);
+        CHECK(memcmp(decoded.miner.identifier,s.miner.identifier,32)==0);
+        CHECK(decoded.nonce==s.nonce);
+
+        decoded=saved_decoded;
+        CHECK(stn_share_decode(canonical,sizeof(canonical)-1u,&decoded)==STN_DATA_LENGTH);
+        CHECK(memcmp(&decoded,&saved_decoded,sizeof(decoded))==0);
+        canonical[0]=(uint8_t)(STN_SHARE_VERSION+1u);
+        CHECK(stn_share_decode(canonical,sizeof(canonical),&decoded)==STN_DATA_VERSION);
+        CHECK(memcmp(&decoded,&saved_decoded,sizeof(decoded))==0);
+        canonical[0]=(uint8_t)STN_SHARE_VERSION;
+        CHECK(stn_share_decode(NULL,sizeof(canonical),&decoded)==STN_DATA_ARGUMENT);
+        CHECK(stn_share_decode(canonical,sizeof(canonical),NULL)==STN_DATA_ARGUMENT);
+    }
+
     CHECK(stn_share_id(&s,id)==STN_DATA_OK);
     CHECK(stn_share_id(&s,id2)==STN_DATA_OK && memcmp(id,id2,32)==0);
 
