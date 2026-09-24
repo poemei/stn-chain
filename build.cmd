@@ -20,8 +20,9 @@ if /i "%~1"=="test-economy" goto setup
 if /i "%~1"=="test-share" goto setup
 if /i "%~1"=="test-share-replay" goto setup
 if /i "%~1"=="test-issuance" goto setup
+if /i "%~1"=="test-economic-state" goto setup
 if not "%~1"=="" (
-    echo Usage: build.cmd [clean^|test-contract^|test-contract-consensus^|test-contract-lineage^|test-contract-state^|test-contract-snapshot^|test-economy^|test-share^|test-share-replay^|test-issuance]
+    echo Usage: build.cmd [clean^|test-contract^|test-contract-consensus^|test-contract-lineage^|test-contract-state^|test-contract-snapshot^|test-economy^|test-share^|test-share-replay^|test-issuance^|test-economic-state]
     exit /b 1
 )
 
@@ -69,6 +70,7 @@ if /i "%~1"=="test-economy" goto test_economy
 if /i "%~1"=="test-share" goto test_share
 if /i "%~1"=="test-share-replay" goto test_share_replay
 if /i "%~1"=="test-issuance" goto test_issuance
+if /i "%~1"=="test-economic-state" goto test_economic_state
 
 echo.
 echo STN Chain Windows x64 build
@@ -76,7 +78,7 @@ echo Compiler: Microsoft cl.exe
 echo Target:   %TARGET%
 echo.
 
-set "SOURCES= src\main.c  src\stn_address.c  src\stn_authority.c  src\stn_block.c  src\stn_chain.c  src\stn_economy.c  src\stn_compensation.c  src\stn_issuance.c  src\stn_contract.c  src\stn_contract_consensus.c  src\stn_contract_lineage.c  src\stn_contract_state.c  src\stn_contract_snapshot.c  src\stn_contract_transaction.c  src\stn_fork.c  src\stn_identity.c  src\stn_sentinel_intelligence.c  src\stn_lifecycle.c  src\stn_mining.c  src\stn_node_service.c  src\stn_peer.c  src\stn_pending.c  src\stn_pow.c  src\stn_record.c  src\stn_replay.c  src\stn_rpc.c  src\stn_share.c  src\stn_share_replay.c  src\stn_storage.c  src\stn_transaction.c  src\stn_validation.c  src\crypto\ed25519_donna\ed25519_provider.c  platforms\windows\stn_sha256.c  platforms\windows\stn_storage_windows.c  platforms\windows\stn_peer_windows.c  platforms\windows\stn_app_windows.c"
+set "SOURCES= src\main.c  src\stn_address.c  src\stn_authority.c  src\stn_block.c  src\stn_chain.c  src\stn_economy.c  src\stn_compensation.c  src\stn_issuance.c  src\stn_economic_state.c  src\stn_contract.c  src\stn_contract_consensus.c  src\stn_contract_lineage.c  src\stn_contract_state.c  src\stn_contract_snapshot.c  src\stn_contract_transaction.c  src\stn_fork.c  src\stn_identity.c  src\stn_sentinel_intelligence.c  src\stn_lifecycle.c  src\stn_mining.c  src\stn_node_service.c  src\stn_peer.c  src\stn_pending.c  src\stn_pow.c  src\stn_record.c  src\stn_replay.c  src\stn_rpc.c  src\stn_share.c  src\stn_share_replay.c  src\stn_storage.c  src\stn_transaction.c  src\stn_validation.c  src\crypto\ed25519_donna\ed25519_provider.c  platforms\windows\stn_sha256.c  platforms\windows\stn_storage_windows.c  platforms\windows\stn_peer_windows.c  platforms\windows\stn_app_windows.c"
 
 cl %CFLAGS% %INCLUDES% %SOURCES% ^
     /Fo"%OBJ_DIR%\\" ^
@@ -390,6 +392,27 @@ echo Running Phase 19 issuance record qualification test...
 if errorlevel 1 goto test_fail
 echo.
 echo ISSUANCE TEST SUCCESSFUL
+exit /b 0
+
+
+:test_economic_state
+set "TEST_TARGET=%BUILD_DIR%\test-economic-state.exe"
+echo.
+echo STN Chain Phase 19 accepted economic state qualification test
+echo Compiler: Microsoft cl.exe
+echo Target:   %TEST_TARGET%
+echo.
+cl %CFLAGS% %INCLUDES% /DSTN_ECONOMIC_STATE_TEST_MAIN ^
+    tests\test_economic_state.c ^
+    src\stn_economic_state.c ^
+    /Fo"%OBJ_DIR%\\" /Fe"%TEST_TARGET%" /link /INCREMENTAL:NO
+if errorlevel 1 goto fail
+echo.
+echo Running Phase 19 accepted economic state qualification test...
+"%TEST_TARGET%"
+if errorlevel 1 goto test_fail
+echo.
+echo ECONOMIC STATE TEST SUCCESSFUL
 exit /b 0
 
 :test_fail
