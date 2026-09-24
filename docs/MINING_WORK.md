@@ -471,26 +471,32 @@ Any proposed change to this envelope is a **Stratum-impacting interface change**
 
 # Work Identity
 
-The qualified work identity is:
+Phase 19 revises the work identity to a compact, historically reproducible form:
 
 ```text
 work_id =
     SHA256(
         "STN-CHAIN:WORK:ID:1"
         || 00
-        || complete_zero_nonce_block
+        || canonical_zero_nonce_block_header[168]
     )
 ```
 
-The domain terminator in this qualified work-ID rule is exactly one `0x00` byte.
+The domain terminator is exactly one `0x00` byte.
 
-Work identity includes the complete canonical zero-nonce candidate block, including its body.
+The 168-byte canonical header commits to the candidate transaction body through
+`transaction_commitment`, while keeping the work preimage bounded enough to
+retain in accepted share evidence. The canonical work header MUST carry a zero
+work nonce. The miner still mutates only the existing 64-bit nonce field while
+searching.
 
-It is not merely a header identifier.
+This Phase 19 change is intentionally Stratum-impacting and requires Chain ↔
+Stratum requalification. The mining envelope itself is unchanged; only the
+deterministic work-ID derivation changes.
 
-Equivalent deterministic candidate context produces the same work identity.
-
-A change to selected candidate content that changes canonical candidate bytes changes work identity.
+Equivalent deterministic header context produces the same work identity. A
+change to any consensus-visible header field, including the transaction
+commitment, target, parent, height, or timestamp, changes work identity.
 
 Work identity is independent of:
 
