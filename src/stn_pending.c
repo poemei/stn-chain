@@ -314,6 +314,31 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
             return STN_DATA_CONTENT;
         }
 
+        /*
+         * Share evidence describes work assigned from the current accepted tip.
+         * It is intentionally deferred one candidate: including it in the same
+         * candidate whose header it proves would change that candidate's body
+         * commitment and Work ID, invalidating other valid shares for the same
+         * assigned work. After the tip advances, the evidence becomes eligible
+         * for deterministic inclusion in the following candidate.
+         */
+        if(tx.type==STN_TX_SHARE_EVIDENCE){
+            stn_share_evidence share;
+            stn_block_header work_header;
+            if(active==NULL ||
+               stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK ||
+               stn_block_header_decode(share.template_header,
+                   STN_SHARE_TEMPLATE_HEADER_SIZE,&work_header)!=STN_DATA_OK){
+                return STN_DATA_CONTENT;
+            }
+            if(!active->state.has_tip || active->state.height==UINT64_MAX){
+                continue;
+            }
+            if(work_header.height>=active->state.height+1u){
+                continue;
+            }
+        }
+
         if(tx.type==STN_TX_PUBLICATION && production_next(active)){
             stn_hash_provider hash={stn_sha256,NULL};stn_record record;
             stn_lifecycle_result checked=stn_lifecycle_check_publication(active->state.lifecycle,tx.record_bytes,tx.record_length,&hash);
