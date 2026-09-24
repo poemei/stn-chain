@@ -6,9 +6,10 @@ Chunk 3). This supersedes historical 256-bit work limits below. STNC/STNP versio
 2 carries widened work fields; block, target, hash and mining-job formats remain.
 
 Status: implemented bounded protocol/server handling, synchronous client sync,
-explicit recovery coordination and Windows Winsock transport. Windows localhost
-integration is tested, including real SHA-256 and NTFS persistence. No public
-node service, automatic discovery, RPC or Internet qualification is provided.
+explicit recovery coordination and Windows/Linux transports. The Linux runnable
+node exposes STNP v2 on TCP port 18474 by default, separately from STNC RPC on
+18473. The P2P port may be changed with `--p2p-port PORT`. Peer evidence remains
+subject to independent local validation; opening the listener confers no trust.
 
 ## No peer is authoritative
 
@@ -177,10 +178,12 @@ failure; orderly close before an exact read completes is DISCONNECTED.
 
 References: [Winsock select](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-select)
 and [Winsock send](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-send).
-The adapter connects to explicit IPv4 addresses; DNS, bootstrap and discovery
-are absent. The listener deliberately binds loopback only. No public listener
-is opened by the scaffold. Production deployments need separate lifecycle,
-peer selection, fairness, authentication/privacy and resource review.
+The adapter connects to explicit IPv4 addresses; DNS aliases are not accepted by
+`--peer`. The Linux runnable node binds its STNP listener on all IPv4 interfaces
+at port 18474 by default, independently of the STNC RPC listener on 18473.
+Configured and discovered candidates still provide evidence only; they do not
+gain consensus authority. Production deployments remain responsible for firewall,
+NAT, lifecycle, fairness and authentication/privacy policy.
 
 ## Tests and deferred work
 
