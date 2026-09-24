@@ -57,6 +57,7 @@ CORE_SOURCES := \
 	src/stn_compensation_state.c \
 	src/stn_issuance_binding.c \
 	src/stn_wallet.c \
+	src/stn_transfer.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -296,3 +297,13 @@ test-wallet: $(BUILD_DIR)/test-wallet
 $(BUILD_DIR)/test-wallet: tests/test_wallet.c src/stn_wallet.c src/stn_address.c platforms/linux/stn_sha256.c includes/stn_wallet.h includes/stn_address.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_WALLET_TEST_MAIN tests/test_wallet.c src/stn_wallet.c src/stn_address.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+
+
+# Phase 19 deterministic transfer primitive qualification.
+.PHONY: test-transfer
+test-transfer: $(BUILD_DIR)/test-transfer
+	$(BUILD_DIR)/test-transfer
+
+$(BUILD_DIR)/test-transfer: tests/test_transfer.c src/stn_transfer.c includes/stn_transfer.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_TEST_MAIN tests/test_transfer.c src/stn_transfer.c -o $@ $(LDLIBS)
