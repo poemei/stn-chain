@@ -331,11 +331,12 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
         return STN_DATA_OK;
     }
 
-    if(!production_next(active)) {
-        if(c==NULL){return STN_DATA_UNRESOLVED;}
-        if(active==NULL || memcmp(c->expected_network,active->state.network_id,32)!=0){return STN_DATA_UNRESOLVED;}
-    }
-
+    /*
+     * Do not require publication validation context merely because pending is
+     * non-empty.  Non-publication entries (notably mining Share Evidence) are
+     * validated from accepted Chain state and must not make canonical mining
+     * work unavailable before publication activation.
+     */
     if(scan(p,active,replay,1,NULL)!=STN_DATA_OK){return STN_DATA_CONTENT;}
 
     if(stn_pending_enumerate(p,0,ids,STN_PENDING_MAX_ENTRIES,&available)!=STN_PENDING_ACCEPTED){
@@ -419,6 +420,10 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
         }
 
         if(tx.type==STN_TX_PUBLICATION && !production_next(active)){
+            if(c==NULL || active==NULL ||
+               memcmp(c->expected_network,active->state.network_id,32)!=0){
+                return STN_DATA_UNRESOLVED;
+            }
             r=stn_validate_intelligence_record(tx.record_bytes,tx.record_length,c);
 
             if(r.acceptance==STN_ACCEPTANCE_ERROR){

@@ -3,6 +3,7 @@
 #include <windows.h>
 #include "stn_mining.h"
 #include "stn_sha256.h"
+#include "stn_share.h"
 #include <stdio.h>
 #include <string.h>
 static unsigned checks,failures;
@@ -357,6 +358,57 @@ static void candidate_checks(stn_mining_service *s,validation_modes *modes)
     stn_pending_clear(&a);stn_storage_view_release(&active);s->pending=original_pool;
     printf("Pending candidates: %u checks, %u failures.\n",checks-initial_checks,failures-initial_failures);
 }
+static void share_only_without_intelligence_context(void)
+{
+    uint8_t anchor[364],canonical[STN_SHARE_CANONICAL_SIZE];
+    uint8_t transaction[STN_TX_HEADER_SIZE+STN_SHARE_CANONICAL_SIZE];
+    uint8_t assembled[STN_BLOCK_MAX_BODY],id[32],parent_id[32];
+    size_t transaction_length=0,written=0;
+    uint32_t count=0;
+    stn_pending pool={0};
+    stn_storage_view active={0};
+    stn_block_span block;
+    stn_hash_provider hash={stn_sha256,NULL};
+    stn_share_evidence share={0};
+    stn_transaction tx={0};
+
+    genesis(anchor);
+    block.bytes=anchor;block.length=sizeof(anchor);
+    active.blocks=&block;active.count=1;
+    active.state.has_tip=1;active.state.height=0;
+    active.state.network_id[0]=1;
+    CHECK(stn_chain_block_id(anchor,sizeof(anchor),&hash,parent_id)==STN_DATA_OK);
+    memcpy(active.state.tip_id,parent_id,32);
+
+    share.miner.type=STN_ADDRESS_IDENTITY;
+    share.miner.identifier[31]=1;
+    memcpy(share.template_header,anchor,STN_BLOCK_HEADER_SIZE);
+    memcpy(share.template_header+40,parent_id,32);
+    memset(share.template_header+72,0,8);
+    share.template_header[79]=1;
+    memcpy(share.body_commitment,share.template_header+88,32);
+    CHECK(stn_share_encode(&share,canonical)==STN_DATA_OK);
+
+    tx.version=1;tx.type=STN_TX_SHARE_EVIDENCE;
+    tx.record_bytes=canonical;tx.record_length=sizeof(canonical);
+    CHECK(stn_transaction_encode(&tx,transaction,sizeof(transaction),
+        &transaction_length)==STN_DATA_OK);
+    CHECK(stn_pending_insert(&pool,transaction,transaction_length,&hash,id)
+        ==STN_PENDING_ACCEPTED);
+
+    /*
+     * Share evidence is Chain mining evidence, not a publication.  Before
+     * publication activation it must not require an intelligence validation
+     * context merely to keep the next mining template available.  The share
+     * is deferred because it proves the current assigned work, so assembly is
+     * canonically empty rather than UNRESOLVED.
+     */
+    CHECK(stn_pending_assemble(&pool,NULL,&active,assembled,sizeof(assembled),
+        &written,&count)==STN_DATA_OK);
+    CHECK(written==0 && count==0);
+    stn_pending_clear(&pool);
+}
+
 int test_pending(void)
 {
     static const uint8_t expected_id[32]={0x35,0xb6,0x9c,0x1f,0x12,0xa5,0x54,0x3f,0x98,0x9a,0x10,0xe3,0x69,0x8b,0xec,0x1d,0xa5,0x62,0xa2,0xc8,0x7f,0x81,0x35,0x4e,0x16,0xb7,0x91,0x1b,0xf5,0x18,0xd5,0x0b};
@@ -369,6 +421,7 @@ int test_pending(void)
     stn_rpc_message r;size_t n,w,i,old_size;uint32_t count;int all;
     store_foundation();
     admission_checks();
+    share_only_without_intelligence_context();
     genesis(anchor);memcpy(policy.fixed_target,anchor+120,32);c.network_id[0]=1;c.genesis_bytes=anchor;
     c.genesis_length=364;c.hash_provider.hash=stn_sha256;c.pow_policy=&policy;
     v.expected_network[0]=1;v.time_configured=1;v.validation_time=10;

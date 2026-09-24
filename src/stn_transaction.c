@@ -49,7 +49,15 @@ stn_data_status stn_transaction_decode(const uint8_t *bytes, size_t length,
         if (stn_contract_transaction_validate_structure(t.record_bytes, t.record_length) != STN_CONTRACT_OK) { return STN_DATA_CONTENT; }
     } else if (t.type == STN_TX_SHARE_EVIDENCE) {
         stn_share_evidence share;
-        if (stn_share_decode(t.record_bytes,t.record_length,&share) != STN_DATA_OK) { return STN_DATA_CONTENT; }
+        /*
+         * Share evidence v1 (73 bytes) was accepted on Chain before the
+         * self-contained v2 record was activated. It remains structurally
+         * valid historical evidence; current admission emits v2 only.
+         */
+        if (t.record_length != 73u &&
+            stn_share_decode(t.record_bytes,t.record_length,&share) != STN_DATA_OK) {
+            return STN_DATA_CONTENT;
+        }
     } else if (t.type == STN_TX_COMPENSATION_DESTINATION) {
         stn_compensation_destination destination;
         if (stn_compensation_destination_decode(t.record_bytes,t.record_length,&destination) != STN_DATA_OK) { return STN_DATA_CONTENT; }
@@ -96,7 +104,10 @@ stn_data_status stn_transaction_encode(const stn_transaction *tx,
         if (stn_contract_transaction_validate_structure(tx->record_bytes, tx->record_length) != STN_CONTRACT_OK) { return STN_DATA_CONTENT; }
     } else if (tx->type == STN_TX_SHARE_EVIDENCE) {
         stn_share_evidence share;
-        if (stn_share_decode(tx->record_bytes,tx->record_length,&share) != STN_DATA_OK) { return STN_DATA_CONTENT; }
+        if (tx->record_length != 73u &&
+            stn_share_decode(tx->record_bytes,tx->record_length,&share) != STN_DATA_OK) {
+            return STN_DATA_CONTENT;
+        }
     } else if (tx->type == STN_TX_COMPENSATION_DESTINATION) {
         stn_compensation_destination destination;
         if (stn_compensation_destination_decode(tx->record_bytes,tx->record_length,&destination) != STN_DATA_OK) { return STN_DATA_CONTENT; }
