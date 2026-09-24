@@ -19,16 +19,12 @@ static stn_data_status work_id_from_evidence(
     uint8_t work_id[32])
 {
     static const uint8_t domain[]="STN-CHAIN:WORK:ID:1";
-    uint8_t bytes[STN_SHARE_TEMPLATE_HEADER_SIZE+STN_SHARE_BODY_COMMITMENT_SIZE];
     stn_data_status status;
     if(share==NULL || provider==NULL || provider->hash==NULL || work_id==NULL){
         return STN_DATA_ARGUMENT;
     }
-    memcpy(bytes,share->template_header,STN_SHARE_TEMPLATE_HEADER_SIZE);
-    memcpy(bytes+STN_SHARE_TEMPLATE_HEADER_SIZE,share->body_commitment,
-        STN_SHARE_BODY_COMMITMENT_SIZE);
     status=provider->hash(provider->user,domain,sizeof(domain),
-        bytes,sizeof(bytes),work_id);
+        share->template_header,STN_SHARE_TEMPLATE_HEADER_SIZE,work_id);
     if(status==STN_DATA_OK || status==STN_DATA_UNRESOLVED){return status;}
     return STN_DATA_PROVIDER_ERROR;
 }
