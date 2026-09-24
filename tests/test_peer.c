@@ -14,6 +14,7 @@
 #include "stn_sha256.h"
 #include "stn_mining.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 static unsigned checks,failures;
 #define CHECK(e) do { ++checks; if(!(e)){++failures;fprintf(stderr,"peer line %d: %s\n",__LINE__,#e);} } while(0)
@@ -342,12 +343,15 @@ static int convergence_solve(uint8_t *p,const stn_hash_provider *hash)
 }
 static stn_rpc_code convergence_rpc(stn_mining_service *s,uint16_t method,const uint8_t *input,size_t length,uint8_t *out,size_t *n)
 {
-    uint8_t request[STN_RPC_MAX_FRAME],response[512];size_t rn,wn;stn_rpc_message q={1,0,STN_RPC_OK,1,NULL,0},r;
+    uint8_t *request=malloc(STN_RPC_MAX_FRAME),response[512];size_t rn,wn;stn_rpc_message q={1,0,STN_RPC_OK,1,NULL,0},r;
     stn_rpc_service service={s,stn_mining_handle};q.method=method;q.payload=input;q.length=length;
-    CHECK(stn_rpc_encode(&q,request,sizeof(request),&rn)==STN_RPC_OK);
+    CHECK(request!=NULL);
+    if(request==NULL){*n=0;return STN_RPC_CAPACITY;}
+    CHECK(stn_rpc_encode(&q,request,STN_RPC_MAX_FRAME,&rn)==STN_RPC_OK);
     CHECK(stn_rpc_dispatch(request,rn,3,&service,response,sizeof(response),&wn)==STN_RPC_OK);
     CHECK(stn_rpc_decode(response,wn,&r)==STN_RPC_OK);*n=r.length;
-    if(r.length!=0){memcpy(out,r.payload,r.length);}return r.code;
+    if(r.length!=0){memcpy(out,r.payload,r.length);}
+    free(request);return r.code;
 }
 static void convergence(void)
 {
