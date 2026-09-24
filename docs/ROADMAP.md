@@ -1170,10 +1170,11 @@ can print success after a Windows exception exit such as `0xC00000FD`. Phase 20
 must correct the runner so every nonzero executable exit status is treated as a
 failure; that correction is not yet recorded as complete.
 
-Linux x64 same-commit Phase 20 baseline execution remains pending. Existing
-Linux qualification from earlier phases remains valid evidence for those
-increments, but it is not substituted for the Phase 20 same-commit production
-qualification run.
+Linux x64 production build, installation and deployed-service restart have been
+completed successfully during Phase 20. This establishes current Linux runtime
+and deployment evidence. The same-commit Linux qualification test suite remains
+pending; earlier Linux phase evidence is retained but is not substituted for
+that test execution.
 
 Phase 20 remains **ACTIVE**. No final production-readiness claim is made here.
 ARM remains outside the currently qualified Phase 20 platform scope.
