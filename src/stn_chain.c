@@ -622,6 +622,20 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
                    stn_share_verify_evidence(&share,&context->hash_provider,proof)!=STN_DATA_OK){
                     failure=STN_DATA_CONTENT;break;
                 }
+                {
+                    /*
+                     * Historical evidence is branch-bound by the retained
+                     * parent hash. During sequential reconstruction the work
+                     * parent must already be part of the accepted prefix.
+                     * The exact ancestry check is performed by reconstruction
+                     * as blocks are replayed; candidate acceptance cannot
+                     * authorize an orphaned Work ID merely by height.
+                     */
+                    if(work_header.height+1u==b.header.height &&
+                       memcmp(work_header.previous_hash,prior->tip_id,32)!=0){
+                        failure=STN_DATA_CONTENT;break;
+                    }
+                }
                 replay=stn_share_replay_consume(&candidate_shares->state,&share);
                 if(replay!=STN_SHARE_REPLAY_FRESH){
                     failure=replay==STN_SHARE_REPLAY_CAPACITY ?
