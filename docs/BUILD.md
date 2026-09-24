@@ -22,6 +22,37 @@ The script builds the node only. Existing solution/project workflows below
 are optional for IDE use and the existing qualification/test targets.
 Historical qualification results retain their original build context.
 
+## Phase 20 qualification status
+
+Phase 20 Production Qualification is active as of 2026-09-24. The initial
+Windows x64 baseline recorded a passing production build and the following
+existing qualification targets:
+
+- `test-contract`: 494 checks, 0 failures
+- `test-contract-consensus`: 41 checks, 0 failures
+- `test-contract-lineage`: 14 checks, 0 failures
+- `test-contract-state`: 17 checks, 0 failures
+- `test-chain`: 1,243 checks, 0 failures
+- `tools/test-node.ps1 -FramingOnly`: 33 checks, 0 failures
+- `test-contract-snapshot`: 337 checks, 0 failures after the qualified
+  dependency/fixture-allocation harness corrections
+- `test-peer`: 2,867 checks, 0 failures with the qualified local
+  `convergence_rpc()` fixture-allocation correction
+
+The snapshot and peer failures discovered during the baseline were Windows
+test-harness stack-allocation defects; neither failure demonstrated a production
+consensus defect. The snapshot dependency correction is recorded in `5fdb395`.
+
+The Windows runner still requires qualification of its nonzero executable-exit
+handling: a Windows exception exit such as `0xC00000FD` was observed to pass
+through the existing `test-peer` target as apparent success. Do not interpret
+the script's success message alone as qualification until that runner defect is
+closed.
+
+Linux x64 must be built and exercised at the same shared commit before Phase 20
+cross-platform qualification can be closed. Earlier Linux evidence remains
+historical phase evidence and is not a substitute for that same-commit run.
+
 ## Windows startup
 
 Run `build\stn-chain.exe` without arguments to start the node on
