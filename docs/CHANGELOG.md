@@ -5,6 +5,38 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Phase 20 production qualification opened - 2026-09-24
+
+- Phase 19 is closed and Phase 20 Production Qualification is ACTIVE. Phase 20
+  is being executed in bounded micro-chunks rather than reopening completed
+  Economy work without a reproducible Phase 19 defect.
+- Established the Windows x64 production-qualification baseline: production
+  build passed; `test-contract` 494/0, `test-contract-consensus` 41/0,
+  `test-contract-lineage` 14/0, `test-contract-state` 17/0,
+  `test-chain` 1,243/0 and STNC framing 33/0.
+- Corrected the Windows `test-contract-snapshot` target dependency list in
+  `5fdb395` using existing compensation, issuance, economic-state, wallet and
+  transfer implementations. The test-harness stack overflow was isolated to
+  oversized automatic fixture buffers, not production execution. With checked
+  allocated fixture ownership and deterministic cleanup, the target completes
+  normally at **337 checks, 0 failures**.
+- Diagnosed `test-peer` apparent success as a test-harness stack overflow.
+  `convergence_rpc()` placed an `STN_RPC_MAX_FRAME` request buffer in a stack
+  frame larger than the default Windows executable reserve. The qualified local
+  correction preserves the existing capacity and assertions while using checked
+  allocated ownership and deterministic cleanup; the test completes normally at
+  **2,867 checks, 0 failures**. Repository qualification requires that local
+  correction to be present on the shared branch.
+- Demonstrated a separate Windows test-runner defect: `build.cmd test-peer`
+  can report success after a Windows exception exit such as `0xC00000FD`.
+  Correct nonzero-exit handling remains a Phase 20 qualification item.
+- Linux x64 production build, installation and deployed-service restart were
+  completed successfully during Phase 20. Same-commit Linux qualification test
+  execution remains pending; earlier Linux phase evidence is retained but is
+  not substituted for that test execution.
+- No consensus, serialization, STNC or Phase 19 economic semantics were changed
+  by these qualification-harness corrections.
+
 ### Phase 19 historical qualifying-share evidence qualification - 2026-09-24
 
 - Defined canonical Share Evidence v2 as a self-contained 273-byte consensus
