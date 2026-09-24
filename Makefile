@@ -51,6 +51,8 @@ CORE_SOURCES := \
 	src/stn_block.c \
 	src/stn_chain.c \
 	src/stn_economy.c \
+	src/stn_compensation.c \
+	src/stn_issuance.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -239,3 +241,13 @@ test-share-replay: $(BUILD_DIR)/test-share-replay
 $(BUILD_DIR)/test-share-replay: tests/test_share_replay.c src/stn_share_replay.c includes/stn_share_replay.h includes/stn_share.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_SHARE_REPLAY_TEST_MAIN tests/test_share_replay.c src/stn_share_replay.c -o $@ $(LDLIBS)
+
+
+# Phase 19 canonical mining issuance record qualification.
+.PHONY: test-issuance
+test-issuance: $(BUILD_DIR)/test-issuance
+	$(BUILD_DIR)/test-issuance
+
+$(BUILD_DIR)/test-issuance: tests/test_issuance.c src/stn_issuance.c src/stn_compensation.c includes/stn_issuance.h includes/stn_compensation.h includes/stn_address.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_ISSUANCE_TEST_MAIN tests/test_issuance.c src/stn_issuance.c src/stn_compensation.c -o $@ $(LDLIBS)
