@@ -145,9 +145,20 @@ install: $(TARGET_PATH)
 	install -m 0755 $(TARGET_PATH) $(DESTDIR)$(BINDIR)/$(TARGET)
 	install -d $(DESTDIR)$(DATADIR)
 	install -d $(DESTDIR)$(LOGDIR)
+	install -d $(DESTDIR)/etc/systemd/system
+	sed 's|@BINDIR@|$(BINDIR)|g' platforms/linux/stn-chain.service.in > $(BUILD_DIR)/stn-chain.service
+	install -m 0644 $(BUILD_DIR)/stn-chain.service $(DESTDIR)/etc/systemd/system/stn-chain.service
+	@if [ -z "$(DESTDIR)" ]; then \
+		systemctl daemon-reload; \
+		systemctl enable stn-chain; \
+		systemctl restart stn-chain; \
+	else \
+		echo "DESTDIR staging: systemd activation skipped."; \
+	fi
 	@echo
 	@echo "Installed:"
 	@echo "  Application: $(BINDIR)/$(TARGET)"
+	@echo "  Service:     /etc/systemd/system/stn-chain.service"
 	@echo "  Data:        $(DATADIR)"
 	@echo "  Logs:        $(LOGDIR)"
 
@@ -157,12 +168,8 @@ uninstall:
 	@echo "Data and logs preserved:"
 	@echo "  $(DATADIR)"
 
-# Enable/start is deliberately separate from staging files under DESTDIR.
+# Compatibility alias: normal sudo make install now installs and activates the service.
 install-service: install
-	install -d $(DESTDIR)/etc/systemd/system
-	sed 's|@BINDIR@|$(BINDIR)|g' platforms/linux/stn-chain.service.in > $(BUILD_DIR)/stn-chain.service
-	install -m 0644 $(BUILD_DIR)/stn-chain.service $(DESTDIR)/etc/systemd/system/stn-chain.service
-	@echo "Service installed. Run: systemctl daemon-reload && systemctl enable --now stn-chain"
 
 clean:
 	rm -rf $(BUILD_DIR)
