@@ -349,7 +349,7 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
                    parent_index>=active->count ||
                    stn_chain_block_id(active->blocks[parent_index].bytes,
                        active->blocks[parent_index].length,
-                       &active->context.hash_provider,parent_id)!=STN_DATA_OK ||
+                       hash,parent_id)!=STN_DATA_OK ||
                    memcmp(parent_id,work_header.previous_hash,32u)!=0){
                     continue;
                 }
