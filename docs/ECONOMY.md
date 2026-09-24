@@ -216,6 +216,34 @@ Reconnecting a miner, resubmitting the same proof, submitting it through another
 
 Duplicate prevention must survive restart, synchronization, and reorganization through deterministic accepted Chain state rather than relying solely on transient Stratum memory.
 
+### 10.1 Canonical Share Evidence v2
+
+The canonical accepted share record is self-contained:
+
+    version[1]
+    work_id[32]
+    mining identity identifier[32]
+    nonce[8] big-endian
+    canonical zero-nonce mining header[168]
+
+Total:
+
+    241 bytes
+
+The retained mining header is consensus evidence, not telemetry. It allows every
+compliant node to reproduce the Work ID, derive the Share Target from the
+historical Chain target, insert the submitted nonce, reproduce the proof hash,
+and independently verify the qualifying share during normal acceptance,
+restart reconstruction, synchronization, and reorganization.
+
+The Work ID is derived from the exact retained 168-byte zero-nonce header. The
+header commits to candidate body content through its transaction commitment.
+
+A share record whose Work ID does not reproduce from its retained header, whose
+header does not describe the applicable Chain work context, or whose reproduced
+proof exceeds the Share Target is invalid economic evidence and creates no
+issuance.
+
 ---
 
 ## 11. Stratum Responsibility
