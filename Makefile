@@ -77,6 +77,7 @@ CORE_SOURCES := \
 	src/stn_pow.c \
 	src/stn_record.c \
 	src/stn_replay.c \
+	src/stn_report.c \
 	src/stn_rpc.c \
 	src/stn_share.c \
 	src/stn_share_replay.c \
@@ -106,7 +107,7 @@ SOURCES := \
 
 OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SOURCES))
 
-.PHONY: all configure clean install install-service uninstall info
+.PHONY: all configure clean install install-service uninstall info test-report
 
 all: configure $(TARGET_PATH)
 
@@ -452,3 +453,12 @@ test-fork: $(BUILD_DIR)/test-fork
 $(BUILD_DIR)/test-fork: tests/test_fork.c $(CHAIN_TEST_SOURCES) src/stn_fork.c
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_LIFECYCLE_TEST -DSTN_FORK_TEST_MAIN tests/test_fork.c src/stn_fork.c $(CHAIN_TEST_SOURCES) -o $@ $(LDLIBS)
+
+
+# Operational reporting qualification.
+test-report: $(BUILD_DIR)/test-report
+	$(BUILD_DIR)/test-report
+
+$(BUILD_DIR)/test-report: tests/test_report.c src/stn_report.c includes/stn_report.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) tests/test_report.c src/stn_report.c -o $@
