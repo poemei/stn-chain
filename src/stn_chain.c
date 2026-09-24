@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_chain.h"
 #include "stn_wire_internal.h"
+#include "stn_share.h"
 #include <string.h>
 #include <stdlib.h>
 #include "stn_sha256.h"
@@ -460,7 +461,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             r.body=STN_STAGE_REJECT; return fail(r,STN_CHAIN_BODY,STN_DATA_CONTENT);
         }
         if(tx.type==STN_TX_CONTRACT_ACTION){has_contracts=1;}
-        else if(tx.type!=STN_TX_PUBLICATION){has_lifecycle=1;}
+        else if(tx.type!=STN_TX_PUBLICATION && tx.type!=STN_TX_SHARE_EVIDENCE){has_lifecycle=1;}
         else {
             if (memcmp(record.network_id,context->network_id,32)!=0) {
                 r.body=STN_STAGE_REJECT; return fail(r,STN_CHAIN_NETWORK,STN_DATA_CONTENT);
@@ -525,6 +526,35 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
                     has_lifecycle ? &candidate_lifecycle->state : prior->lifecycle;
                 failure=contract_apply_transaction(candidate_contracts,
                     authority_state,&tx,&context->hash_provider);
+                if(failure!=STN_DATA_OK)break;
+                continue;
+            }
+            if(tx.type==STN_TX_SHARE_EVIDENCE){
+                stn_share_evidence share;
+                size_t bi,bo=0;
+                if(stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK){
+                    failure=STN_DATA_CONTENT;break;
+                }
+                for(bi=0;bi<i && failure==STN_DATA_OK;++bi){
+                    stn_transaction prior_tx;
+                    uint32_t prior_n=(uint32_t)stn_wire_read(b.body+bo,4);
+                    bo+=4;
+                    if(stn_transaction_decode(b.body+bo,prior_n,&prior_tx)!=STN_DATA_OK){
+                        failure=STN_DATA_CONTENT;break;
+                    }
+                    if(prior_tx.type==STN_TX_SHARE_EVIDENCE){
+                        stn_share_evidence prior_share;
+                        if(stn_share_decode(prior_tx.record_bytes,prior_tx.record_length,&prior_share)!=STN_DATA_OK){
+                            failure=STN_DATA_CONTENT;break;
+                        }
+                        if(memcmp(prior_share.miner.identifier,share.miner.identifier,32)==0 &&
+                           memcmp(prior_share.work_id,share.work_id,32)==0 &&
+                           prior_share.nonce==share.nonce){
+                            failure=STN_DATA_DUPLICATE;break;
+                        }
+                    }
+                    bo+=prior_n;
+                }
                 if(failure!=STN_DATA_OK)break;
                 continue;
             }
