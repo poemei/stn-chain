@@ -345,6 +345,11 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
             {
                 size_t parent_index=(size_t)(work_header.height-1u);
                 uint8_t parent_id[32];
+                /*
+                 * The active view is already a fully validated accepted
+                 * history. Its canonical block ID is SHA-256 over the Chain
+                 * block-ID domain and header, matching the consensus provider.
+                 */
                 stn_hash_provider hash_provider={stn_sha256,NULL};
                 if(work_header.height==0u ||
                    parent_index>=active->count ||
