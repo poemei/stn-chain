@@ -9,7 +9,7 @@
 #define STN_TX_IDENTITY_ROTATE_SIZE 129u
 /* Share evidence is larger than the pre-existing authority-revoke minimum.
  * Keep the structural minimum at the smallest canonical transaction class. */
-#define STN_TX_SHARE_EVIDENCE_SIZE 241u
+#define STN_TX_SHARE_EVIDENCE_SIZE 273u
 #define STN_TX_MIN_SIZE (STN_TX_HEADER_SIZE + STN_TX_AUTHORITY_REVOKE_SIZE)
 #define STN_TX_CONTRACT_ACTION_MAX_SIZE (116u + 66656u + 97u)
 #define STN_TX_MAX_SIZE (STN_TX_HEADER_SIZE + STN_TX_CONTRACT_ACTION_MAX_SIZE)
