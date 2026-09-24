@@ -30,9 +30,10 @@ are not claims of a published or deployed release.
 - Demonstrated a separate Windows test-runner defect: `build.cmd test-peer`
   can report success after a Windows exception exit such as `0xC00000FD`.
   Correct nonzero-exit handling remains a Phase 20 qualification item.
-- Linux x64 same-commit Phase 20 build/test evidence remains pending. Earlier
-  Linux phase evidence is retained but is not substituted for the Phase 20
-  baseline.
+- Linux x64 production build, installation and deployed-service restart were
+  completed successfully during Phase 20. Same-commit Linux qualification test
+  execution remains pending; earlier Linux phase evidence is retained but is
+  not substituted for that test execution.
 - No consensus, serialization, STNC or Phase 19 economic semantics were changed
   by these qualification-harness corrections.
 
