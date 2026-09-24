@@ -27,8 +27,9 @@ if /i "%~1"=="test-wallet" goto setup
 if /i "%~1"=="test-transfer" goto setup
 if /i "%~1"=="test-transfer-replay" goto setup
 if /i "%~1"=="test-transfer-binding" goto setup
+if /i "%~1"=="test-transfer-authorization" goto setup
 if not "%~1"=="" (
-    echo Usage: build.cmd [clean^|test-contract^|test-contract-consensus^|test-contract-lineage^|test-contract-state^|test-contract-snapshot^|test-economy^|test-share^|test-share-replay^|test-issuance^|test-economic-state^|test-compensation-state^|test-issuance-binding^|test-wallet^|test-transfer^|test-transfer-replay^|test-transfer-binding]
+    echo Usage: build.cmd [clean^|test-contract^|test-contract-consensus^|test-contract-lineage^|test-contract-state^|test-contract-snapshot^|test-economy^|test-share^|test-share-replay^|test-issuance^|test-economic-state^|test-compensation-state^|test-issuance-binding^|test-wallet^|test-transfer^|test-transfer-replay^|test-transfer-binding^|test-transfer-authorization]
     exit /b 1
 )
 
@@ -83,6 +84,7 @@ if /i "%~1"=="test-wallet" goto test_wallet
 if /i "%~1"=="test-transfer" goto test_transfer
 if /i "%~1"=="test-transfer-replay" goto test_transfer_replay
 if /i "%~1"=="test-transfer-binding" goto test_transfer_binding
+if /i "%~1"=="test-transfer-authorization" goto test_transfer_authorization
 
 echo.
 echo STN Chain Windows x64 build
@@ -90,7 +92,7 @@ echo Compiler: Microsoft cl.exe
 echo Target:   %TARGET%
 echo.
 
-set "SOURCES= src\main.c  src\stn_address.c  src\stn_authority.c  src\stn_block.c  src\stn_chain.c  src\stn_economy.c  src\stn_compensation.c  src\stn_issuance.c  src\stn_economic_state.c  src\stn_compensation_state.c  src\stn_issuance_binding.c  src\stn_wallet.c  src\stn_transfer.c  src\stn_transfer_replay.c  src\stn_transfer_binding.c  src\stn_contract.c  src\stn_contract_consensus.c  src\stn_contract_lineage.c  src\stn_contract_state.c  src\stn_contract_snapshot.c  src\stn_contract_transaction.c  src\stn_fork.c  src\stn_identity.c  src\stn_sentinel_intelligence.c  src\stn_lifecycle.c  src\stn_mining.c  src\stn_node_service.c  src\stn_peer.c  src\stn_pending.c  src\stn_pow.c  src\stn_record.c  src\stn_replay.c  src\stn_rpc.c  src\stn_share.c  src\stn_share_replay.c  src\stn_compensation_state.c  src\stn_storage.c  src\stn_transaction.c  src\stn_validation.c  src\crypto\ed25519_donna\ed25519_provider.c  platforms\windows\stn_sha256.c  platforms\windows\stn_storage_windows.c  platforms\windows\stn_peer_windows.c  platforms\windows\stn_app_windows.c"
+set "SOURCES= src\main.c  src\stn_address.c  src\stn_authority.c  src\stn_block.c  src\stn_chain.c  src\stn_economy.c  src\stn_compensation.c  src\stn_issuance.c  src\stn_economic_state.c  src\stn_compensation_state.c  src\stn_issuance_binding.c  src\stn_wallet.c  src\stn_transfer.c  src\stn_transfer_replay.c  src\stn_transfer_binding.c  src\stn_transfer_authorization.c  src\stn_contract.c  src\stn_contract_consensus.c  src\stn_contract_lineage.c  src\stn_contract_state.c  src\stn_contract_snapshot.c  src\stn_contract_transaction.c  src\stn_fork.c  src\stn_identity.c  src\stn_sentinel_intelligence.c  src\stn_lifecycle.c  src\stn_mining.c  src\stn_node_service.c  src\stn_peer.c  src\stn_pending.c  src\stn_pow.c  src\stn_record.c  src\stn_replay.c  src\stn_rpc.c  src\stn_share.c  src\stn_share_replay.c  src\stn_compensation_state.c  src\stn_storage.c  src\stn_transaction.c  src\stn_validation.c  src\crypto\ed25519_donna\ed25519_provider.c  platforms\windows\stn_sha256.c  platforms\windows\stn_storage_windows.c  platforms\windows\stn_peer_windows.c  platforms\windows\stn_app_windows.c"
 
 cl %CFLAGS% %INCLUDES% %SOURCES% ^
     /Fo"%OBJ_DIR%\\" ^
@@ -580,6 +582,31 @@ if errorlevel 1 goto fail
 if errorlevel 1 goto test_fail
 echo.
 echo TRANSFER BINDING TEST SUCCESSFUL
+exit /b 0
+
+
+:test_transfer_authorization
+set "TEST_TARGET=%BUILD_DIR%\test-transfer-authorization.exe"
+echo.
+echo STN Chain Phase 19 transfer authorization qualification test
+echo Compiler: Microsoft cl.exe
+echo Target:   %TEST_TARGET%
+echo.
+cl %CFLAGS% %INCLUDES% /DSTN_TRANSFER_AUTHORIZATION_TEST_MAIN ^
+    tests\test_transfer_authorization.c ^
+    src\stn_transfer_authorization.c ^
+    src\stn_transfer.c ^
+    src\stn_wallet.c ^
+    src\stn_address.c ^
+    src\stn_identity.c ^
+    src\crypto\ed25519_donna\ed25519_provider.c ^
+    platforms\windows\stn_sha256.c ^
+    /Fo"%OBJ_DIR%\\" /Fe"%TEST_TARGET%" /link /INCREMENTAL:NO bcrypt.lib
+if errorlevel 1 goto fail
+"%TEST_TARGET%"
+if errorlevel 1 goto test_fail
+echo.
+echo TRANSFER AUTHORIZATION TEST SUCCESSFUL
 exit /b 0
 
 :test_fail
