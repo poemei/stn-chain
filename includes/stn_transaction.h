@@ -4,7 +4,10 @@
 #include "stn_record.h"
 
 #define STN_TX_HEADER_SIZE 12u
-#define STN_TX_MIN_SIZE (STN_TX_HEADER_SIZE + STN_TX_AUTHORITY_REVOKE_SIZE)
+/* Smallest canonical transaction is Phase 19 share evidence:
+ * 12-byte transaction header + 73-byte canonical share record. */
+#define STN_TX_SHARE_EVIDENCE_SIZE 73u
+#define STN_TX_MIN_SIZE (STN_TX_HEADER_SIZE + STN_TX_SHARE_EVIDENCE_SIZE)
 #define STN_TX_CONTRACT_ACTION_MAX_SIZE (116u + 66656u + 97u)
 #define STN_TX_MAX_SIZE (STN_TX_HEADER_SIZE + STN_TX_CONTRACT_ACTION_MAX_SIZE)
 #define STN_TX_PUBLICATION 1u
