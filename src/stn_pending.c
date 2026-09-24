@@ -334,8 +334,25 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
             if(!active->state.has_tip || active->state.height==UINT64_MAX){
                 continue;
             }
+            /*
+             * A share is eligible only after its exact parent tip is present in
+             * accepted history. Height alone is insufficient: after a reorg,
+             * evidence from an orphaned Work ID must not enter the new branch.
+             */
             if(work_header.height>=active->state.height+1u){
                 continue;
+            }
+            {
+                size_t parent_index=(size_t)(work_header.height-1u);
+                uint8_t parent_id[32];
+                if(work_header.height==0u ||
+                   parent_index>=active->count ||
+                   stn_chain_block_id(active->blocks[parent_index].bytes,
+                       active->blocks[parent_index].length,
+                       &active->context.hash_provider,parent_id)!=STN_DATA_OK ||
+                   memcmp(parent_id,work_header.previous_hash,32u)!=0){
+                    continue;
+                }
             }
         }
 
