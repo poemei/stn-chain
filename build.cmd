@@ -469,6 +469,7 @@ cl %CFLAGS% %INCLUDES% /DSTN_ISSUANCE_BINDING_TEST_MAIN ^
     src\stn_address.c ^
     src\stn_contract_lineage.c ^
     src\stn_contract_state.c ^
+    src\stn_contract_consensus.c ^
     src\stn_sentinel_intelligence.c ^
     src\stn_contract_snapshot.c ^
     src\stn_contract_transaction.c ^
