@@ -38,12 +38,11 @@ stn_peer_status stn_peer_encode(uint16_t t,const uint8_t *p,size_t n,uint8_t *ou
 }
 static stn_peer_status local_validate(const stn_chain_context *c,const stn_block_span *b,size_t n,stn_chain_state *out)
 {
-    stn_chain_state state;size_t i;
-    if(c==NULL || c->pow_policy==NULL || b==NULL || n==0 || n>UINT32_MAX || stn_chain_initialize(c,&state)!=STN_DATA_OK){return STN_PEER_VALIDATION;}
-    for(i=0;i<n;++i){
-        if(stn_chain_validate_candidate(c,&state,b[i].bytes,b[i].length,&state).acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){stn_chain_state_release(&state);return STN_PEER_VALIDATION;}
-    }
-    *out=state;return STN_PEER_OK;
+    stn_chain_report report;
+    if(c==NULL || c->pow_policy==NULL || b==NULL || n==0 || n>UINT32_MAX || out==NULL){return STN_PEER_VALIDATION;}
+    report=stn_chain_reconstruct_history(c,b,n,out);
+    if(report.acceptance==STN_ACCEPTANCE_UNRESOLVED){return STN_PEER_VALIDATION;}
+    return report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT ? STN_PEER_OK : STN_PEER_VALIDATION;
 }
 static stn_peer_status hello(const stn_chain_context *c,uint8_t p[68])
 {
