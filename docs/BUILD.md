@@ -24,36 +24,26 @@ Historical qualification results retain their original build context.
 
 ## Phase 20 qualification status
 
-Phase 20 Production Qualification is active as of 2026-09-24. The initial
-Windows x64 baseline recorded a passing production build and the following
-existing qualification targets:
+Phase 20 Production Qualification completed on 2026-09-24 for the bounded
+Windows x64 and Linux x64 scope.
 
-- `test-contract`: 494 checks, 0 failures
-- `test-contract-consensus`: 41 checks, 0 failures
-- `test-contract-lineage`: 14 checks, 0 failures
-- `test-contract-state`: 17 checks, 0 failures
-- `test-chain`: 1,243 checks, 0 failures
-- `tools/test-node.ps1 -FramingOnly`: 33 checks, 0 failures
-- `test-contract-snapshot`: 337 checks, 0 failures after the qualified
-  dependency/fixture-allocation harness corrections
-- `test-peer`: 2,867 checks, 0 failures with the qualified local
-  `convergence_rpc()` fixture-allocation correction
+Final matching qualification evidence:
 
-The snapshot and peer failures discovered during the baseline were Windows
-test-harness stack-allocation defects; neither failure demonstrated a production
-consensus defect. The snapshot dependency correction is recorded in `5fdb395`.
+| Target | Windows x64 | Linux x64 |
+| --- | ---: | ---: |
+| `test-chain` | 1,243 / 0 | 1,243 / 0 |
+| `test-contract-snapshot` | 337 / 0 | 337 / 0 |
+| `test-peer` | 2,867 / 0 | 2,867 / 0 |
 
-The Windows runner still requires qualification of its nonzero executable-exit
-handling: a Windows exception exit such as `0xC00000FD` was observed to pass
-through the existing `test-peer` target as apparent success. Do not interpret
-the script's success message alone as qualification until that runner defect is
-closed.
+Windows also retained the Phase 20 baseline contract and framing qualifications,
+and `build.cmd` now requires an exact zero exit status from qualification
+executables. Linux x64 production build, installation and deployed-service
+restart completed successfully during the phase.
 
-Linux x64 production build, installation and deployed-service restart have
-completed successfully during Phase 20. Cross-platform qualification still
-requires the Linux qualification tests to be exercised against the same shared
-commit. Earlier Linux test evidence remains historical phase evidence and is not
-a substitute for that same-commit test run.
+The Linux snapshot dependency correction and peer harness portability work were
+build/test-only changes. No production consensus, protocol, serialization,
+economic, mining or P2P behavior changed for qualification. ARM and other
+architectures remain outside this Phase 20 claim.
 
 ## Windows startup
 
