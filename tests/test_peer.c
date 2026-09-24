@@ -1,9 +1,16 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#endif
 #include "stn_peer.h"
+#ifdef _WIN32
 #include "stn_windows_peer.h"
 #include "stn_windows_storage.h"
+#else
+#include "stn_linux_peer.h"
+#include "stn_linux_storage.h"
+#endif
 #include "stn_sha256.h"
 #include "stn_mining.h"
 #include <stdio.h>
@@ -683,3 +690,6 @@ int test_peer_ownership(void)
     printf("Peer ownership/restart: %u checks, %u failures.\n",checks,failures);
     return failures!=0;
 }
+#ifdef STN_PEER_TEST_MAIN
+int main(void){return test_peer();}
+#endif
