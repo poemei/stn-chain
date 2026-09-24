@@ -608,6 +608,9 @@ static void *inbound_thread(void *user)
         }
 
         peer.io_timeout_ms = APP_P2P_IO_TIMEOUT_MS;
+        report_event(
+            STN_REPORT_PEER,
+            "Inbound P2P connection accepted.");
         snapshot = (uint8_t *)malloc(capacity);
         request = (uint8_t *)malloc(STN_PEER_MAX_FRAME);
         response = (uint8_t *)malloc(STN_PEER_MAX_FRAME);
@@ -653,7 +656,21 @@ static void *inbound_thread(void *user)
 
             pthread_mutex_unlock(runtime->lock);
 
+            if(storage_status != STN_STORAGE_OK) {
+                report_event(
+                    STN_REPORT_PEER,
+                    "Inbound P2P snapshot unavailable status=%d needed=%zu capacity=%zu",
+                    (int)storage_status,
+                    needed,
+                    capacity);
+            }
+
             if(storage_status == STN_STORAGE_OK) {
+                report_event(
+                    STN_REPORT_PEER,
+                    "Inbound P2P snapshot ready blocks=%zu.",
+                    view.count);
+
                 for(;;) {
                     size_t request_length = 0;
                     size_t response_length = 0;
@@ -676,6 +693,11 @@ static void *inbound_thread(void *user)
                         break;
                     }
 
+                    report_event(
+                        STN_REPORT_PEER,
+                        "Inbound STNP frame received bytes=%zu.",
+                        request_length);
+
                     status = stn_peer_serve(
                         runtime->mining->chain,
                         view.blocks,
@@ -694,6 +716,11 @@ static void *inbound_thread(void *user)
                             (int)status);
                         break;
                     }
+
+                    report_event(
+                        STN_REPORT_PEER,
+                        "Inbound STNP request accepted response_bytes=%zu.",
+                        response_length);
 
                     status = transport.send(
                         transport.user,
