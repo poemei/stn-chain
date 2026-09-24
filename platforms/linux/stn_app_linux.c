@@ -1008,6 +1008,57 @@ int stn_linux_app(int argc, char **argv)
                             (int)report.target,
                             (int)report.pow,
                             (int)report.work);
+                        if(report.failing_index < diagnostic_count) {
+                            const stn_block_span *failed =
+                                &diagnostic_blocks[report.failing_index];
+                            if(failed->length >= STN_BLOCK_HEADER_SIZE) {
+                                const uint8_t *fb = failed->bytes;
+                                uint32_t tx_count =
+                                    (uint32_t)stn_wire_read(fb + 160,4);
+                                uint32_t body_length =
+                                    (uint32_t)stn_wire_read(fb + 164,4);
+                                fprintf(
+                                    stderr,
+                                    "Failed block raw header: stored_length=%zu magic=%02x%02x%02x%02x"
+                                    " version=%u flags=%u height=%llu tx_count=%u body_length=%u.\n",
+                                    failed->length,
+                                    fb[0],fb[1],fb[2],fb[3],
+                                    (unsigned)stn_wire_read(fb + 4,2),
+                                    (unsigned)stn_wire_read(fb + 6,2),
+                                    (unsigned long long)stn_wire_read(fb + 72,8),
+                                    (unsigned)tx_count,
+                                    (unsigned)body_length);
+                                if(failed->length > STN_BLOCK_HEADER_SIZE &&
+                                   tx_count != 0u &&
+                                   failed->length - STN_BLOCK_HEADER_SIZE >= 4u) {
+                                    uint32_t tx_length =
+                                        (uint32_t)stn_wire_read(
+                                            fb + STN_BLOCK_HEADER_SIZE,4);
+                                    fprintf(
+                                        stderr,
+                                        "Failed block first transaction: length=%u"
+                                        " magic=%02x%02x%02x%02x version=%u type=%u record_length=%u.\n",
+                                        (unsigned)tx_length,
+                                        failed->length >= STN_BLOCK_HEADER_SIZE + 16u ?
+                                            fb[STN_BLOCK_HEADER_SIZE + 4u] : 0u,
+                                        failed->length >= STN_BLOCK_HEADER_SIZE + 16u ?
+                                            fb[STN_BLOCK_HEADER_SIZE + 5u] : 0u,
+                                        failed->length >= STN_BLOCK_HEADER_SIZE + 16u ?
+                                            fb[STN_BLOCK_HEADER_SIZE + 6u] : 0u,
+                                        failed->length >= STN_BLOCK_HEADER_SIZE + 16u ?
+                                            fb[STN_BLOCK_HEADER_SIZE + 7u] : 0u,
+                                        failed->length >= STN_BLOCK_HEADER_SIZE + 16u ?
+                                            (unsigned)stn_wire_read(
+                                                fb + STN_BLOCK_HEADER_SIZE + 8u,2) : 0u,
+                                        failed->length >= STN_BLOCK_HEADER_SIZE + 16u ?
+                                            (unsigned)stn_wire_read(
+                                                fb + STN_BLOCK_HEADER_SIZE + 10u,2) : 0u,
+                                        failed->length >= STN_BLOCK_HEADER_SIZE + 16u ?
+                                            (unsigned)stn_wire_read(
+                                                fb + STN_BLOCK_HEADER_SIZE + 12u,4) : 0u);
+                                }
+                            }
+                        }
                     }
                     stn_chain_state_release(&diagnostic_state);
                 }
