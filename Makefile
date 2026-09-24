@@ -61,6 +61,7 @@ CORE_SOURCES := \
 	src/stn_transfer_replay.c \
 	src/stn_transfer_binding.c \
 	src/stn_transfer_authorization.c \
+	src/stn_transfer_acceptance.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -340,3 +341,15 @@ test-transfer-authorization: $(BUILD_DIR)/test-transfer-authorization
 $(BUILD_DIR)/test-transfer-authorization: tests/test_transfer_authorization.c src/stn_transfer_authorization.c src/stn_transfer.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_transfer_authorization.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_TRANSFER_AUTHORIZATION_TEST_MAIN tests/test_transfer_authorization.c src/stn_transfer_authorization.c src/stn_transfer.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+
+
+# Phase 19 authorized accepted-transfer qualification.
+.PHONY: test-transfer-acceptance
+test-transfer-acceptance: $(BUILD_DIR)/test-transfer-acceptance
+	$(BUILD_DIR)/test-transfer-acceptance
+
+TRANSFER_ACCEPTANCE_SOURCES := src/stn_transfer_acceptance.c src/stn_transfer_authorization.c src/stn_transfer_binding.c src/stn_transfer_replay.c src/stn_transfer.c src/stn_economic_state.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c
+
+$(BUILD_DIR)/test-transfer-acceptance: tests/test_transfer_acceptance.c $(TRANSFER_ACCEPTANCE_SOURCES) includes/stn_transfer_acceptance.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_ACCEPTANCE_TEST_MAIN tests/test_transfer_acceptance.c $(TRANSFER_ACCEPTANCE_SOURCES) -o $@ $(LDLIBS)
