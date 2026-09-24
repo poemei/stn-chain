@@ -388,9 +388,66 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
             goto done;
         }
 
-        if(stn_share_id(&evidence,p)!=STN_DATA_OK){
-            code=STN_RPC_PROVIDER;
-            goto done;
+        {
+            stn_transaction tx={0};
+            uint8_t canonical[STN_SHARE_CANONICAL_SIZE];
+            uint8_t transaction[STN_TX_HEADER_SIZE+STN_SHARE_CANONICAL_SIZE];
+            uint8_t transaction_id[32];
+            size_t transaction_length=0;
+            stn_validation_report report;
+            stn_pending_result result;
+
+            if(s->pending==NULL){
+                code=STN_RPC_UNAVAILABLE;
+                goto done;
+            }
+
+            if(stn_share_encode(&evidence,canonical)!=STN_DATA_OK){
+                code=STN_RPC_PROVIDER;
+                goto done;
+            }
+
+            tx.version=1;
+            tx.type=STN_TX_SHARE_EVIDENCE;
+            tx.record_bytes=canonical;
+            tx.record_length=STN_SHARE_CANONICAL_SIZE;
+
+            if(stn_transaction_encode(
+                    &tx,
+                    transaction,
+                    sizeof(transaction),
+                    &transaction_length)!=STN_DATA_OK){
+                code=STN_RPC_PROVIDER;
+                goto done;
+            }
+
+            result=stn_pending_admit_transaction(
+                s->pending,
+                transaction,
+                transaction_length,
+                s->intelligence,
+                &v,
+                &s->chain->hash_provider,
+                &report,
+                transaction_id);
+
+            if(result==STN_PENDING_DUPLICATE || result==STN_PENDING_REPLAY){
+                code=STN_RPC_REJECTED;
+                goto done;
+            }
+            if(result!=STN_PENDING_ACCEPTED){
+                code=result==STN_PENDING_CAPACITY ? STN_RPC_CAPACITY :
+                    result==STN_PENDING_UNAVAILABLE ? STN_RPC_UNAVAILABLE :
+                    result==STN_PENDING_PROVIDER ? STN_RPC_PROVIDER :
+                    STN_RPC_REJECTED;
+                goto done;
+            }
+
+            if(stn_share_id(&evidence,p)!=STN_DATA_OK){
+                stn_pending_remove(s->pending,transaction_id);
+                code=STN_RPC_PROVIDER;
+                goto done;
+            }
         }
 
         *written=32u;
