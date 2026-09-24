@@ -46,10 +46,14 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
     case STN_RPC_BLOCK_ID:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_GET_ACCEPTED_RECORD:return n==32;
     case STN_RPC_INTELLIGENCE_CURSOR:return n==40;
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_SUBMIT_INTELLIGENCE:return n>=STN_RECORD_OVERHEAD && n<=STN_RECORD_MAX_SIZE;
-    case STN_RPC_SUBMIT_WORK:
-        return n>=68+STN_BLOCK_HEADER_SIZE &&
-            n<=68+STN_BLOCK_MAX_SIZE &&
-            stn_wire_read(p+64,4)==n-68;
+    case STN_RPC_SUBMIT_WORK:{
+        stn_address miner;
+        return n>=STN_RPC_MINING_SUBMISSION_PREFIX+STN_BLOCK_HEADER_SIZE &&
+            n<=STN_RPC_MINING_SUBMISSION_PREFIX+STN_BLOCK_MAX_SIZE &&
+            stn_wire_read(p+64,4)==n-STN_RPC_MINING_SUBMISSION_PREFIX &&
+            stn_address_decode((const char *)(p+68),STN_RPC_MINER_IDENTITY_SIZE,&miner)==STN_DATA_OK &&
+            miner.type==STN_ADDRESS_IDENTITY;
+    }
     default:return 1;
     }
 }
@@ -101,7 +105,9 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
      * and body length are both zero.
      */
     case STN_RPC_MINING_TEMPLATE:
-        return shape(STN_RPC_SUBMIT_WORK,p,n);
+        return n>=68+STN_BLOCK_HEADER_SIZE &&
+            n<=68+STN_BLOCK_MAX_SIZE &&
+            stn_wire_read(p+64,4)==n-68;
 
     case STN_RPC_SUBMIT_WORK:
         return n==80;
