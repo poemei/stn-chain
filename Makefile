@@ -59,6 +59,7 @@ CORE_SOURCES := \
 	src/stn_wallet.c \
 	src/stn_transfer.c \
 	src/stn_transfer_replay.c \
+	src/stn_transfer_binding.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -318,3 +319,13 @@ test-transfer-replay: $(BUILD_DIR)/test-transfer-replay
 $(BUILD_DIR)/test-transfer-replay: tests/test_transfer_replay.c src/stn_transfer_replay.c src/stn_transfer.c includes/stn_transfer_replay.h includes/stn_transfer.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_TRANSFER_REPLAY_TEST_MAIN tests/test_transfer_replay.c src/stn_transfer_replay.c src/stn_transfer.c -o $@ $(LDLIBS)
+
+
+# Phase 19 accepted transfer replay/economic-state binding qualification.
+.PHONY: test-transfer-binding
+test-transfer-binding: $(BUILD_DIR)/test-transfer-binding
+	$(BUILD_DIR)/test-transfer-binding
+
+$(BUILD_DIR)/test-transfer-binding: tests/test_transfer_binding.c src/stn_transfer_binding.c src/stn_transfer_replay.c src/stn_transfer.c src/stn_economic_state.c includes/stn_transfer_binding.h includes/stn_transfer_replay.h includes/stn_transfer.h includes/stn_economic_state.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_BINDING_TEST_MAIN tests/test_transfer_binding.c src/stn_transfer_binding.c src/stn_transfer_replay.c src/stn_transfer.c src/stn_economic_state.c -o $@ $(LDLIBS)
