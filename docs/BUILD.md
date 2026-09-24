@@ -49,9 +49,11 @@ through the existing `test-peer` target as apparent success. Do not interpret
 the script's success message alone as qualification until that runner defect is
 closed.
 
-Linux x64 must be built and exercised at the same shared commit before Phase 20
-cross-platform qualification can be closed. Earlier Linux evidence remains
-historical phase evidence and is not a substitute for that same-commit run.
+Linux x64 production build, installation and deployed-service restart have
+completed successfully during Phase 20. Cross-platform qualification still
+requires the Linux qualification tests to be exercised against the same shared
+commit. Earlier Linux test evidence remains historical phase evidence and is not
+a substitute for that same-commit test run.
 
 ## Windows startup
 
