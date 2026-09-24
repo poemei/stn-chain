@@ -3,6 +3,7 @@
 #include "stn_contract_transaction.h"
 #include "stn_share.h"
 #include "stn_compensation.h"
+#include "stn_issuance.h"
 #include "stn_wire_internal.h"
 #include <string.h>
 
@@ -10,6 +11,8 @@ _Static_assert(STN_TX_SHARE_EVIDENCE_SIZE==STN_SHARE_CANONICAL_SIZE,
     "share transaction size must match canonical share evidence");
 _Static_assert(STN_TX_COMPENSATION_DESTINATION_SIZE==STN_COMPENSATION_DESTINATION_SIZE,
     "compensation transaction size must match canonical destination");
+_Static_assert(STN_TX_ISSUANCE_SIZE==STN_ISSUANCE_CANONICAL_SIZE,
+    "issuance transaction size must match canonical issuance record");
 
 static const uint8_t magic[4] = {0x53, 0x54, 0x4e, 0x54};
 
@@ -33,7 +36,7 @@ stn_data_status stn_transaction_decode(const uint8_t *bytes, size_t length,
     t.version = (uint16_t)stn_wire_read(bytes + 4, 2);
     t.type = (uint16_t)stn_wire_read(bytes + 6, 2);
     if (t.version != 1) { return STN_DATA_VERSION; }
-    if (t.type < STN_TX_PUBLICATION || t.type > STN_TX_COMPENSATION_DESTINATION) { return STN_DATA_TYPE; }
+    if (t.type < STN_TX_PUBLICATION || t.type > STN_TX_ISSUANCE) { return STN_DATA_TYPE; }
     t.record_length = (uint32_t)stn_wire_read(bytes + 8, 4);
     if ((size_t)t.record_length != length - STN_TX_HEADER_SIZE) { return STN_DATA_LENGTH; }
     t.record_bytes = bytes + STN_TX_HEADER_SIZE;
@@ -47,6 +50,9 @@ stn_data_status stn_transaction_decode(const uint8_t *bytes, size_t length,
     } else if (t.type == STN_TX_COMPENSATION_DESTINATION) {
         stn_compensation_destination destination;
         if (stn_compensation_destination_decode(t.record_bytes,t.record_length,&destination) != STN_DATA_OK) { return STN_DATA_CONTENT; }
+    } else if (t.type == STN_TX_ISSUANCE) {
+        stn_issuance_record issuance;
+        if (stn_issuance_decode(t.record_bytes,t.record_length,&issuance) != STN_DATA_OK) { return STN_DATA_CONTENT; }
     } else if ((size_t)t.record_length != lifecycle_size(t.type)) { return STN_DATA_LENGTH; }
     *out = t;
     return STN_DATA_OK;
@@ -68,12 +74,13 @@ stn_data_status stn_transaction_encode(const stn_transaction *tx,
         return STN_DATA_ARGUMENT;
     }
     if (tx->version != 1) { return STN_DATA_VERSION; }
-    if (tx->type < STN_TX_PUBLICATION || tx->type > STN_TX_COMPENSATION_DESTINATION) { return STN_DATA_TYPE; }
+    if (tx->type < STN_TX_PUBLICATION || tx->type > STN_TX_ISSUANCE) { return STN_DATA_TYPE; }
     if (tx->type == STN_TX_PUBLICATION && (tx->record_length < STN_RECORD_OVERHEAD || tx->record_length > STN_RECORD_MAX_SIZE)) return STN_DATA_LENGTH;
     if (tx->type != STN_TX_PUBLICATION &&
         tx->type != STN_TX_CONTRACT_ACTION &&
         tx->type != STN_TX_SHARE_EVIDENCE &&
         tx->type != STN_TX_COMPENSATION_DESTINATION &&
+        tx->type != STN_TX_ISSUANCE &&
         (size_t)tx->record_length != lifecycle_size(tx->type)) return STN_DATA_LENGTH;
     if (tx->type == STN_TX_PUBLICATION) {
         if (stn_record_decode(tx->record_bytes, tx->record_length, &r) != STN_RECORD_OK) { return STN_DATA_CONTENT; }
@@ -86,6 +93,9 @@ stn_data_status stn_transaction_encode(const stn_transaction *tx,
     } else if (tx->type == STN_TX_COMPENSATION_DESTINATION) {
         stn_compensation_destination destination;
         if (stn_compensation_destination_decode(tx->record_bytes,tx->record_length,&destination) != STN_DATA_OK) { return STN_DATA_CONTENT; }
+    } else if (tx->type == STN_TX_ISSUANCE) {
+        stn_issuance_record issuance;
+        if (stn_issuance_decode(tx->record_bytes,tx->record_length,&issuance) != STN_DATA_OK) { return STN_DATA_CONTENT; }
     } else if ((size_t)tx->record_length != lifecycle_size(tx->type)) { return STN_DATA_LENGTH; }
     total = STN_TX_HEADER_SIZE + (size_t)tx->record_length;
     if (capacity < total) { return STN_DATA_CAPACITY; }
