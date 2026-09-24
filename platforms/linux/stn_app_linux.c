@@ -29,6 +29,8 @@
 
 #define APP_RPC_ACCEPT_POLL_MS 250u
 #define APP_RPC_IO_TIMEOUT_MS 60000u
+#define APP_P2P_PORT 18474u
+#define APP_P2P_IO_TIMEOUT_MS 5000u
 
 static volatile sig_atomic_t stopping;
 
@@ -560,6 +562,144 @@ static int serve_once(
     return ok;
 }
 
+typedef struct inbound_runtime {
+    stn_linux_peer listener;
+    stn_mining_service *mining;
+    pthread_mutex_t *lock;
+    pthread_t thread;
+    int thread_started;
+    uint16_t bound;
+} inbound_runtime;
+
+static void *inbound_thread(void *user)
+{
+    inbound_runtime *runtime = (inbound_runtime *)user;
+
+    while(!stopping) {
+        stn_linux_peer peer;
+        stn_peer_transport transport;
+        stn_peer_status accepted;
+        uint8_t *snapshot = NULL;
+        uint8_t *request = NULL;
+        uint8_t *response = NULL;
+        size_t capacity = 1u;
+        stn_storage_view view = {0};
+        stn_peer_session session = {0};
+
+        memset(&peer, 0, sizeof(peer));
+        peer.socket = -1;
+
+        accepted = stn_linux_peer_accept(
+            &runtime->listener,
+            APP_RPC_ACCEPT_POLL_MS,
+            &peer,
+            &transport);
+
+        if(accepted == STN_PEER_TIMEOUT) {
+            continue;
+        }
+
+        if(accepted != STN_PEER_OK) {
+            if(!stopping) {
+                sleep_ms(APP_RPC_ACCEPT_POLL_MS);
+            }
+            continue;
+        }
+
+        peer.io_timeout_ms = APP_P2P_IO_TIMEOUT_MS;
+        snapshot = (uint8_t *)malloc(capacity);
+        request = (uint8_t *)malloc(STN_PEER_MAX_FRAME);
+        response = (uint8_t *)malloc(STN_PEER_MAX_FRAME);
+
+        if(snapshot != NULL && request != NULL && response != NULL) {
+            stn_storage_status storage_status;
+            size_t needed = 0;
+
+            pthread_mutex_lock(runtime->lock);
+
+            storage_status = runtime->mining->storage->acquire(
+                runtime->mining->storage->user);
+
+            if(storage_status == STN_STORAGE_OK) {
+                storage_status = runtime->mining->storage->read(
+                    runtime->mining->storage->user,
+                    snapshot,
+                    0,
+                    &needed);
+
+                runtime->mining->storage->release(
+                    runtime->mining->storage->user);
+            }
+
+            if((storage_status == STN_STORAGE_OK ||
+                storage_status == STN_STORAGE_CAPACITY) &&
+               needed != 0) {
+                uint8_t *grown = (uint8_t *)realloc(snapshot, needed);
+
+                if(grown != NULL) {
+                    snapshot = grown;
+                    capacity = needed;
+                    storage_status = stn_storage_load(
+                        runtime->mining->chain,
+                        runtime->mining->storage,
+                        snapshot,
+                        capacity,
+                        &view);
+                } else {
+                    storage_status = STN_STORAGE_CAPACITY;
+                }
+            }
+
+            pthread_mutex_unlock(runtime->lock);
+
+            if(storage_status == STN_STORAGE_OK) {
+                for(;;) {
+                    size_t request_length = 0;
+                    size_t response_length = 0;
+                    stn_peer_status status;
+
+                    status = stn_peer_receive(
+                        &transport,
+                        request,
+                        STN_PEER_MAX_FRAME,
+                        &request_length);
+
+                    if(status != STN_PEER_OK) {
+                        break;
+                    }
+
+                    status = stn_peer_serve(
+                        runtime->mining->chain,
+                        view.blocks,
+                        view.count,
+                        &session,
+                        request,
+                        request_length,
+                        response,
+                        STN_PEER_MAX_FRAME,
+                        &response_length);
+
+                    if(status != STN_PEER_OK ||
+                       transport.send(
+                           transport.user,
+                           response,
+                           response_length) != STN_PEER_OK) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        stn_storage_view_release(&view);
+        free(snapshot);
+        free(request);
+        free(response);
+        stn_linux_peer_close(&peer);
+    }
+
+    return NULL;
+}
+
 typedef struct outbound_runtime {
     stn_peer_outbound manager;
     stn_linux_peer socket;
@@ -727,6 +867,7 @@ int stn_linux_app(int argc, char **argv)
     char *instance_path = NULL;
 
     unsigned long port = 18473;
+    unsigned long p2p_port = APP_P2P_PORT;
     char *end;
 
     uint8_t *genesis = NULL;
@@ -747,6 +888,7 @@ int stn_linux_app(int argc, char **argv)
 
     stn_linux_peer listener;
     uint16_t bound;
+    inbound_runtime inbound;
 
     stn_storage_status status;
     stn_rpc_service service = {
@@ -765,6 +907,9 @@ int stn_linux_app(int argc, char **argv)
 
     memset(&listener, 0, sizeof(listener));
     listener.socket = -1;
+
+    memset(&inbound, 0, sizeof(inbound));
+    inbound.listener.socket = -1;
 
     memset(&outbound, 0, sizeof(outbound));
     outbound.socket.socket = -1;
@@ -804,6 +949,18 @@ int stn_linux_app(int argc, char **argv)
                *end != '\0' ||
                end == argv[i] ||
                port > 65535) {
+                goto usage;
+            }
+        } else if(strcmp(argv[i], "--p2p-port") == 0 &&
+                  i + 1 < argc) {
+            errno = 0;
+            p2p_port = strtoul(argv[++i], &end, 10);
+
+            if(errno != 0 ||
+               *end != '\0' ||
+               end == argv[i] ||
+               p2p_port == 0 ||
+               p2p_port > 65535) {
                 goto usage;
             }
         } else {
@@ -1196,6 +1353,16 @@ int stn_linux_app(int argc, char **argv)
         goto cleanup;
     }
 
+    if(stn_linux_peer_listen(
+           (uint16_t)p2p_port,
+           &inbound.listener,
+           &inbound.bound) != STN_PEER_OK) {
+        fprintf(
+            stderr,
+            "Cannot bind P2P port.\n");
+        goto cleanup;
+    }
+
     if(!install_signal_handlers()) {
         goto cleanup;
     }
@@ -1210,8 +1377,9 @@ int stn_linux_app(int argc, char **argv)
 
     report_event(
         STN_REPORT_START,
-        "RPC 0.0.0.0:%u height=%llu",
+        "RPC 0.0.0.0:%u P2P 0.0.0.0:%u height=%llu",
         (unsigned)bound,
+        (unsigned)inbound.bound,
         (unsigned long long)mining.active.height);
 
     if(dev) {
@@ -1227,6 +1395,20 @@ int stn_linux_app(int argc, char **argv)
     fflush(stdout);
 
     result = EXIT_SUCCESS;
+
+    inbound.mining = &mining;
+    inbound.lock = &dispatch_lock;
+
+    if(pthread_create(
+           &inbound.thread,
+           NULL,
+           inbound_thread,
+           &inbound) != 0) {
+        result = EXIT_FAILURE;
+        goto shutdown;
+    }
+
+    inbound.thread_started = 1;
 
     if(candidates.count != 0) {
         size_t capacity = 8u * 1024u * 1024u;
@@ -1388,6 +1570,13 @@ shutdown:
      * during shutdown.
      */
     stn_linux_peer_close(&listener);
+    stn_linux_peer_close(&inbound.listener);
+
+    if(inbound.thread_started) {
+        (void)pthread_join(
+            inbound.thread,
+            NULL);
+    }
 
     if(outbound.thread_started) {
         (void)pthread_join(
@@ -1399,6 +1588,7 @@ shutdown:
 
 cleanup:
     stn_linux_peer_close(&listener);
+    stn_linux_peer_close(&inbound.listener);
 
     if(lock_ready) {
         pthread_mutex_destroy(
@@ -1432,12 +1622,13 @@ cleanup:
 
 usage:
     puts(
-        "Usage: stn-chain [--data PATH] [--rpc-port 18473]\n"
+        "Usage: stn-chain [--data PATH] [--rpc-port 18473] [--p2p-port 18474]\n"
         "Resume saved history or initialize the built-in genesis if absent.\n"
         "Optional --dev enables the repeated development transaction.\n"
         "   or: stn-chain --genesis BLOCK --data PATH [--rpc-port PORT]\n"
         "Explicit selected content: --dev --genesis BLOCK "
         "--transaction STNT.\n"
+        "P2P listens on all IPv4 interfaces; default port 18474.\n"
         "Repeat --peer IPv4:PORT for automatic outbound P2P "
         "(not with --once).\n"
         "RPC listens on all IPv4 interfaces. --once serves one connection. "
