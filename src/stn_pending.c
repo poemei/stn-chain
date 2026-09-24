@@ -262,6 +262,38 @@ stn_pending_result stn_pending_admit_transaction(stn_pending *p,const uint8_t *b
         report->acceptance=STN_ACCEPTANCE_REJECTED;
         return lifecycle_result;
     }
+    if(tx.type==STN_TX_COMPENSATION_DESTINATION){
+        stn_compensation_destination destination;
+        stn_address wallet;
+        stn_data_status mapping;
+        if(p==NULL || active==NULL || hash==NULL || active->state.compensation==NULL){
+            report->acceptance=STN_ACCEPTANCE_UNRESOLVED;
+            return STN_PENDING_UNAVAILABLE;
+        }
+        if(stn_compensation_destination_decode(tx.record_bytes,tx.record_length,&destination)!=STN_DATA_OK){
+            report->structure=STN_STAGE_REJECT;
+            report->acceptance=STN_ACCEPTANCE_REJECTED;
+            return STN_PENDING_INVALID;
+        }
+        mapping=stn_compensation_state_lookup(active->state.compensation,
+            &destination.mining_identity,&wallet);
+        if(mapping==STN_DATA_OK &&
+           memcmp(wallet.identifier,destination.wallet.identifier,STN_ADDRESS_ID_SIZE)!=0){
+            report->acceptance=STN_ACCEPTANCE_REJECTED;
+            return STN_PENDING_REPLAY;
+        }
+        if(mapping!=STN_DATA_OK && mapping!=STN_DATA_UNRESOLVED){
+            report->acceptance=STN_ACCEPTANCE_ERROR;
+            return mapping==STN_DATA_CAPACITY ? STN_PENDING_CAPACITY : STN_PENDING_PROVIDER;
+        }
+        lifecycle_result=stn_pending_insert(p,bytes,length,hash,id);
+        if(lifecycle_result==STN_PENDING_ACCEPTED){
+            report->acceptance=STN_ACCEPTANCE_UNDER_CONTEXT;
+            return lifecycle_result;
+        }
+        report->acceptance=STN_ACCEPTANCE_REJECTED;
+        return lifecycle_result;
+    }
     if(tx.type!=STN_TX_PUBLICATION){
         if(c==NULL || active==NULL || memcmp(c->expected_network,active->state.network_id,32)!=0){report->acceptance=STN_ACCEPTANCE_UNRESOLVED;return STN_PENDING_UNAVAILABLE;}
         lifecycle_result=stn_pending_insert(p,bytes,length,hash,id);
