@@ -35,6 +35,7 @@ if /i "%~1"=="test-transfer-envelope-authorization" goto setup
 if /i "%~1"=="test-transfer-envelope-acceptance" goto setup
 if /i "%~1"=="test-transfer-transaction" goto setup
 if /i "%~1"=="test-chain" goto setup
+if /i "%~1"=="test-peer" goto setup
 if not "%~1"=="" (
     echo Usage: build.cmd [clean^|test-contract^|test-contract-consensus^|test-contract-lineage^|test-contract-state^|test-contract-snapshot^|test-economy^|test-share^|test-share-replay^|test-issuance^|test-economic-state^|test-compensation-state^|test-issuance-binding^|test-wallet^|test-transfer^|test-transfer-replay^|test-transfer-binding^|test-transfer-authorization^|test-transfer-acceptance^|test-transfer-envelope^|test-transfer-envelope-replay^|test-transfer-envelope-authorization^|test-transfer-envelope-acceptance^|test-transfer-transaction^|test-chain]
     exit /b 1
@@ -99,6 +100,7 @@ if /i "%~1"=="test-transfer-envelope-authorization" goto test_transfer_envelope_
 if /i "%~1"=="test-transfer-envelope-acceptance" goto test_transfer_envelope_acceptance
 if /i "%~1"=="test-transfer-transaction" goto test_transfer_transaction
 if /i "%~1"=="test-chain" goto test_chain
+if /i "%~1"=="test-peer" goto test_peer
 
 echo.
 echo STN Chain Windows x64 build
@@ -804,6 +806,18 @@ if errorlevel 1 goto fail
 if errorlevel 1 goto test_fail
 echo.
 echo ECONOMIC PERSISTENCE TEST SUCCESSFUL
+exit /b 0
+
+:test_peer
+set "TEST_TARGET=%BUILD_DIR%\test-peer.exe"
+echo.
+echo Running P2P synchronization qualification test...
+cl %CFLAGS% /experimental:c11atomics %INCLUDES% /DSTN_LIFECYCLE_TEST /DSTN_PEER_TEST_MAIN tests\test_peer.c src\stn_address.c src\stn_authority.c src\stn_block.c src\stn_chain.c src\stn_economy.c src\stn_compensation.c src\stn_issuance.c src\stn_economic_state.c src\stn_compensation_state.c src\stn_issuance_binding.c src\stn_wallet.c src\stn_transfer.c src\stn_transfer_replay.c src\stn_transfer_binding.c src\stn_transfer_authorization.c src\stn_transfer_acceptance.c src\stn_transfer_envelope.c src\stn_transfer_envelope_replay.c src\stn_transfer_envelope_authorization.c src\stn_transfer_envelope_acceptance.c src\stn_contract.c src\stn_contract_consensus.c src\stn_contract_lineage.c src\stn_contract_state.c src\stn_contract_snapshot.c src\stn_contract_transaction.c src\stn_fork.c src\stn_identity.c src\stn_lifecycle.c src\stn_mining.c src\stn_peer.c src\stn_pending.c src\stn_pow.c src\stn_record.c src\stn_replay.c src\stn_share.c src\stn_share_replay.c src\stn_storage.c src\stn_transaction.c src\stn_validation.c src\crypto\ed25519_donna\ed25519_provider.c platforms\windows\stn_sha256.c platforms\windows\stn_storage_windows.c platforms\windows\stn_peer_windows.c /Fo"%OBJ_DIR%\\" /Fe"%TEST_TARGET%" /link /INCREMENTAL:NO ws2_32.lib bcrypt.lib crypt32.lib advapi32.lib user32.lib
+if errorlevel 1 goto fail
+"%TEST_TARGET%"
+if errorlevel 1 goto test_fail
+echo.
+echo P2P TEST SUCCESSFUL
 exit /b 0
 
 :test_chain
