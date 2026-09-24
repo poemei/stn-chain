@@ -613,6 +613,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
                        STN_SHARE_TEMPLATE_HEADER_SIZE,&work_header)!=STN_DATA_OK ||
                    work_header.version!=STN_POW_BLOCK_VERSION ||
                    work_header.reserved_work_nonce!=0u ||
+                   memcmp(work_header.transaction_commitment,share.body_commitment,32u)!=0 ||
                    memcmp(work_header.network_id,context->network_id,32)!=0 ||
                    !prior->has_tip ||
                    prior->height==UINT64_MAX ||
