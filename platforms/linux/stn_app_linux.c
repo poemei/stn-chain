@@ -8,6 +8,7 @@
 #include "stn_report.h"
 
 #include <errno.h>
+#include <netdb.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <pthread.h>
@@ -823,53 +824,76 @@ static int candidate_argument(
     const char *text,
     stn_peer_candidates *set)
 {
-    stn_peer_endpoint endpoint;
-    unsigned values[5] = {0};
-    size_t i;
-    const char *cursor = text;
+    char host[256];
+    char service[6];
+    const char *colon;
+    char *end;
+    unsigned long port;
+    struct addrinfo hints;
+    struct addrinfo *resolved = NULL;
+    struct addrinfo *entry;
+    int accepted = 0;
 
-    for(i = 0; i < 5; ++i) {
-        unsigned digits = 0;
-
-        while(*cursor >= '0' && *cursor <= '9') {
-            if(++digits > (i == 4 ? 5u : 3u)) {
-                return 0;
-            }
-
-            values[i] =
-                values[i] * 10u +
-                (unsigned)(*cursor++ - '0');
-        }
-
-        if(digits == 0 ||
-           values[i] > (i == 4 ? 65535u : 255u)) {
-            return 0;
-        }
-
-        if(i < 4) {
-            if(*cursor++ != (i == 3 ? ':' : '.')) {
-                return 0;
-            }
-        }
-    }
-
-    if(*cursor != '\0') {
+    if(text == NULL || set == NULL) {
         return 0;
     }
 
-    for(i = 0; i < 4; ++i) {
-        endpoint.address[i] = (uint8_t)values[i];
+    colon = strrchr(text, ':');
+
+    if(colon == NULL || colon == text || colon[1] == '\0' ||
+       (size_t)(colon - text) >= sizeof(host)) {
+        return 0;
     }
 
-    endpoint.port = (uint16_t)values[4];
+    memcpy(host, text, (size_t)(colon - text));
+    host[colon - text] = '\0';
 
-    {
-        stn_peer_status status =
-            stn_peer_candidate_add(set, &endpoint);
+    errno = 0;
+    port = strtoul(colon + 1, &end, 10);
 
-        return status == STN_PEER_OK ||
-            status == STN_PEER_RETAINED;
+    if(errno != 0 || end == colon + 1 || *end != '\0' ||
+       port == 0 || port > 65535) {
+        return 0;
     }
+
+    snprintf(service, sizeof(service), "%lu", port);
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    if(getaddrinfo(host, service, &hints, &resolved) != 0) {
+        return 0;
+    }
+
+    for(entry = resolved; entry != NULL; entry = entry->ai_next) {
+        const struct sockaddr_in *address;
+        stn_peer_endpoint endpoint;
+        uint32_t ipv4;
+        stn_peer_status status;
+
+        if(entry->ai_family != AF_INET ||
+           entry->ai_addr == NULL ||
+           entry->ai_addrlen < (socklen_t)sizeof(struct sockaddr_in)) {
+            continue;
+        }
+
+        address = (const struct sockaddr_in *)entry->ai_addr;
+        ipv4 = ntohl(address->sin_addr.s_addr);
+        endpoint.address[0] = (uint8_t)(ipv4 >> 24);
+        endpoint.address[1] = (uint8_t)(ipv4 >> 16);
+        endpoint.address[2] = (uint8_t)(ipv4 >> 8);
+        endpoint.address[3] = (uint8_t)ipv4;
+        endpoint.port = (uint16_t)port;
+
+        status = stn_peer_candidate_add(set, &endpoint);
+
+        if(status == STN_PEER_OK || status == STN_PEER_RETAINED) {
+            accepted = 1;
+        }
+    }
+
+    freeaddrinfo(resolved);
+    return accepted;
 }
 
 int stn_linux_app(int argc, char **argv)
