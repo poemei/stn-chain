@@ -572,177 +572,220 @@ typedef struct inbound_runtime {
     uint16_t bound;
 } inbound_runtime;
 
+typedef struct inbound_client {
+    stn_linux_peer peer;
+    stn_peer_transport transport;
+    stn_mining_service *mining;
+    pthread_mutex_t *lock;
+} inbound_client;
+
+static void *inbound_client_thread(void *user)
+{
+    inbound_client *client = (inbound_client *)user;
+    uint8_t *snapshot = NULL;
+    uint8_t *request = NULL;
+    uint8_t *response = NULL;
+    size_t capacity = 1u;
+    stn_storage_view view = {0};
+    stn_peer_session session = {0};
+    stn_storage_status storage_status = STN_STORAGE_ARGUMENT;
+    size_t needed = 0;
+
+    client->peer.io_timeout_ms = APP_P2P_IO_TIMEOUT_MS;
+    report_event(STN_REPORT_PEER, "Inbound P2P connection accepted.");
+
+    snapshot = (uint8_t *)malloc(capacity);
+    request = (uint8_t *)malloc(STN_PEER_MAX_FRAME);
+    response = (uint8_t *)malloc(STN_PEER_MAX_FRAME);
+
+    if(snapshot != NULL && request != NULL && response != NULL) {
+        pthread_mutex_lock(client->lock);
+
+        storage_status = client->mining->storage->acquire(
+            client->mining->storage->user);
+
+        if(storage_status == STN_STORAGE_OK) {
+            storage_status = client->mining->storage->read(
+                client->mining->storage->user,
+                snapshot,
+                0,
+                &needed);
+
+            client->mining->storage->release(
+                client->mining->storage->user);
+        }
+
+        if((storage_status == STN_STORAGE_OK ||
+            storage_status == STN_STORAGE_CAPACITY) &&
+           needed != 0) {
+            uint8_t *grown = (uint8_t *)realloc(snapshot, needed);
+
+            if(grown != NULL) {
+                snapshot = grown;
+                capacity = needed;
+                storage_status = stn_storage_load(
+                    client->mining->chain,
+                    client->mining->storage,
+                    snapshot,
+                    capacity,
+                    &view);
+            } else {
+                storage_status = STN_STORAGE_CAPACITY;
+            }
+        }
+
+        pthread_mutex_unlock(client->lock);
+
+        if(storage_status != STN_STORAGE_OK) {
+            report_event(
+                STN_REPORT_PEER,
+                "Inbound P2P snapshot unavailable status=%d needed=%zu capacity=%zu",
+                (int)storage_status,
+                needed,
+                capacity);
+        }
+
+        if(storage_status == STN_STORAGE_OK) {
+            report_event(
+                STN_REPORT_PEER,
+                "Inbound P2P snapshot ready blocks=%zu.",
+                view.count);
+
+            while(!stopping) {
+                size_t request_length = 0;
+                size_t response_length = 0;
+                stn_peer_status status;
+
+                status = stn_peer_receive(
+                    &client->transport,
+                    request,
+                    STN_PEER_MAX_FRAME,
+                    &request_length);
+
+                if(status != STN_PEER_OK) {
+                    if(status != STN_PEER_DISCONNECTED &&
+                       status != STN_PEER_TIMEOUT) {
+                        report_event(
+                            STN_REPORT_PEER,
+                            "Inbound receive failed status=%d",
+                            (int)status);
+                    }
+                    break;
+                }
+
+                report_event(
+                    STN_REPORT_PEER,
+                    "Inbound STNP frame received bytes=%zu.",
+                    request_length);
+
+                status = stn_peer_serve(
+                    client->mining->chain,
+                    view.blocks,
+                    view.count,
+                    &session,
+                    request,
+                    request_length,
+                    response,
+                    STN_PEER_MAX_FRAME,
+                    &response_length);
+
+                if(status != STN_PEER_OK) {
+                    report_event(
+                        STN_REPORT_PEER,
+                        "Inbound request rejected status=%d",
+                        (int)status);
+                    break;
+                }
+
+                report_event(
+                    STN_REPORT_PEER,
+                    "Inbound STNP request accepted response_bytes=%zu.",
+                    response_length);
+
+                status = client->transport.send(
+                    client->transport.user,
+                    response,
+                    response_length);
+
+                if(status != STN_PEER_OK) {
+                    report_event(
+                        STN_REPORT_PEER,
+                        "Inbound response failed status=%d",
+                        (int)status);
+                    break;
+                }
+            }
+        }
+    }
+
+    stn_storage_view_release(&view);
+    free(snapshot);
+    free(request);
+    free(response);
+    stn_linux_peer_close(&client->peer);
+    free(client);
+    return NULL;
+}
+
 static void *inbound_thread(void *user)
 {
     inbound_runtime *runtime = (inbound_runtime *)user;
 
     while(!stopping) {
-        stn_linux_peer peer;
-        stn_peer_transport transport;
+        inbound_client *client;
         stn_peer_status accepted;
-        uint8_t *snapshot = NULL;
-        uint8_t *request = NULL;
-        uint8_t *response = NULL;
-        size_t capacity = 1u;
-        stn_storage_view view = {0};
-        stn_peer_session session = {0};
+        pthread_t thread;
 
-        memset(&peer, 0, sizeof(peer));
-        peer.socket = -1;
+        client = (inbound_client *)calloc(1, sizeof(*client));
+
+        if(client == NULL) {
+            sleep_ms(APP_RPC_ACCEPT_POLL_MS);
+            continue;
+        }
+
+        client->peer.socket = -1;
 
         accepted = stn_linux_peer_accept(
             &runtime->listener,
             APP_RPC_ACCEPT_POLL_MS,
-            &peer,
-            &transport);
+            &client->peer,
+            &client->transport);
 
         if(accepted == STN_PEER_TIMEOUT) {
+            free(client);
             continue;
         }
 
         if(accepted != STN_PEER_OK) {
+            free(client);
+
             if(!stopping) {
                 sleep_ms(APP_RPC_ACCEPT_POLL_MS);
             }
             continue;
         }
 
-        peer.io_timeout_ms = APP_P2P_IO_TIMEOUT_MS;
-        report_event(
-            STN_REPORT_PEER,
-            "Inbound P2P connection accepted.");
-        snapshot = (uint8_t *)malloc(capacity);
-        request = (uint8_t *)malloc(STN_PEER_MAX_FRAME);
-        response = (uint8_t *)malloc(STN_PEER_MAX_FRAME);
+        client->transport.user = &client->peer;
+        client->mining = runtime->mining;
+        client->lock = runtime->lock;
 
-        if(snapshot != NULL && request != NULL && response != NULL) {
-            stn_storage_status storage_status;
-            size_t needed = 0;
-
-            pthread_mutex_lock(runtime->lock);
-
-            storage_status = runtime->mining->storage->acquire(
-                runtime->mining->storage->user);
-
-            if(storage_status == STN_STORAGE_OK) {
-                storage_status = runtime->mining->storage->read(
-                    runtime->mining->storage->user,
-                    snapshot,
-                    0,
-                    &needed);
-
-                runtime->mining->storage->release(
-                    runtime->mining->storage->user);
-            }
-
-            if((storage_status == STN_STORAGE_OK ||
-                storage_status == STN_STORAGE_CAPACITY) &&
-               needed != 0) {
-                uint8_t *grown = (uint8_t *)realloc(snapshot, needed);
-
-                if(grown != NULL) {
-                    snapshot = grown;
-                    capacity = needed;
-                    storage_status = stn_storage_load(
-                        runtime->mining->chain,
-                        runtime->mining->storage,
-                        snapshot,
-                        capacity,
-                        &view);
-                } else {
-                    storage_status = STN_STORAGE_CAPACITY;
-                }
-            }
-
-            pthread_mutex_unlock(runtime->lock);
-
-            if(storage_status != STN_STORAGE_OK) {
-                report_event(
-                    STN_REPORT_PEER,
-                    "Inbound P2P snapshot unavailable status=%d needed=%zu capacity=%zu",
-                    (int)storage_status,
-                    needed,
-                    capacity);
-            }
-
-            if(storage_status == STN_STORAGE_OK) {
-                report_event(
-                    STN_REPORT_PEER,
-                    "Inbound P2P snapshot ready blocks=%zu.",
-                    view.count);
-
-                for(;;) {
-                    size_t request_length = 0;
-                    size_t response_length = 0;
-                    stn_peer_status status;
-
-                    status = stn_peer_receive(
-                        &transport,
-                        request,
-                        STN_PEER_MAX_FRAME,
-                        &request_length);
-
-                    if(status != STN_PEER_OK) {
-                        if(status != STN_PEER_DISCONNECTED &&
-                           status != STN_PEER_TIMEOUT) {
-                            report_event(
-                                STN_REPORT_PEER,
-                                "Inbound receive failed status=%d",
-                                (int)status);
-                        }
-                        break;
-                    }
-
-                    report_event(
-                        STN_REPORT_PEER,
-                        "Inbound STNP frame received bytes=%zu.",
-                        request_length);
-
-                    status = stn_peer_serve(
-                        runtime->mining->chain,
-                        view.blocks,
-                        view.count,
-                        &session,
-                        request,
-                        request_length,
-                        response,
-                        STN_PEER_MAX_FRAME,
-                        &response_length);
-
-                    if(status != STN_PEER_OK) {
-                        report_event(
-                            STN_REPORT_PEER,
-                            "Inbound request rejected status=%d",
-                            (int)status);
-                        break;
-                    }
-
-                    report_event(
-                        STN_REPORT_PEER,
-                        "Inbound STNP request accepted response_bytes=%zu.",
-                        response_length);
-
-                    status = transport.send(
-                        transport.user,
-                        response,
-                        response_length);
-
-                    if(status != STN_PEER_OK) {
-                        report_event(
-                            STN_REPORT_PEER,
-                            "Inbound response failed status=%d",
-                            (int)status);
-                        break;
-                    }
-                }
-            }
+        if(pthread_create(
+               &thread,
+               NULL,
+               inbound_client_thread,
+               client) != 0) {
+            stn_linux_peer_close(&client->peer);
+            free(client);
+            continue;
         }
 
-        stn_storage_view_release(&view);
-        free(snapshot);
-        free(request);
-        free(response);
-        stn_linux_peer_close(&peer);
+        /*
+         * Each inbound STNP session owns its socket, immutable snapshot and
+         * buffers.  Detachment keeps the accept lane free for other peers;
+         * process shutdown closes the listener and the bounded session I/O
+         * timeout lets detached workers observe stopping and retire.
+         */
+        (void)pthread_detach(thread);
     }
 
     return NULL;
