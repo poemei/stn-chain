@@ -204,7 +204,7 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
         domain,
         sizeof(domain),
         s->template_bytes,
-        *length,
+        STN_BLOCK_HEADER_SIZE,
         id)==STN_DATA_OK ? STN_RPC_OK : STN_RPC_PROVIDER;
 }
 
@@ -375,10 +375,12 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
     if(q->method==STN_RPC_SUBMIT_SHARE){
         stn_address miner;
         stn_share_evidence evidence;
-        uint8_t proof[32];
+        stn_block_header work_header;
+        uint8_t proof[32],required_target[32],computed_work_id[32];
+        static const uint8_t work_domain[]="STN-CHAIN:WORK:ID:1";
         stn_data_status verified;
 
-        if(q->payload==NULL || q->length!=109u ||
+        if(q->payload==NULL || q->length!=277u ||
            stn_address_decode((const char *)(q->payload+32),STN_MINING_IDENTITY_SIZE,&miner)!=STN_DATA_OK ||
            miner.type!=STN_ADDRESS_IDENTITY){
             code=STN_RPC_INVALID;
@@ -389,18 +391,52 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         memcpy(evidence.work_id,q->payload,32u);
         evidence.miner=miner;
         evidence.nonce=stn_wire_read(q->payload+101,8u);
+        memcpy(evidence.template_header,q->payload+109u,STN_BLOCK_HEADER_SIZE);
 
-        code=template_build(s,&v,&n,id);
-        if(code!=STN_RPC_OK){goto done;}
-        if(memcmp(evidence.work_id,id,32u)!=0){
+        if(stn_block_header_decode(evidence.template_header,
+                STN_BLOCK_HEADER_SIZE,&work_header)!=STN_DATA_OK ||
+           work_header.version!=STN_POW_BLOCK_VERSION ||
+           work_header.reserved_work_nonce!=0u ||
+           memcmp(work_header.network_id,v.state.network_id,32u)!=0 ||
+           !v.state.has_tip ||
+           v.state.height==UINT64_MAX ||
+           work_header.height!=v.state.height+1u ||
+           memcmp(work_header.previous_hash,v.state.tip_id,32u)!=0 ||
+           work_header.timestamp!=v.state.timestamp){
             code=STN_RPC_STALE;
             goto done;
         }
 
-        verified=stn_share_verify(
+        verified=stn_chain_required_target(s->chain,&v.state,required_target);
+        if(verified!=STN_DATA_OK){
+            code=verified==STN_DATA_UNRESOLVED ? STN_RPC_UNAVAILABLE :
+                verified==STN_DATA_CAPACITY || verified==STN_DATA_OVERFLOW ?
+                    STN_RPC_CAPACITY : STN_RPC_PROVIDER;
+            goto done;
+        }
+        if(memcmp(work_header.reserved_target,required_target,32u)!=0){
+            code=STN_RPC_REJECTED;
+            goto done;
+        }
+
+        verified=s->chain->hash_provider.hash(
+            s->chain->hash_provider.user,
+            work_domain,
+            sizeof(work_domain),
+            evidence.template_header,
+            STN_BLOCK_HEADER_SIZE,
+            computed_work_id);
+        if(verified!=STN_DATA_OK){
+            code=verified==STN_DATA_UNRESOLVED ? STN_RPC_UNAVAILABLE : STN_RPC_PROVIDER;
+            goto done;
+        }
+        if(memcmp(evidence.work_id,computed_work_id,32u)!=0){
+            code=STN_RPC_REJECTED;
+            goto done;
+        }
+
+        verified=stn_share_verify_evidence(
             &evidence,
-            s->template_bytes,
-            n,
             &s->chain->hash_provider,
             proof);
         if(verified!=STN_DATA_OK){
