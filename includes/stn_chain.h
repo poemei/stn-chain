@@ -9,6 +9,7 @@
 #include "stn_contract_snapshot.h"
 #include "stn_share_replay.h"
 #include "stn_compensation_state.h"
+#include "stn_economic_state.h"
 
 #define STN_CHAIN_MAX_BATCH 64u
 
@@ -47,6 +48,7 @@ typedef struct stn_chain_state {
     stn_contract_snapshot *contracts;
     stn_share_replay_state *shares;
     stn_compensation_state *compensation;
+    stn_economic_state *economy;
     uint64_t publication_activation_height;
 } stn_chain_state;
 /* One local reference per owning state. Plain structure copies are BORROWS,
