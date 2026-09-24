@@ -134,8 +134,14 @@ stn_data_status stn_share_verify_evidence(
     if(status!=STN_DATA_OK){return status;}
     if(written!=STN_SHARE_TEMPLATE_HEADER_SIZE){return STN_DATA_CONTENT;}
 
-    status=stn_chain_block_id(header_bytes,sizeof(header_bytes),provider,hash);
-    if(status!=STN_DATA_OK){return status;}
+    {
+        static const uint8_t block_domain[]="STN-CHAIN:BLOCK:ID:1";
+        status=provider->hash(provider->user,block_domain,sizeof(block_domain),
+            header_bytes,sizeof(header_bytes),hash);
+        if(status!=STN_DATA_OK){
+            return status==STN_DATA_UNRESOLVED ? status : STN_DATA_PROVIDER_ERROR;
+        }
+    }
     status=stn_pow_compare(hash,share_target);
     if(status==STN_DATA_OK){memcpy(digest,hash,32);}
     return status;
