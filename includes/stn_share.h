@@ -27,6 +27,14 @@ stn_data_status stn_share_encode(
     const stn_share_evidence *share,
     uint8_t canonical[STN_SHARE_CANONICAL_SIZE]);
 
+/* Decode exact canonical share evidence. The miner namespace is implicit in
+ * this record class and is restored as STN_ADDRESS_IDENTITY. Output remains
+ * unchanged on failure. */
+stn_data_status stn_share_decode(
+    const uint8_t canonical[STN_SHARE_CANONICAL_SIZE],
+    size_t length,
+    stn_share_evidence *out);
+
 stn_data_status stn_share_id(
     const stn_share_evidence *share,
     uint8_t id[STN_SHARE_ID_SIZE]);
