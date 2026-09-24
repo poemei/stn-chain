@@ -26,21 +26,25 @@ operators is not a Phase 17 completion gate. These observations do not constitut
 qualification of all hardware or final production readiness. See the
 [current roadmap](docs/ROADMAP.md) for scope and historical test evidence.
 
-Phase 18 now includes the qualified Contract Engine through canonical Contract
-v1 data, typed `stnc0_` identity, Contract action transactions, deterministic
-lifecycle enforcement, scoped identity/signature/authority validation, strict
-majority approval by eligible approvers, stable DRAFT lineage, snapshot-owned
-accepted state, and accepted-history reconstruction. Windows x64 and Linux x64
-qualification cover the current Contract scope through majority reconstruction
-to `ATTESTATION/4`, with qualified CREATE, AMEND, APPROVE, EXECUTE, REJECT,
-REVOKE and CLOSE paths. The Contract-capable Chain was installed and restarted
-on the deployed node on 2026-09-22. Phase 18 is now SHELVED / CHAIN SCOPE
-QUALIFIED; application-facing Contract workflow is deferred until STNC Core has
-the GUI/client surface required to use Contracts. Phase 19 (Economics /
-Issuance / Rewards) is ACTIVE and begins with deterministic protocol definition;
-no economic parameters are implied merely by activating the phase.
-See [Contracts](docs/CONTRACTS.md), the [current roadmap](docs/ROADMAP.md), and
-the [typed address foundation](docs/ADDRESSES.md).
+Phase 18 is SHELVED / CHAIN SCOPE QUALIFIED at its bounded Chain-side
+Contract boundary. Phase 19 (Economics / Issuance / Rewards) is COMPLETE:
+accepted Chain state now owns the bounded economic path through qualifying-share
+evidence, miner compensation, canonical issuance, integer balances and total
+supply, no-fee wallet transfers, persistence primitives, P2P reconstruction and
+reorganization reconstruction.
+
+Phase 20 (Production Qualification) is ACTIVE. Qualification is proceeding in
+small, bounded increments across Windows x64 and Linux x64. The current Windows
+baseline includes a passing production build, `test-chain` at 1,243 checks with
+0 failures, repaired Contract snapshot qualification at 337 checks with
+0 failures, and qualified peer-test execution at 2,867 checks with 0 failures
+for the corrected local harness. Same-commit Linux Phase 20 evidence and the
+remaining Windows runner qualification are still pending, so this is not a
+final production-readiness claim.
+
+See [Economy](docs/ECONOMY.md), [Contracts](docs/CONTRACTS.md), the
+[current roadmap](docs/ROADMAP.md), and the
+[typed address foundation](docs/ADDRESSES.md).
 The old Go prototype is not a compatibility requirement.
 
 ## Build
