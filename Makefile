@@ -54,6 +54,7 @@ CORE_SOURCES := \
 	src/stn_compensation.c \
 	src/stn_issuance.c \
 	src/stn_economic_state.c \
+	src/stn_compensation_state.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -262,3 +263,13 @@ test-economic-state: $(BUILD_DIR)/test-economic-state
 $(BUILD_DIR)/test-economic-state: tests/test_economic_state.c src/stn_economic_state.c includes/stn_economic_state.h includes/stn_issuance.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_ECONOMIC_STATE_TEST_MAIN tests/test_economic_state.c src/stn_economic_state.c -o $@ $(LDLIBS)
+
+
+# Phase 19 deterministic accepted compensation mapping state qualification.
+.PHONY: test-compensation-state
+test-compensation-state: $(BUILD_DIR)/test-compensation-state
+	$(BUILD_DIR)/test-compensation-state
+
+$(BUILD_DIR)/test-compensation-state: tests/test_compensation_state.c src/stn_compensation_state.c includes/stn_compensation_state.h includes/stn_compensation.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_COMPENSATION_STATE_TEST_MAIN tests/test_compensation_state.c src/stn_compensation_state.c -o $@ $(LDLIBS)
