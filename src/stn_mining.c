@@ -156,6 +156,17 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
                stn_share_verify_evidence(&share,&s->chain->hash_provider,proof)!=STN_DATA_OK){
                 return STN_RPC_REJECTED;
             }
+            {
+                size_t parent_index=(size_t)(work_header.height-1u);
+                uint8_t parent_id[32];
+                if(parent_index>=v->count ||
+                   stn_chain_block_id(v->blocks[parent_index].bytes,
+                       v->blocks[parent_index].length,
+                       &s->chain->hash_provider,parent_id)!=STN_DATA_OK ||
+                   memcmp(parent_id,work_header.previous_hash,32u)!=0){
+                    return STN_RPC_REJECTED;
+                }
+            }
         }
         /*
          * Publication records carry their network ID at record offset 8.
