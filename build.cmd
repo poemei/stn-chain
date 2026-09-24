@@ -232,6 +232,8 @@ echo.
 cl %CFLAGS% %INCLUDES% /DSTN_CONTRACT_SNAPSHOT_TEST_MAIN ^
     tests\test_contract_snapshot.c ^
     src\stn_chain.c ^
+    src\stn_share.c ^
+    src\stn_share_replay.c ^
     src\stn_block.c ^
     src\stn_transaction.c ^
     src\stn_record.c ^
@@ -274,6 +276,8 @@ cl %CFLAGS% %INCLUDES% /DSTN_ECONOMY_TEST_MAIN ^
     src\stn_pow.c ^
     src\stn_block.c ^
     src\stn_chain.c ^
+    src\stn_share.c ^
+    src\stn_share_replay.c ^
     src\stn_transaction.c ^
     src\stn_record.c ^
     src\stn_validation.c ^
@@ -316,6 +320,7 @@ cl %CFLAGS% %INCLUDES% /DSTN_SHARE_TEST_MAIN ^
     src\stn_pow.c ^
     src\stn_block.c ^
     src\stn_chain.c ^
+    src\stn_share_replay.c ^
     src\stn_transaction.c ^
     src\stn_record.c ^
     src\stn_validation.c ^
