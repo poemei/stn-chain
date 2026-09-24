@@ -401,6 +401,12 @@ static stn_data_status prior_valid(const stn_chain_context *c,const stn_chain_st
     if(status!=STN_DATA_OK)return status;
     if(s->publication_activation_height!=activation)return STN_DATA_CONTENT;
     if (memcmp(s->network_id,c->network_id,32)!=0 || (s->has_tip!=0 && s->has_tip!=1)) { return STN_DATA_CONTENT; }
+    if(s->economy==NULL)return STN_DATA_CONTENT;
+    {
+        const stn_chain_economic_owned *economic=(const stn_chain_economic_owned *)s->economy;
+        if(economic->references==0 || economic->replay_count>economic->replay_capacity ||
+           (economic->replay_capacity!=0u && economic->replay_bytes==NULL))return STN_DATA_CONTENT;
+    }
     if(!s->has_tip || c->pow_policy==NULL) {
         if(!zero32(s->current_target) || !(zero32(s->cumulative_work.bytes) && zero32(s->cumulative_work.bytes+8))) { return STN_DATA_CONTENT; }
     } else {
