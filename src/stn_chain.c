@@ -606,7 +606,21 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             if(tx.type==STN_TX_SHARE_EVIDENCE){
                 stn_share_evidence share;
                 stn_share_replay_result replay;
-                if(stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK){
+                stn_block_header work_header;
+                uint8_t proof[32];
+                if(stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK ||
+                   stn_block_header_decode(share.template_header,
+                       STN_SHARE_TEMPLATE_HEADER_SIZE,&work_header)!=STN_DATA_OK ||
+                   work_header.version!=STN_POW_BLOCK_VERSION ||
+                   work_header.reserved_work_nonce!=0u ||
+                   memcmp(work_header.network_id,context->network_id,32)!=0 ||
+                   !prior->has_tip ||
+                   prior->height==UINT64_MAX ||
+                   work_header.height!=prior->height+1u ||
+                   memcmp(work_header.previous_hash,prior->tip_id,32)!=0 ||
+                   work_header.timestamp!=prior->timestamp ||
+                   memcmp(work_header.reserved_target,b.header.reserved_target,32)!=0 ||
+                   stn_share_verify_evidence(&share,&context->hash_provider,proof)!=STN_DATA_OK){
                     failure=STN_DATA_CONTENT;break;
                 }
                 replay=stn_share_replay_consume(&candidate_shares->state,&share);
