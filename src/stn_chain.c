@@ -463,7 +463,8 @@ static stn_data_status contract_apply_transaction(
 }
 
 static stn_chain_report validate_candidate(const stn_chain_context *context,
-    const stn_chain_state *prior, const uint8_t *bytes, size_t length, stn_chain_state *out,int reconstruct)
+    const stn_chain_state *prior,const stn_block_span *history,size_t history_count,
+    const uint8_t *bytes,size_t length,stn_chain_state *out,int reconstruct)
 {
     stn_chain_report r=initial_report();
     stn_block b;
@@ -622,19 +623,25 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
                    stn_share_verify_evidence(&share,&context->hash_provider,proof)!=STN_DATA_OK){
                     failure=STN_DATA_CONTENT;break;
                 }
-                {
-                    /*
-                     * Historical evidence is branch-bound by the retained
-                     * parent hash. During sequential reconstruction the work
-                     * parent must already be part of the accepted prefix.
-                     * The exact ancestry check is performed by reconstruction
-                     * as blocks are replayed; candidate acceptance cannot
-                     * authorize an orphaned Work ID merely by height.
-                     */
-                    if(work_header.height+1u==b.header.height &&
-                       memcmp(work_header.previous_hash,prior->tip_id,32)!=0){
+                /*
+                 * Reconstruction has the immutable accepted prefix available,
+                 * so bind deferred evidence to the exact historical parent.
+                 * Ordinary one-block validation has only consensus state; its
+                 * immediate-parent case remains independently checkable.
+                 */
+                if(history!=NULL){
+                    size_t parent_index=(size_t)(work_header.height-1u);
+                    uint8_t parent_id[32];
+                    if(parent_index>=history_count ||
+                       stn_chain_block_id(history[parent_index].bytes,
+                           history[parent_index].length,
+                           &context->hash_provider,parent_id)!=STN_DATA_OK ||
+                       memcmp(parent_id,work_header.previous_hash,32u)!=0){
                         failure=STN_DATA_CONTENT;break;
                     }
+                }else if(work_header.height+1u==b.header.height &&
+                         memcmp(work_header.previous_hash,prior->tip_id,32u)!=0){
+                    failure=STN_DATA_CONTENT;break;
                 }
                 replay=stn_share_replay_consume(&candidate_shares->state,&share);
                 if(replay!=STN_SHARE_REPLAY_FRESH){
@@ -708,7 +715,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
 stn_chain_report stn_chain_validate_candidate(const stn_chain_context *context,
     const stn_chain_state *prior,const uint8_t *bytes,size_t length,stn_chain_state *out)
 {
-    return validate_candidate(context,prior,bytes,length,out,0);
+    return validate_candidate(context,prior,NULL,0,bytes,length,out,0);
 }
 
 stn_chain_report stn_chain_reconstruct_history(const stn_chain_context *context,
@@ -720,7 +727,7 @@ stn_chain_report stn_chain_reconstruct_history(const stn_chain_context *context,
     status=stn_chain_initialize(context,&state);
     if(status!=STN_DATA_OK)return fail(r,STN_CHAIN_CONTEXT,status);
     for(i=0;i<count;++i){
-        r=validate_candidate(context,&state,blocks[i].bytes,blocks[i].length,&state,1);
+        r=validate_candidate(context,&state,blocks,i,blocks[i].bytes,blocks[i].length,&state,1);
         if(r.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){
             r.failing_index=i;stn_chain_state_release(&state);return r;
         }
