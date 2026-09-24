@@ -10,6 +10,7 @@
 /* Share evidence is larger than the pre-existing authority-revoke minimum.
  * Keep the structural minimum at the smallest canonical transaction class. */
 #define STN_TX_SHARE_EVIDENCE_SIZE 273u
+#define STN_TX_COMPENSATION_DESTINATION_SIZE 65u
 #define STN_TX_MIN_SIZE (STN_TX_HEADER_SIZE + STN_TX_AUTHORITY_REVOKE_SIZE)
 #define STN_TX_CONTRACT_ACTION_MAX_SIZE (116u + 66656u + 97u)
 #define STN_TX_MAX_SIZE (STN_TX_HEADER_SIZE + STN_TX_CONTRACT_ACTION_MAX_SIZE)
@@ -19,6 +20,7 @@
 #define STN_TX_IDENTITY_ROTATE 4u
 #define STN_TX_CONTRACT_ACTION 5u
 #define STN_TX_SHARE_EVIDENCE 6u
+#define STN_TX_COMPENSATION_DESTINATION 7u
 
 typedef enum stn_data_status {
     STN_DATA_OK = 0, STN_DATA_ARGUMENT, STN_DATA_LENGTH,
