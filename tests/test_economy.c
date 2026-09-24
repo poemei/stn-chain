@@ -33,14 +33,16 @@ static void share_target_vectors(void)
     memset(expected,0,32);expected[30]=0xff;expected[31]=0xfa;
     CHECK(memcmp(out,expected,32)==0);
 
-    /* Largest unsaturated integer floor(MAX_TARGET / 10). */
-    memset(chain,0x99,32);chain[0]=0x0c;
+    /* Largest unsaturated integer floor(MAX_TARGET / 10):
+     * 0x0c followed by 31 bytes of 0xcc. Multiplication yields
+     * MAX_TARGET-7 exactly, so it must not saturate. */
+    memset(chain,0xcc,32);chain[0]=0x0c;
     CHECK(stn_economy_share_target(chain,out)==STN_DATA_OK);
-    memset(expected,0xff,32);expected[0]=0x7f;expected[31]=0xfa;
+    memset(expected,0xff,32);expected[0]=0x7f;expected[31]=0xf8;
     CHECK(memcmp(out,expected,32)==0);
 
     /* One larger target saturates exactly at MAX_TARGET. */
-    chain[31]=0x9a;
+    chain[31]=0xcd;
     CHECK(stn_economy_share_target(chain,out)==STN_DATA_OK);
     max_target(expected);
     CHECK(memcmp(out,expected,32)==0);
