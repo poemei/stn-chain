@@ -113,11 +113,51 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
         return STN_RPC_REJECTED;
     }
 
+    {
+        stn_data_status target_status=stn_chain_required_target(
+            s->chain,
+            &v->state,
+            required_target);
+
+        if(target_status!=STN_DATA_OK){
+            if(target_status==STN_DATA_UNRESOLVED){
+                return STN_RPC_UNAVAILABLE;
+            }
+            if(target_status==STN_DATA_CAPACITY || target_status==STN_DATA_OVERFLOW){
+                return STN_RPC_CAPACITY;
+            }
+            if(target_status==STN_DATA_PROVIDER_ERROR || target_status==STN_DATA_ARGUMENT){
+                return STN_RPC_PROVIDER;
+            }
+            return STN_RPC_REJECTED;
+        }
+    }
+
     for(i=0;i<transaction_count;++i){
         size_t n=(size_t)stn_wire_read(body+offset,4);
         stn_transaction tx;
         if(stn_transaction_decode(body+offset+4,n,&tx)!=STN_DATA_OK){
             return STN_RPC_REJECTED;
+        }
+        if(tx.type==STN_TX_SHARE_EVIDENCE){
+            stn_share_evidence share;
+            stn_block_header work_header;
+            uint8_t proof[32];
+            if(stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK ||
+               stn_block_header_decode(share.template_header,
+                   STN_SHARE_TEMPLATE_HEADER_SIZE,&work_header)!=STN_DATA_OK ||
+               work_header.version!=STN_POW_BLOCK_VERSION ||
+               work_header.reserved_work_nonce!=0u ||
+               memcmp(work_header.network_id,v->state.network_id,32u)!=0 ||
+               !v->state.has_tip ||
+               v->state.height==UINT64_MAX ||
+               work_header.height!=v->state.height+1u ||
+               memcmp(work_header.previous_hash,v->state.tip_id,32u)!=0 ||
+               work_header.timestamp!=v->state.timestamp ||
+               memcmp(work_header.reserved_target,required_target,32u)!=0 ||
+               stn_share_verify_evidence(&share,&s->chain->hash_provider,proof)!=STN_DATA_OK){
+                return STN_RPC_REJECTED;
+            }
         }
         /*
          * Publication records carry their network ID at record offset 8.
@@ -137,26 +177,6 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
             }
         }
         offset+=4+n;
-    }
-
-    {
-        stn_data_status target_status=stn_chain_required_target(
-            s->chain,
-            &v->state,
-            required_target);
-
-        if(target_status!=STN_DATA_OK){
-            if(target_status==STN_DATA_UNRESOLVED){
-                return STN_RPC_UNAVAILABLE;
-            }
-            if(target_status==STN_DATA_CAPACITY || target_status==STN_DATA_OVERFLOW){
-                return STN_RPC_CAPACITY;
-            }
-            if(target_status==STN_DATA_PROVIDER_ERROR || target_status==STN_DATA_ARGUMENT){
-                return STN_RPC_PROVIDER;
-            }
-            return STN_RPC_REJECTED;
-        }
     }
 
     if(stn_target_work(required_target,&increment)!=STN_DATA_OK ||
