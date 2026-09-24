@@ -257,6 +257,125 @@ static void share_reorg_replay(stn_chain_context *c)
     stn_chain_state_release(&replacement_state);
 }
 
+
+static void share_history_rejections(stn_chain_context *c)
+{
+    static const uint8_t work_domain[]="STN-CHAIN:WORK:ID:1";
+    stn_share_evidence share={0};
+    stn_transaction tx={0};
+    stn_chain_state state={0};
+    stn_block_span history[3];
+    uint8_t canonical[STN_SHARE_CANONICAL_SIZE];
+    uint8_t transaction[STN_TX_HEADER_SIZE+STN_SHARE_CANONICAL_SIZE];
+    uint8_t share_block[STN_BLOCK_HEADER_SIZE+4u+STN_TX_HEADER_SIZE+STN_SHARE_CANONICAL_SIZE];
+    uint8_t original_target[32],original_parent[32];
+    size_t transaction_length=0u;
+    size_t body_length=4u+STN_TX_HEADER_SIZE+STN_SHARE_CANONICAL_SIZE;
+
+    memcpy(share.template_header,a[1],STN_SHARE_TEMPLATE_HEADER_SIZE);
+    share.miner.type=STN_ADDRESS_IDENTITY;
+    memset(share.miner.identifier,0x7c,sizeof(share.miner.identifier));
+    share.nonce=3u;
+    memcpy(share.body_commitment,share.template_header+88u,32u);
+    CHECK(c->hash_provider.hash(c->hash_provider.user,
+        work_domain,sizeof(work_domain),
+        share.template_header,STN_SHARE_TEMPLATE_HEADER_SIZE,
+        share.work_id)==STN_DATA_OK);
+    CHECK(stn_share_verify_evidence(&share,&c->hash_provider,canonical)==STN_DATA_OK);
+
+    memcpy(original_target,share.template_header+120u,32u);
+    memcpy(original_parent,share.template_header+40u,32u);
+
+    /* A retained historical header may not claim an easier Chain target. */
+    memset(share.template_header+120u,0xff,32u);
+    CHECK(c->hash_provider.hash(c->hash_provider.user,
+        work_domain,sizeof(work_domain),
+        share.template_header,STN_SHARE_TEMPLATE_HEADER_SIZE,
+        share.work_id)==STN_DATA_OK);
+    CHECK(stn_share_encode(&share,canonical)==STN_DATA_OK);
+    tx.version=1u;tx.type=STN_TX_SHARE_EVIDENCE;
+    tx.record_bytes=canonical;tx.record_length=STN_SHARE_CANONICAL_SIZE;
+    CHECK(stn_transaction_encode(&tx,transaction,sizeof(transaction),
+        &transaction_length)==STN_DATA_OK);
+    memcpy(share_block,a[2],STN_BLOCK_HEADER_SIZE);
+    share_block[162]=0u;share_block[163]=1u;
+    share_block[164]=(uint8_t)(body_length>>24);
+    share_block[165]=(uint8_t)(body_length>>16);
+    share_block[166]=(uint8_t)(body_length>>8);
+    share_block[167]=(uint8_t)body_length;
+    share_block[168]=(uint8_t)(transaction_length>>24);
+    share_block[169]=(uint8_t)(transaction_length>>16);
+    share_block[170]=(uint8_t)(transaction_length>>8);
+    share_block[171]=(uint8_t)transaction_length;
+    memcpy(share_block+172u,transaction,transaction_length);
+    CHECK(stn_block_body_commitment(share_block+168u,body_length,1u,
+        &c->hash_provider,share_block+88u)==STN_DATA_OK);
+    history[0]=as[0];history[1]=as[1];
+    history[2].bytes=share_block;history[2].length=sizeof(share_block);
+    CHECK(stn_chain_reconstruct_history(c,history,3u,&state).acceptance==
+        STN_ACCEPTANCE_REJECTED);
+    stn_chain_state_release(&state);
+
+    /* A proof from an orphaned historical parent is not valid on this branch. */
+    memcpy(share.template_header+120u,original_target,32u);
+    memcpy(share.template_header+40u,original_parent,32u);
+    share.template_header[71]^=1u;
+    memcpy(share.body_commitment,share.template_header+88u,32u);
+    CHECK(c->hash_provider.hash(c->hash_provider.user,
+        work_domain,sizeof(work_domain),
+        share.template_header,STN_SHARE_TEMPLATE_HEADER_SIZE,
+        share.work_id)==STN_DATA_OK);
+    CHECK(stn_share_encode(&share,canonical)==STN_DATA_OK);
+    tx.record_bytes=canonical;
+    CHECK(stn_transaction_encode(&tx,transaction,sizeof(transaction),
+        &transaction_length)==STN_DATA_OK);
+    memcpy(share_block,a[2],STN_BLOCK_HEADER_SIZE);
+    share_block[162]=0u;share_block[163]=1u;
+    share_block[164]=(uint8_t)(body_length>>24);
+    share_block[165]=(uint8_t)(body_length>>16);
+    share_block[166]=(uint8_t)(body_length>>8);
+    share_block[167]=(uint8_t)body_length;
+    share_block[168]=(uint8_t)(transaction_length>>24);
+    share_block[169]=(uint8_t)(transaction_length>>16);
+    share_block[170]=(uint8_t)(transaction_length>>8);
+    share_block[171]=(uint8_t)transaction_length;
+    memcpy(share_block+172u,transaction,transaction_length);
+    CHECK(stn_block_body_commitment(share_block+168u,body_length,1u,
+        &c->hash_provider,share_block+88u)==STN_DATA_OK);
+    CHECK(stn_chain_reconstruct_history(c,history,3u,&state).acceptance==
+        STN_ACCEPTANCE_REJECTED);
+    stn_chain_state_release(&state);
+
+    /* A fabricated Work ID is rejected even when the retained header is valid. */
+    memcpy(share.template_header,a[1],STN_SHARE_TEMPLATE_HEADER_SIZE);
+    memcpy(share.body_commitment,share.template_header+88u,32u);
+    CHECK(c->hash_provider.hash(c->hash_provider.user,
+        work_domain,sizeof(work_domain),
+        share.template_header,STN_SHARE_TEMPLATE_HEADER_SIZE,
+        share.work_id)==STN_DATA_OK);
+    share.work_id[0]^=1u;
+    CHECK(stn_share_encode(&share,canonical)==STN_DATA_OK);
+    tx.record_bytes=canonical;
+    CHECK(stn_transaction_encode(&tx,transaction,sizeof(transaction),
+        &transaction_length)==STN_DATA_OK);
+    memcpy(share_block,a[2],STN_BLOCK_HEADER_SIZE);
+    share_block[162]=0u;share_block[163]=1u;
+    share_block[164]=(uint8_t)(body_length>>24);
+    share_block[165]=(uint8_t)(body_length>>16);
+    share_block[166]=(uint8_t)(body_length>>8);
+    share_block[167]=(uint8_t)body_length;
+    share_block[168]=(uint8_t)(transaction_length>>24);
+    share_block[169]=(uint8_t)(transaction_length>>16);
+    share_block[170]=(uint8_t)(transaction_length>>8);
+    share_block[171]=(uint8_t)transaction_length;
+    memcpy(share_block+172u,transaction,transaction_length);
+    CHECK(stn_block_body_commitment(share_block+168u,body_length,1u,
+        &c->hash_provider,share_block+88u)==STN_DATA_OK);
+    CHECK(stn_chain_reconstruct_history(c,history,3u,&state).acceptance==
+        STN_ACCEPTANCE_REJECTED);
+    stn_chain_state_release(&state);
+}
+
 typedef struct memory_store { uint8_t data[CAP],stage[CAP];size_t n;int exists,locked,failure; } memory_store;
 static memory_store mem;
 static stn_storage_status acquire(void *u){memory_store *m=u;if(m->failure==1 || m->locked){return STN_STORAGE_BUSY;}m->locked=1;return STN_STORAGE_OK;}
@@ -395,7 +514,7 @@ int test_storage(void)
     stn_chain_context c={0};stn_pow_policy policy;
     branch(a,as,99);branch(b,bs,1);memcpy(policy.fixed_target,a[0]+120,32);
     c.network_id[0]=1;c.genesis_bytes=a[0];c.genesis_length=364;c.pow_policy=&policy;c.hash_provider.hash=test_hash;
-    codecs(&c);share_restart_replay(&c);share_reorg_replay(&c);application(&c);windows_disk(&c);publication_activation_boundary();
+    codecs(&c);share_restart_replay(&c);share_reorg_replay(&c);share_history_rejections(&c);application(&c);windows_disk(&c);publication_activation_boundary();
     CHECK(stn_chain_test_live_snapshots()==ownership_baseline);
     printf("Persistence/application: %u checks, %u failures.\n",checks,failures);
     return failures==0 ? 0 : 1;
