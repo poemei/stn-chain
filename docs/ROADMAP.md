@@ -143,7 +143,7 @@ Phase 16        COMPLETE (Operations status, 2026-09-21)
 Phase 17        COMPLETE / QUALIFIED (Operations closeout, 2026-09-21)
 Phase 18        SHELVED / CHAIN SCOPE QUALIFIED
 Phase 19        COMPLETE
-Phase 20        ACTIVE
+Phase 20        COMPLETE
 
 Historical qualified Phase 16 1C checkpoint: 8a1264a
 Current source reviewed: a278c33
@@ -1126,55 +1126,47 @@ The governing Phase 19 rule remains:
 
 > **Mining produces economic evidence. Consensus determines accepted issuance.**
 
-## Phase 20 --- Production Qualification --- ACTIVE
+## Phase 20 --- Production Qualification --- COMPLETE
 
-Phase 20 began on 2026-09-24 and is proceeding in deliberately bounded
-micro-chunks. Phase 19 remains closed; Phase 20 qualification work does not
-reopen or extend the Economy protocol unless a reproducible Phase 19 defect is
-demonstrated.
+Phase 20 began on 2026-09-24 and is complete for the bounded Windows x64 and
+Linux x64 production-qualification scope. Phase 19 remains closed; qualification
+did not reopen or extend the Economy protocol.
 
 ### Phase 20 qualification record
 
-The initial Windows x64 baseline established:
+Windows x64 qualification completed with:
 
-- production `build.cmd`: PASS with no compiler errors/warnings; the observed
-  LNK4042 duplicate-object linker warning remains build-harness evidence, not a
-  consensus failure;
+- production `build.cmd`: PASS;
 - `test-contract`: 494 checks, 0 failures;
 - `test-contract-consensus`: 41 checks, 0 failures;
 - `test-contract-lineage`: 14 checks, 0 failures;
 - `test-contract-state`: 17 checks, 0 failures;
-- `test-chain`: 1,243 checks, 0 failures;
+- `test-chain`: **1,243 checks, 0 failures**;
+- `test-contract-snapshot`: **337 checks, 0 failures**;
+- `test-peer`: **2,867 checks, 0 failures**;
 - `tools/test-node.ps1 -FramingOnly`: 33 checks, 0 failures.
 
-The baseline also exposed two Windows test-harness defects rather than
-production consensus defects:
+The Windows snapshot and peer failures exposed during qualification were
+test-harness defects, not production consensus defects. The snapshot target
+dependencies and oversized fixture ownership were corrected; the peer RPC
+fixture was moved off the default executable stack. The Windows runner was also
+corrected so qualification executables must return exactly zero; exception
+statuses such as `0xC00000FD` can no longer be reported as success.
 
-1. `test-contract-snapshot` lacked existing implementation dependencies in
-   its `build.cmd` target and then overflowed the default Windows stack because
-   large fixture buffers were automatic local storage. The target dependency
-   list was corrected in `5fdb395`; the oversized fixture buffers were given
-   checked allocated ownership with deterministic cleanup. Qualification now
-   completes normally at **337 checks, 0 failures**.
+Linux x64 production build, installation and deployed-service restart completed
+successfully. Same-cycle Linux qualification then completed with:
 
-2. `test-peer` overflowed the default Windows stack before its RPC calls
-   executed because `convergence_rpc()` placed an `STN_RPC_MAX_FRAME` request
-   buffer on the stack. The qualified local correction gives that existing
-   buffer checked allocated ownership with deterministic cleanup while
-   preserving capacity and assertions. Qualification completes normally at
-   **2,867 checks, 0 failures**. This correction must be present on the shared
-   repository before it is treated as repository qualification evidence.
+- `test-chain`: **1,243 checks, 0 failures**;
+- `test-contract-snapshot`: **337 checks, 0 failures**;
+- `test-peer`: **2,867 checks, 0 failures**.
 
-A separate Windows test-runner issue was demonstrated: `build.cmd test-peer`
-can print success after a Windows exception exit such as `0xC00000FD`. Phase 20
-must correct the runner so every nonzero executable exit status is treated as a
-failure; that correction is not yet recorded as complete.
+Linux qualification required only build/test-harness portability corrections:
+the snapshot target received its existing Phase 19 dependencies and the peer
+qualification harness was adapted to the existing Linux peer/storage backends.
+No production consensus, protocol, serialization, economic, mining or P2P
+behavior was changed to obtain the cross-platform results.
 
-Linux x64 production build, installation and deployed-service restart have been
-completed successfully during Phase 20. This establishes current Linux runtime
-and deployment evidence. The same-commit Linux qualification test suite remains
-pending; earlier Linux phase evidence is retained but is not substituted for
-that test execution.
-
-Phase 20 remains **ACTIVE**. No final production-readiness claim is made here.
-ARM remains outside the currently qualified Phase 20 platform scope.
+The three final cross-platform qualification targets therefore match exactly
+between Windows x64 and Linux x64. Phase 20 is **COMPLETE** for this bounded
+platform scope. ARM and other architectures remain outside the Phase 20
+qualification claim.
