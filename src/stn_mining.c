@@ -219,13 +219,19 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
         return STN_RPC_REJECTED;
     }
 
-    return stn_sha256(
-        NULL,
-        domain,
-        sizeof(domain),
-        s->template_bytes,
-        STN_BLOCK_HEADER_SIZE,
-        id)==STN_DATA_OK ? STN_RPC_OK : STN_RPC_PROVIDER;
+    {
+        uint8_t work_evidence[STN_BLOCK_HEADER_SIZE+32u];
+        memcpy(work_evidence,s->template_bytes,STN_BLOCK_HEADER_SIZE);
+        memcpy(work_evidence+STN_BLOCK_HEADER_SIZE,
+            b.header.transaction_commitment,32u);
+        return stn_sha256(
+            NULL,
+            domain,
+            sizeof(domain),
+            work_evidence,
+            sizeof(work_evidence),
+            id)==STN_DATA_OK ? STN_RPC_OK : STN_RPC_PROVIDER;
+    }
 }
 
 stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t cap,size_t *written)
@@ -426,6 +432,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
             code=STN_RPC_STALE;
             goto done;
         }
+        memcpy(evidence.body_commitment,work_header.transaction_commitment,32u);
 
         verified=stn_chain_required_target(s->chain,&v.state,required_target);
         if(verified!=STN_DATA_OK){
@@ -439,13 +446,18 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
             goto done;
         }
 
-        verified=s->chain->hash_provider.hash(
-            s->chain->hash_provider.user,
-            work_domain,
-            sizeof(work_domain),
-            evidence.template_header,
-            STN_BLOCK_HEADER_SIZE,
-            computed_work_id);
+        {
+            uint8_t work_evidence[STN_BLOCK_HEADER_SIZE+32u];
+            memcpy(work_evidence,evidence.template_header,STN_BLOCK_HEADER_SIZE);
+            memcpy(work_evidence+STN_BLOCK_HEADER_SIZE,evidence.body_commitment,32u);
+            verified=s->chain->hash_provider.hash(
+                s->chain->hash_provider.user,
+                work_domain,
+                sizeof(work_domain),
+                work_evidence,
+                sizeof(work_evidence),
+                computed_work_id);
+        }
         if(verified!=STN_DATA_OK){
             code=verified==STN_DATA_UNRESOLVED ? STN_RPC_UNAVAILABLE : STN_RPC_PROVIDER;
             goto done;
