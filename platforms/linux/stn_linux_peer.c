@@ -12,6 +12,17 @@
 #include <time.h>
 #include <unistd.h>
 
+const char *stn_linux_peer_operation_name(int operation)
+{
+    switch(operation) {
+        case STN_LINUX_PEER_OP_CONNECT: return "connect";
+        case STN_LINUX_PEER_OP_SEND: return "send";
+        case STN_LINUX_PEER_OP_RECEIVE: return "receive";
+        case STN_LINUX_PEER_OP_POLL: return "poll";
+        default: return "none";
+    }
+}
+
 static uint64_t monotonic_ms(void)
 {
     struct timespec value;
@@ -64,10 +75,20 @@ static stn_peer_status ready(stn_linux_peer *peer, int writing)
     }
 
     if(result < 0) {
+        peer->last_operation = STN_LINUX_PEER_OP_POLL;
+        peer->last_errno = errno;
         return STN_PEER_IO;
     }
 
     if((descriptor.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
+        int socket_error = 0;
+        socklen_t socket_error_length = (socklen_t)sizeof(socket_error);
+        peer->last_operation = STN_LINUX_PEER_OP_POLL;
+        if(getsockopt(peer->socket, SOL_SOCKET, SO_ERROR, &socket_error, &socket_error_length) == 0) {
+            peer->last_errno = socket_error;
+        } else {
+            peer->last_errno = errno;
+        }
         return STN_PEER_IO;
     }
 
@@ -115,6 +136,8 @@ static stn_peer_status send_all(
                 continue;
             }
 
+            peer->last_operation = STN_LINUX_PEER_OP_SEND;
+            peer->last_errno = errno;
             return STN_PEER_IO;
         }
 
@@ -165,6 +188,8 @@ static stn_peer_status receive_all(
                 continue;
             }
 
+            peer->last_operation = STN_LINUX_PEER_OP_RECEIVE;
+            peer->last_errno = errno;
             return STN_PEER_IO;
         }
 
@@ -213,6 +238,8 @@ static stn_peer_status setup(
     out->socket = socket_value;
     out->io_timeout_ms = timeout;
     out->operation_deadline_ms = 0;
+    out->last_errno = 0;
+    out->last_operation = STN_LINUX_PEER_OP_NONE;
     out->opened = 1;
 
     if(transport != NULL) {
@@ -259,6 +286,8 @@ stn_peer_status stn_linux_peer_connect(
     socket_value = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     if(socket_value < 0) {
+        out->last_operation = STN_LINUX_PEER_OP_CONNECT;
+        out->last_errno = errno;
         return STN_PEER_IO;
     }
 
@@ -274,6 +303,8 @@ stn_peer_status stn_linux_peer_connect(
         sizeof(address));
 
     if(result != 0 && errno != EINPROGRESS) {
+        out->last_operation = STN_LINUX_PEER_OP_CONNECT;
+        out->last_errno = errno;
         stn_linux_peer_close(out);
         return STN_PEER_IO;
     }
@@ -295,6 +326,8 @@ stn_peer_status stn_linux_peer_connect(
             &error,
             &error_length) != 0 ||
            error != 0) {
+            out->last_operation = STN_LINUX_PEER_OP_CONNECT;
+            out->last_errno = error != 0 ? error : errno;
             stn_linux_peer_close(out);
             return STN_PEER_IO;
         }
