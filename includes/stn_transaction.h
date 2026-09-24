@@ -12,6 +12,7 @@
 #define STN_TX_AUTHORITY_REVOKE 3u
 #define STN_TX_IDENTITY_ROTATE 4u
 #define STN_TX_CONTRACT_ACTION 5u
+#define STN_TX_SHARE_EVIDENCE 6u
 
 typedef enum stn_data_status {
     STN_DATA_OK = 0, STN_DATA_ARGUMENT, STN_DATA_LENGTH,
