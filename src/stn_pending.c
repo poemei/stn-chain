@@ -345,11 +345,12 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
             {
                 size_t parent_index=(size_t)(work_header.height-1u);
                 uint8_t parent_id[32];
+                stn_hash_provider hash_provider={stn_sha256,NULL};
                 if(work_header.height==0u ||
                    parent_index>=active->count ||
                    stn_chain_block_id(active->blocks[parent_index].bytes,
                        active->blocks[parent_index].length,
-                       hash,parent_id)!=STN_DATA_OK ||
+                       &hash_provider,parent_id)!=STN_DATA_OK ||
                    memcmp(parent_id,work_header.previous_hash,32u)!=0){
                     continue;
                 }
