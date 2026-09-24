@@ -2,6 +2,7 @@
 #include "stn_mining.h"
 #include "stn_sha256.h"
 #include "stn_wire_internal.h"
+#include "stn_address.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -356,10 +357,13 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
          * canonical block header. Transaction body bytes are optional and
          * are governed by the block header itself.
          */
+        stn_address miner;
         if(q->payload==NULL ||
-           q->length<68+STN_BLOCK_HEADER_SIZE ||
-           q->length>68+STN_BLOCK_MAX_SIZE ||
-           stn_wire_read(q->payload+64,4)!=q->length-68){
+           q->length<STN_MINING_SUBMISSION_PREFIX+STN_BLOCK_HEADER_SIZE ||
+           q->length>STN_MINING_SUBMISSION_PREFIX+STN_BLOCK_MAX_SIZE ||
+           stn_wire_read(q->payload+64,4)!=q->length-STN_MINING_SUBMISSION_PREFIX ||
+           stn_address_decode((const char *)(q->payload+68),STN_MINING_IDENTITY_SIZE,&miner)!=STN_DATA_OK ||
+           miner.type!=STN_ADDRESS_IDENTITY){
             code=STN_RPC_INVALID;
             goto done;
         }
@@ -429,14 +433,14 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         goto done;
     }
 
-    if(q->length!=68+n ||
+    if(q->length!=STN_MINING_SUBMISSION_PREFIX+n ||
        memcmp(q->payload+32,id,32)!=0 ||
        memcmp(
-           q->payload+68,
+           q->payload+STN_MINING_SUBMISSION_PREFIX,
            s->template_bytes,
            STN_MINING_NONCE_OFFSET)!=0 ||
        memcmp(
-           q->payload+68+STN_MINING_NONCE_OFFSET+STN_MINING_NONCE_SIZE,
+           q->payload+STN_MINING_SUBMISSION_PREFIX+STN_MINING_NONCE_OFFSET+STN_MINING_NONCE_SIZE,
            s->template_bytes+STN_MINING_NONCE_OFFSET+STN_MINING_NONCE_SIZE,
            n-STN_MINING_NONCE_OFFSET-STN_MINING_NONCE_SIZE)!=0){
         code=STN_RPC_REJECTED;
@@ -444,7 +448,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
     }
 
     if(s->pending!=NULL){
-        stn_block_span block={q->payload+68,n};
+        stn_block_span block={q->payload+STN_MINING_SUBMISSION_PREFIX,n};
         stn_storage_view inclusion={0};
 
         inclusion.blocks=&block;
@@ -474,7 +478,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
     code=storage_code(stn_storage_extend(
         s->chain,
         s->storage,
-        q->payload+68,
+        q->payload+STN_MINING_SUBMISSION_PREFIX,
         n,
         &s->workspace,
         &accepted));
