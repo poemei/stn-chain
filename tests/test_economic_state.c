@@ -89,10 +89,76 @@ static void vectors(void)
     CHECK(stn_economic_state_apply(&state,&r)==STN_DATA_CAPACITY);
 }
 
+
+static void transfer_vectors(void)
+{
+    stn_economic_balance storage[4],snapshot[4];
+    stn_economic_state state={0};
+    stn_issuance_record r;
+    stn_transfer transfer={0};
+    uint64_t total;
+    size_t count;
+
+    memset(storage,0,sizeof(storage));
+    CHECK(stn_economic_state_initialize(&state,storage,4u)==STN_DATA_OK);
+    issuance(&r,STN_ISSUANCE_REASON_BLOCK,0x22);
+    CHECK(stn_economic_state_apply(&state,&r)==STN_DATA_OK);
+    issuance(&r,STN_ISSUANCE_REASON_BLOCK,0x33);
+    CHECK(stn_economic_state_apply(&state,&r)==STN_DATA_OK);
+    total=state.total_supply;
+
+    transfer.source.type=STN_ADDRESS_WALLET;
+    transfer.destination.type=STN_ADDRESS_WALLET;
+    memset(transfer.source.identifier,0x22,STN_ADDRESS_ID_SIZE);
+    memset(transfer.destination.identifier,0x33,STN_ADDRESS_ID_SIZE);
+    transfer.units=25u;
+    CHECK(stn_economic_state_apply_transfer(&state,&transfer)==STN_DATA_OK);
+    CHECK(state.balances[0].units==75u && state.balances[1].units==125u);
+    CHECK(state.total_supply==total);
+
+    memset(transfer.destination.identifier,0x11,STN_ADDRESS_ID_SIZE);
+    transfer.units=10u;
+    CHECK(stn_economic_state_apply_transfer(&state,&transfer)==STN_DATA_OK);
+    CHECK(state.balance_count==3u);
+    CHECK(state.balances[0].wallet_id[0]==0x11u && state.balances[0].units==10u);
+    CHECK(state.balances[1].wallet_id[0]==0x22u && state.balances[1].units==65u);
+    CHECK(state.balances[2].wallet_id[0]==0x33u && state.balances[2].units==125u);
+    CHECK(state.total_supply==total);
+
+    memcpy(snapshot,storage,sizeof(storage));count=state.balance_count;
+    memset(transfer.source.identifier,0x44,STN_ADDRESS_ID_SIZE);
+    transfer.units=1u;
+    CHECK(stn_economic_state_apply_transfer(&state,&transfer)==STN_DATA_CONTENT);
+    CHECK(state.balance_count==count && state.total_supply==total);
+    CHECK(memcmp(storage,snapshot,sizeof(storage))==0);
+
+    memset(transfer.source.identifier,0x22,STN_ADDRESS_ID_SIZE);
+    transfer.units=66u;
+    CHECK(stn_economic_state_apply_transfer(&state,&transfer)==STN_DATA_CONTENT);
+    CHECK(memcmp(storage,snapshot,sizeof(storage))==0);
+
+    transfer.units=0u;
+    CHECK(stn_economic_state_apply_transfer(&state,&transfer)==STN_DATA_CONTENT);
+    transfer.units=1u;transfer.destination=transfer.source;
+    CHECK(stn_economic_state_apply_transfer(&state,&transfer)==STN_DATA_CONTENT);
+    transfer.destination.type=STN_ADDRESS_IDENTITY;
+    CHECK(stn_economic_state_apply_transfer(&state,&transfer)==STN_DATA_TYPE);
+    CHECK(stn_economic_state_apply_transfer(NULL,&transfer)==STN_DATA_ARGUMENT);
+    CHECK(stn_economic_state_apply_transfer(&state,NULL)==STN_DATA_ARGUMENT);
+
+    transfer.destination.type=STN_ADDRESS_WALLET;
+    memset(transfer.destination.identifier,0x55,STN_ADDRESS_ID_SIZE);
+    state.balance_capacity=state.balance_count;
+    memcpy(snapshot,storage,sizeof(storage));
+    CHECK(stn_economic_state_apply_transfer(&state,&transfer)==STN_DATA_CAPACITY);
+    CHECK(memcmp(storage,snapshot,sizeof(storage))==0 && state.total_supply==total);
+}
+
 int test_economic_state(void);
 int test_economic_state(void)
 {
     vectors();
+    transfer_vectors();
     printf("Economic accepted state: %u checks, %u failures.\n",checks,failures);
     return failures==0 ? 0 : 1;
 }
