@@ -58,6 +58,7 @@ CORE_SOURCES := \
 	src/stn_issuance_binding.c \
 	src/stn_wallet.c \
 	src/stn_transfer.c \
+	src/stn_transfer_replay.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -307,3 +308,13 @@ test-transfer: $(BUILD_DIR)/test-transfer
 $(BUILD_DIR)/test-transfer: tests/test_transfer.c src/stn_transfer.c includes/stn_transfer.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_TRANSFER_TEST_MAIN tests/test_transfer.c src/stn_transfer.c -o $@ $(LDLIBS)
+
+
+# Phase 19 deterministic accepted-transfer replay qualification.
+.PHONY: test-transfer-replay
+test-transfer-replay: $(BUILD_DIR)/test-transfer-replay
+	$(BUILD_DIR)/test-transfer-replay
+
+$(BUILD_DIR)/test-transfer-replay: tests/test_transfer_replay.c src/stn_transfer_replay.c src/stn_transfer.c includes/stn_transfer_replay.h includes/stn_transfer.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_REPLAY_TEST_MAIN tests/test_transfer_replay.c src/stn_transfer_replay.c src/stn_transfer.c -o $@ $(LDLIBS)
