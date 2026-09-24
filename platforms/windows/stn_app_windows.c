@@ -68,7 +68,10 @@ static void development_genesis(uint8_t *b)
     memset(b,0,364);memcpy(b,"STNB",4);b[5]=3;b[8]=1;b[163]=1;b[167]=196;b[171]=192;
     memcpy(b+172,"STNT",4);b[177]=1;b[179]=1;b[183]=180;
     memcpy(b+184,"STNR",4);b[189]=1;b[191]=1;b[192]=1;b[256]=3;
-    memcpy(b+88,commitment,32);memset(b+120,255,32);b[120]=127;
+    memcpy(b+88,commitment,32);
+    /* Deterministic bootstrap PoW target: 0000007f...; nonce 51449120. */
+    memset(b+120,255,32);b[120]=0;b[121]=0;b[122]=0;b[123]=127;
+    b[152]=0;b[153]=0;b[154]=0;b[155]=0;b[156]=3;b[157]=17;b[158]=13;b[159]=32;
 }
 static stn_peer_status transfer(const stn_peer_transport *t,uint8_t *p,size_t n,int sending,int idle_allowed)
 {
