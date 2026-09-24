@@ -139,6 +139,26 @@ static stn_chain_economic_owned *economic_clone(const stn_chain_state *s){
 }
 static void economic_destroy(stn_chain_economic_owned *o){free(o);}
 
+#ifdef STN_LIFECYCLE_TEST
+stn_data_status stn_chain_test_seed_balance(stn_chain_state *state,const stn_address *wallet,uint64_t units)
+{
+    stn_chain_economic_owned *old,*seeded;
+    if(state==NULL || wallet==NULL)return STN_DATA_ARGUMENT;
+    if(wallet->type!=STN_ADDRESS_WALLET || state->economy==NULL)return STN_DATA_TYPE;
+    seeded=economic_clone(state);
+    if(seeded==NULL || seeded->state.balance_capacity==0u){economic_destroy(seeded);return STN_DATA_CAPACITY;}
+    memcpy(seeded->state.balances[0].wallet_id,wallet->identifier,STN_ADDRESS_ID_SIZE);
+    seeded->state.balances[0].units=units;
+    seeded->state.balance_count=1u;
+    seeded->state.total_supply=units;
+    old=(stn_chain_economic_owned *)state->economy;
+    if(old->references==0u){economic_destroy(seeded);return STN_DATA_CONTENT;}
+    if(--old->references==0u)economic_destroy(old);
+    state->economy=&seeded->state;
+    return STN_DATA_OK;
+}
+#endif
+
 
 #ifdef STN_LIFECYCLE_TEST
 #include <stdatomic.h>
