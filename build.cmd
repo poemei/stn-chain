@@ -310,7 +310,26 @@ echo.
 cl %CFLAGS% %INCLUDES% /DSTN_SHARE_TEST_MAIN ^
     tests\test_share.c ^
     src\stn_share.c ^
+    src\stn_economy.c ^
+    src\stn_pow.c ^
+    src\stn_block.c ^
+    src\stn_chain.c ^
+    src\stn_transaction.c ^
+    src\stn_record.c ^
+    src\stn_validation.c ^
+    src\stn_sentinel_intelligence.c ^
+    src\stn_lifecycle.c ^
+    src\stn_replay.c ^
+    src\stn_contract_transaction.c ^
+    src\stn_contract_snapshot.c ^
+    src\stn_contract_state.c ^
+    src\stn_contract_consensus.c ^
+    src\stn_contract_lineage.c ^
+    src\stn_contract.c ^
     src\stn_address.c ^
+    src\stn_authority.c ^
+    src\stn_identity.c ^
+    src\crypto\ed25519_donna\ed25519_provider.c ^
     platforms\windows\stn_sha256.c ^
     /Fo"%OBJ_DIR%\\" /Fe"%TEST_TARGET%" /link /INCREMENTAL:NO bcrypt.lib
 if errorlevel 1 goto fail
