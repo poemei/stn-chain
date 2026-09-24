@@ -151,10 +151,8 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
                memcmp(work_header.network_id,v->state.network_id,32u)!=0 ||
                !v->state.has_tip ||
                v->state.height==UINT64_MAX ||
-               work_header.height!=v->state.height+1u ||
-               memcmp(work_header.previous_hash,v->state.tip_id,32u)!=0 ||
-               work_header.timestamp!=v->state.timestamp ||
-               memcmp(work_header.reserved_target,required_target,32u)!=0 ||
+               work_header.height>=v->state.height+1u ||
+               work_header.height==0u ||
                stn_share_verify_evidence(&share,&s->chain->hash_provider,proof)!=STN_DATA_OK){
                 return STN_RPC_REJECTED;
             }
