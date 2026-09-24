@@ -38,9 +38,10 @@ small, bounded increments across Windows x64 and Linux x64. The current Windows
 baseline includes a passing production build, `test-chain` at 1,243 checks with
 0 failures, repaired Contract snapshot qualification at 337 checks with
 0 failures, and qualified peer-test execution at 2,867 checks with 0 failures
-for the corrected local harness. Same-commit Linux Phase 20 evidence and the
-remaining Windows runner qualification are still pending, so this is not a
-final production-readiness claim.
+for the corrected local harness. Linux x64 production build, installation and
+service restart have also completed successfully during Phase 20. Same-commit
+Linux qualification-test evidence and the remaining Windows runner qualification
+are still pending, so this is not a final production-readiness claim.
 
 See [Economy](docs/ECONOMY.md), [Contracts](docs/CONTRACTS.md), the
 [current roadmap](docs/ROADMAP.md), and the
