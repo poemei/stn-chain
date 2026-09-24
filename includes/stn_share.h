@@ -26,7 +26,8 @@ typedef struct stn_share_evidence {
  * exact canonical mining header[168] || body commitment[32].
  *
  * Work ID is SHA256("STN-CHAIN:WORK:ID:1" including its terminating NUL ||
- * canonical mining header[168] || body commitment[32]). The retained evidence makes accepted share proof
+ * canonical mining header[168]). The separately retained body commitment
+ * must equal the header commitment. Together the retained evidence makes accepted share proof
  * independently reproducible during restart, synchronization and reorg
  * without retaining transient Stratum or pending-pool state.
  *
