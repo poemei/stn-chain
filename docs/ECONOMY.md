@@ -448,13 +448,13 @@ Before STNC issuance is activated, Chain development must define and test at lea
 3. Deterministic 256-bit Share Target derivation with saturation at `MAX_TARGET`. **IMPLEMENTED / QUALIFIED**
 4. Deterministic proof verification independent of Stratum trust. **IMPLEMENTED / PRIMITIVE QUALIFIED**
 5. Replay and duplicate state. **IMPLEMENTED / REPLAY PRIMITIVE QUALIFIED**
-6. The explicit relationship between compensated `stn0_` mining identity and `stnw0_` wallet destination.
-7. Canonical economic record representation.
-8. Integer balance and total-supply reconstruction.
+6. The explicit relationship between compensated `stn0_` mining identity and `stnw0_` wallet destination. **IMPLEMENTED / QUALIFIED**
+7. Canonical economic record representation. **IMPLEMENTED / QUALIFIED**
+8. Integer balance and total-supply reconstruction. **IMPLEMENTED / CHAIN ACCEPTANCE QUALIFIED**
 9. Persistence and restart behavior.
 10. P2P synchronization and independent validation of economic history.
 11. Reorganization rollback/reconstruction behavior.
-12. Cross-platform deterministic tests.
+12. Cross-platform deterministic tests. **ACTIVE — Windows/Linux x64 transfer acceptance qualified**
 
 Every Chain implementation addition must preserve the project's development rule that a new Chain component is introduced with its corresponding `.c`, `.h`, and test `.c`.
 
