@@ -56,6 +56,7 @@ CORE_SOURCES := \
 	src/stn_economic_state.c \
 	src/stn_compensation_state.c \
 	src/stn_issuance_binding.c \
+	src/stn_wallet.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -285,3 +286,13 @@ ISSUANCE_BINDING_SOURCES := $(filter-out src/main.c,$(CORE_SOURCES)) $(CRYPTO_SO
 $(BUILD_DIR)/test-issuance-binding: tests/test_issuance_binding.c $(ISSUANCE_BINDING_SOURCES)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_ISSUANCE_BINDING_TEST_MAIN tests/test_issuance_binding.c $(ISSUANCE_BINDING_SOURCES) -o $@ $(LDLIBS)
+
+
+# Phase 19 deterministic wallet primitive qualification.
+.PHONY: test-wallet
+test-wallet: $(BUILD_DIR)/test-wallet
+	$(BUILD_DIR)/test-wallet
+
+$(BUILD_DIR)/test-wallet: tests/test_wallet.c src/stn_wallet.c src/stn_address.c platforms/linux/stn_sha256.c includes/stn_wallet.h includes/stn_address.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_WALLET_TEST_MAIN tests/test_wallet.c src/stn_wallet.c src/stn_address.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
