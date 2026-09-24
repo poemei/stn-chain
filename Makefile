@@ -63,6 +63,7 @@ CORE_SOURCES := \
 	src/stn_transfer_authorization.c \
 	src/stn_transfer_acceptance.c \
 	src/stn_transfer_envelope.c \
+	src/stn_transfer_envelope_replay.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -364,3 +365,13 @@ test-transfer-envelope: $(BUILD_DIR)/test-transfer-envelope
 $(BUILD_DIR)/test-transfer-envelope: tests/test_transfer_envelope.c src/stn_transfer_envelope.c src/stn_transfer.c includes/stn_transfer_envelope.h includes/stn_transfer.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_TEST_MAIN tests/test_transfer_envelope.c src/stn_transfer_envelope.c src/stn_transfer.c -o $@ $(LDLIBS)
+
+
+# Phase 19 nonce-aware transfer replay qualification.
+.PHONY: test-transfer-envelope-replay
+test-transfer-envelope-replay: $(BUILD_DIR)/test-transfer-envelope-replay
+	$(BUILD_DIR)/test-transfer-envelope-replay
+
+$(BUILD_DIR)/test-transfer-envelope-replay: tests/test_transfer_envelope_replay.c src/stn_transfer_envelope_replay.c src/stn_replay.c src/stn_record.c src/stn_identity.c includes/stn_transfer_envelope_replay.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_REPLAY_TEST_MAIN tests/test_transfer_envelope_replay.c src/stn_transfer_envelope_replay.c src/stn_replay.c src/stn_record.c src/stn_identity.c -o $@ $(LDLIBS)
