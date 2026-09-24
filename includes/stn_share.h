@@ -5,20 +5,29 @@
 #include "stn_economy.h"
 #include "stn_address.h"
 
-#define STN_SHARE_VERSION 1u
+#define STN_SHARE_VERSION 2u
 #define STN_SHARE_WORK_ID_SIZE 32u
 #define STN_SHARE_ID_SIZE 32u
 #define STN_SHARE_NONCE_SIZE 8u
-#define STN_SHARE_CANONICAL_SIZE 73u
+#define STN_SHARE_TEMPLATE_HEADER_SIZE 168u
+#define STN_SHARE_CANONICAL_SIZE 241u
 
 typedef struct stn_share_evidence {
     uint8_t work_id[STN_SHARE_WORK_ID_SIZE];
     stn_address miner;
     uint64_t nonce;
+    uint8_t template_header[STN_SHARE_TEMPLATE_HEADER_SIZE];
 } stn_share_evidence;
 
-/* Canonical share evidence is:
- * version[1] || work_id[32] || miner identifier[32] || nonce[8] big-endian.
+/* Canonical share evidence v2 is:
+ * version[1] || work_id[32] || miner identifier[32] || nonce[8] big-endian ||
+ * exact canonical mining header[168].
+ *
+ * Work ID is SHA256("STN-CHAIN:WORK:ID:1" including its terminating NUL ||
+ * canonical mining header[168]). The header makes accepted share proof
+ * independently reproducible during restart, synchronization and reorg
+ * without retaining transient Stratum or pending-pool state.
+ *
  * miner must be an stn0_ identity. The textual address prefix is namespace
  * syntax and is not duplicated in canonical evidence.
  * Share ID = SHA256("STN-CHAIN:SHARE:ID:1" including its terminating NUL ||
@@ -39,14 +48,17 @@ stn_data_status stn_share_id(
     const stn_share_evidence *share,
     uint8_t id[STN_SHARE_ID_SIZE]);
 
-/* Independently verify qualifying-share PoW against an exact canonical mining
- * template. work_id must equal SHA256("STN-CHAIN:WORK:ID:1" including NUL ||
- * the unmodified template). The template's canonical nonce is replaced only
- * in a local copy with share->nonce. Its declared Chain target is multiplied
- * by STN_SHARE_FACTOR using stn_economy_share_target(), then the resulting
- * block hash must be <= that Share Target. digest is the reproduced PoW hash.
- * No accepted-state, freshness, duplicate/replay, reward, balance or issuance
- * decision is made here. Output is unchanged on failure. */
+/* Independently verify canonical share evidence using its retained mining
+ * header. The Work ID is reproduced from that exact header, the share target
+ * is derived from its Chain target, only the nonce field is replaced, and the
+ * resulting block-header hash must satisfy the Share Target. */
+stn_data_status stn_share_verify_evidence(
+    const stn_share_evidence *share,
+    const stn_hash_provider *provider,
+    uint8_t digest[32]);
+
+/* Live-path verification additionally requires the supplied canonical mining
+ * template to carry exactly the same 168-byte header as the evidence. */
 stn_data_status stn_share_verify(
     const stn_share_evidence *share,
     const uint8_t *canonical_template,
