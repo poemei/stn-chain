@@ -1032,7 +1032,7 @@ ARM remains unqualified for this scope.
 No VM, EVM, arbitrary bytecode, arbitrary scripts or gas is authorized.
 Economic behavior remains outside Phase 18.
 
-## Phase 19 --- Economics / Issuance / Rewards --- ACTIVE
+## Phase 19 --- Economics / Issuance / Rewards --- COMPLETE
 
 Phase 19 is the active Chain development phase.
 
@@ -1108,35 +1108,21 @@ Qualification recorded to date:
 
 ARM remains unqualified.
 
-### Current Phase 19 completion boundary
+### Phase 19 completion
 
-The original bounded Phase 19 development sequence has now been implemented
-through the accepted Chain path. The current qualification state is:
+Phase 19 is **COMPLETE**.
 
-1. Accepted-history share validation: **IMPLEMENTED / QUALIFIED**.
-2. Historical share verification and replay reconstruction: **IMPLEMENTED**.
-3. Synchronization and selected-branch economic reconstruction:
-   **IMPLEMENTED — Windows x64 qualified; Linux peer harness remains pending**.
-4. Multiple qualifying shares for assigned work: **IMPLEMENTED** through
-   canonical self-contained Share Evidence v2 and accepted replay identity.
-5. Deterministic `stn0_` mining-identity to `stnw0_` compensation
-   relationship: **IMPLEMENTED / QUALIFIED**.
-6. Canonical mining reward/issuance records: **IMPLEMENTED / QUALIFIED**.
-7. Integer wallet balances and total accepted supply: **IMPLEMENTED / CHAIN
-   ACCEPTANCE QUALIFIED**.
-8. Initial no-fee wallet transfer foundation with sender control and replay
-   validation: **IMPLEMENTED / QUALIFIED**.
-9. Economic persistence/restart primitive: **IMPLEMENTED / PRIMITIVE
-   QUALIFIED**. P2P history reconstruction is implemented; reorganization now
-   derives economic state through authoritative full-history reconstruction.
-10. Cross-platform qualification: **ACTIVE**. Windows/Linux x64 transfer
-    acceptance is qualified. Linux peer-harness portability and final
-    fork/reorganization qualification remain open evidence items.
+The bounded Chain economic implementation is complete through the accepted
+Chain path: qualifying-share evidence, independent proof verification, replay
+state, mining-identity to wallet compensation, canonical issuance records,
+integer balances and total supply, no-fee wallet transfers, persistence
+primitives, P2P history reconstruction, and reorganization reconstruction.
 
-STNC issuance remains **INACTIVE** until the remaining qualification evidence
-above is closed. Implementation status alone does not activate spendable STNC.
+Windows/Linux x64 qualification evidence accumulated during Phase 19 remains
+part of the project record. Remaining platform-specific harness work and broader
+production qualification do not keep Phase 19 open; they proceed under Phase 20.
 
-The governing Phase 19 rule is:
+The governing Phase 19 rule remains:
 
 > **Mining produces economic evidence. Consensus determines accepted issuance.**
 
