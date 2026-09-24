@@ -1,5 +1,7 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_share.h"
+#include "stn_sha256.h"
+#include "stn_chain.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -56,11 +58,74 @@ static void vectors(void)
     CHECK(memcmp(id2,saved_id,sizeof(id2))==0);
 }
 
+static void proof_vectors(void)
+{
+    static const uint8_t work_domain[]="STN-CHAIN:WORK:ID:1";
+    stn_hash_provider provider={stn_sha256,NULL};
+    stn_share_evidence s={0};
+    stn_block b={0};
+    uint8_t bytes[STN_BLOCK_HEADER_SIZE],hash[32],saved[32],share_target[32];
+    size_t written=0;
+    uint64_t nonce;
+
+    s.miner.type=STN_ADDRESS_IDENTITY;
+    memset(s.miner.identifier,0x44,32);
+
+    b.header.version=STN_POW_BLOCK_VERSION;
+    b.header.height=1;
+    b.header.timestamp=1;
+    b.header.previous_hash[31]=1;
+    b.header.reserved_target[0]=0x0f;
+    b.header.reserved_target[31]=0xff;
+    b.header.transaction_count=0;
+    b.header.body_length=0;
+    CHECK(stn_block_body_commitment(NULL,0,0,&provider,b.header.transaction_commitment)==STN_DATA_OK);
+    CHECK(stn_block_encode(&b,bytes,sizeof(bytes),&written)==STN_DATA_OK &&
+          written==sizeof(bytes));
+    CHECK(stn_sha256(NULL,work_domain,sizeof(work_domain),bytes,sizeof(bytes),s.work_id)==STN_DATA_OK);
+    CHECK(stn_economy_share_target(b.header.reserved_target,share_target)==STN_DATA_OK);
+
+    for(nonce=0;;++nonce){
+        uint8_t candidate[STN_BLOCK_HEADER_SIZE];
+        stn_block_header h=b.header;
+        size_t n=0;
+        h.reserved_work_nonce=nonce;
+        CHECK(stn_block_header_encode(&h,candidate,sizeof(candidate),&n)==STN_DATA_OK);
+        CHECK(stn_chain_block_id(candidate,sizeof(candidate),&provider,hash)==STN_DATA_OK);
+        if(stn_pow_compare(hash,share_target)==STN_DATA_OK){break;}
+        CHECK(nonce!=UINT64_MAX);
+    }
+    s.nonce=nonce;
+    CHECK(stn_share_verify(&s,bytes,sizeof(bytes),&provider,hash)==STN_DATA_OK);
+
+    memset(saved,0xa5,32);
+    {
+        stn_share_evidence bad=s;
+        uint8_t out[32];memcpy(out,saved,32);
+        bad.work_id[0]^=1u;
+        CHECK(stn_share_verify(&bad,bytes,sizeof(bytes),&provider,out)==STN_DATA_CONTENT);
+        CHECK(memcmp(out,saved,32)==0);
+    }
+    {
+        stn_share_evidence bad=s;
+        uint8_t out[32];memcpy(out,saved,32);
+        bad.miner.type=STN_ADDRESS_WALLET;
+        CHECK(stn_share_verify(&bad,bytes,sizeof(bytes),&provider,out)==STN_DATA_TYPE);
+        CHECK(memcmp(out,saved,32)==0);
+    }
+    CHECK(stn_share_verify(NULL,bytes,sizeof(bytes),&provider,hash)==STN_DATA_ARGUMENT);
+    CHECK(stn_share_verify(&s,NULL,sizeof(bytes),&provider,hash)==STN_DATA_ARGUMENT);
+    CHECK(stn_share_verify(&s,bytes,sizeof(bytes),NULL,hash)==STN_DATA_ARGUMENT);
+    CHECK(stn_share_verify(&s,bytes,sizeof(bytes),&provider,NULL)==STN_DATA_ARGUMENT);
+    CHECK(stn_share_verify(&s,bytes,STN_BLOCK_HEADER_SIZE-1,&provider,hash)==STN_DATA_LENGTH);
+}
+
 int test_share(void);
 int test_share(void)
 {
     vectors();
-    printf("Economy share evidence: %u checks, %u failures.\n",checks,failures);
+    proof_vectors();
+    printf("Economy share evidence/proof: %u checks, %u failures.\n",checks,failures);
     return failures==0 ? 0 : 1;
 }
 
