@@ -157,3 +157,7 @@ int test_fork(void)
     printf("Fork choice/planning: %u checks, %u failures.\n",checks,failures);
     return failures==0 ? 0 : 1;
 }
+
+#ifdef STN_FORK_TEST_MAIN
+int main(void){return test_fork();}
+#endif
