@@ -3,6 +3,7 @@
 #include "stn_sha256.h"
 #include "stn_wire_internal.h"
 #include "stn_address.h"
+#include "stn_share.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -349,6 +350,53 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
             code=STN_RPC_OK;
             goto done;
         }
+    }
+
+    if(q->method==STN_RPC_SUBMIT_SHARE){
+        stn_address miner;
+        stn_share_evidence evidence;
+        uint8_t proof[32];
+        stn_data_status verified;
+
+        if(q->payload==NULL || q->length!=109u ||
+           stn_address_decode((const char *)(q->payload+32),STN_MINING_IDENTITY_SIZE,&miner)!=STN_DATA_OK ||
+           miner.type!=STN_ADDRESS_IDENTITY){
+            code=STN_RPC_INVALID;
+            goto done;
+        }
+
+        memset(&evidence,0,sizeof(evidence));
+        evidence.version=STN_SHARE_VERSION;
+        memcpy(evidence.work_id,q->payload,32u);
+        evidence.miner=miner;
+        evidence.nonce=stn_wire_read(q->payload+101,8u);
+
+        code=template_build(s,&v,&n,id);
+        if(code!=STN_RPC_OK){goto done;}
+        if(memcmp(evidence.work_id,id,32u)!=0){
+            code=STN_RPC_STALE;
+            goto done;
+        }
+
+        verified=stn_share_verify(
+            &evidence,
+            s->template_bytes,
+            n,
+            &s->chain->hash_provider,
+            proof);
+        if(verified!=STN_DATA_OK){
+            code=STN_RPC_REJECTED;
+            goto done;
+        }
+
+        if(stn_share_id(&evidence,&s->chain->hash_provider,p)!=STN_DATA_OK){
+            code=STN_RPC_PROVIDER;
+            goto done;
+        }
+
+        *written=32u;
+        code=STN_RPC_OK;
+        goto done;
     }
 
     if(q->method==STN_RPC_SUBMIT_WORK){
