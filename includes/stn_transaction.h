@@ -4,6 +4,9 @@
 #include "stn_record.h"
 
 #define STN_TX_HEADER_SIZE 12u
+#define STN_TX_AUTHORITY_GRANT_SIZE 194u
+#define STN_TX_AUTHORITY_REVOKE_SIZE 129u
+#define STN_TX_IDENTITY_ROTATE_SIZE 129u
 /* Share evidence is larger than the pre-existing authority-revoke minimum.
  * Keep the structural minimum at the smallest canonical transaction class. */
 #define STN_TX_SHARE_EVIDENCE_SIZE 241u
@@ -31,10 +34,6 @@ typedef struct stn_transaction {
     const uint8_t *record_bytes;
     uint32_t record_length;
 } stn_transaction;
-
-#define STN_TX_AUTHORITY_GRANT_SIZE 194u
-#define STN_TX_AUTHORITY_REVOKE_SIZE 129u
-#define STN_TX_IDENTITY_ROTATE_SIZE 129u
 
 /* Provider must calculate SHA-256(domain || bytes), including domain's NUL.
  * Return OK, UNRESOLVED, or PROVIDER_ERROR. Other returns become errors.
