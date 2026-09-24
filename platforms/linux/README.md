@@ -23,12 +23,12 @@ Install and enable once on the Linux host:
 
 ```sh
 make
-sudo make install-service
-sudo systemctl daemon-reload
-sudo systemctl enable --now stn-chain
+sudo make install
 ```
 
-systemd starts the node at boot, restarts failures and sends SIGTERM for shutdown.
+`sudo make install` installs the application and service, reloads systemd, enables
+the service for boot, and starts/restarts the node immediately. systemd then
+restarts failures and sends SIGTERM for shutdown.
 No login, terminal, genesis-generation command or mode flag is required.
 The service runs as the persistent `stnchain` identity and uses
 `/var/lib/stn-chain/chain.stns`. A persistent service identity is required
