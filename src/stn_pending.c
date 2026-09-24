@@ -262,6 +262,12 @@ stn_pending_result stn_pending_admit_transaction(stn_pending *p,const uint8_t *b
         report->acceptance=STN_ACCEPTANCE_REJECTED;
         return lifecycle_result;
     }
+    if(tx.type==STN_TX_ISSUANCE){
+        /* No caller may place an issuance record into pending until Chain can
+         * bind its evidence ID and destination to accepted mining evidence. */
+        report->acceptance=STN_ACCEPTANCE_UNRESOLVED;
+        return STN_PENDING_UNAVAILABLE;
+    }
     if(tx.type==STN_TX_COMPENSATION_DESTINATION){
         stn_compensation_destination destination;
         stn_address wallet;
