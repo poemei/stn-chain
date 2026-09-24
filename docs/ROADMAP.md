@@ -120,17 +120,16 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
                                                            Contract workflow is deferred
                                                            to STNC Core/GUI integration.
 
-                     19 Economics /       **ACTIVE**  Native economics, issuance
-                        Issuance /                         and reward rules remain
-                        Rewards                            deferred pending explicit
-                                                           Operations/consensus
-                                                           decisions.
+                     19 Economics /       **COMPLETE**     Native economics, issuance,
+                        Issuance /                         rewards, balances, transfers,
+                        Rewards                            persistence and reconstruction
+                                                           are complete at the bounded
+                                                           Chain scope.
 
-                     20 Production        **NOT STARTED**  Final production
-                        Qualification                      qualification remains future
-                                                           work after preceding
-                                                           development boundaries are
-                                                           complete.
+                     20 Production        **ACTIVE**       Production qualification is
+                        Qualification                      proceeding in bounded micro-
+                                                           chunks across the supported
+                                                           Windows/Linux x64 scope.
   -------------------------------------------------------------------------------------
 
 ### Current Development Position
@@ -143,8 +142,8 @@ Phase 16        COMPLETE (Operations status, 2026-09-21)
   Micro-Chunk 1C  COMPLETE / QUALIFIED
 Phase 17        COMPLETE / QUALIFIED (Operations closeout, 2026-09-21)
 Phase 18        SHELVED / CHAIN SCOPE QUALIFIED
-Phase 19        ACTIVE
-Phase 20        NOT STARTED
+Phase 19        COMPLETE
+Phase 20        ACTIVE
 
 Historical qualified Phase 16 1C checkpoint: 8a1264a
 Current source reviewed: a278c33
@@ -1034,7 +1033,8 @@ Economic behavior remains outside Phase 18.
 
 ## Phase 19 --- Economics / Issuance / Rewards --- COMPLETE
 
-Phase 19 is the active Chain development phase.
+Phase 19 is closed. Further work belongs to Phase 20 unless a reproducible
+defect is demonstrated in an existing Phase 19 requirement.
 
 The native economic model is now defined:
 
@@ -1126,13 +1126,54 @@ The governing Phase 19 rule remains:
 
 > **Mining produces economic evidence. Consensus determines accepted issuance.**
 
-## Phase 20 --- Production Qualification --- NOT STARTED
+## Phase 20 --- Production Qualification --- ACTIVE
 
-Final production qualification has not started. Completion will require
-the applicable deterministic, negative, boundary, persistence, recovery,
-interoperability, concurrency, protocol and platform evidence for the
-production system then in scope.
+Phase 20 began on 2026-09-24 and is proceeding in deliberately bounded
+micro-chunks. Phase 19 remains closed; Phase 20 qualification work does not
+reopen or extend the Economy protocol unless a reproducible Phase 19 defect is
+demonstrated.
 
-Earlier Windows Release/x64 phase qualification is evidence for those
-qualified increments; it is not by itself a Phase 20
-production-readiness claim.
+### Phase 20 qualification record
+
+The initial Windows x64 baseline established:
+
+- production `build.cmd`: PASS with no compiler errors/warnings; the observed
+  LNK4042 duplicate-object linker warning remains build-harness evidence, not a
+  consensus failure;
+- `test-contract`: 494 checks, 0 failures;
+- `test-contract-consensus`: 41 checks, 0 failures;
+- `test-contract-lineage`: 14 checks, 0 failures;
+- `test-contract-state`: 17 checks, 0 failures;
+- `test-chain`: 1,243 checks, 0 failures;
+- `tools/test-node.ps1 -FramingOnly`: 33 checks, 0 failures.
+
+The baseline also exposed two Windows test-harness defects rather than
+production consensus defects:
+
+1. `test-contract-snapshot` lacked existing implementation dependencies in
+   its `build.cmd` target and then overflowed the default Windows stack because
+   large fixture buffers were automatic local storage. The target dependency
+   list was corrected in `5fdb395`; the oversized fixture buffers were given
+   checked allocated ownership with deterministic cleanup. Qualification now
+   completes normally at **337 checks, 0 failures**.
+
+2. `test-peer` overflowed the default Windows stack before its RPC calls
+   executed because `convergence_rpc()` placed an `STN_RPC_MAX_FRAME` request
+   buffer on the stack. The qualified local correction gives that existing
+   buffer checked allocated ownership with deterministic cleanup while
+   preserving capacity and assertions. Qualification completes normally at
+   **2,867 checks, 0 failures**. This correction must be present on the shared
+   repository before it is treated as repository qualification evidence.
+
+A separate Windows test-runner issue was demonstrated: `build.cmd test-peer`
+can print success after a Windows exception exit such as `0xC00000FD`. Phase 20
+must correct the runner so every nonzero executable exit status is treated as a
+failure; that correction is not yet recorded as complete.
+
+Linux x64 same-commit Phase 20 baseline execution remains pending. Existing
+Linux qualification from earlier phases remains valid evidence for those
+increments, but it is not substituted for the Phase 20 same-commit production
+qualification run.
+
+Phase 20 remains **ACTIVE**. No final production-readiness claim is made here.
+ARM remains outside the currently qualified Phase 20 platform scope.
