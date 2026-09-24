@@ -3,6 +3,7 @@
 #include "stn_wire_internal.h"
 #include "stn_share.h"
 #include "stn_issuance.h"
+#include "stn_issuance_binding.h"
 #include <string.h>
 #include <stdlib.h>
 #include "stn_sha256.h"
@@ -102,6 +103,15 @@ static stn_chain_compensation_owned *compensation_clone(const stn_chain_state *s
 }
 static void compensation_destroy(stn_chain_compensation_owned *o){free(o);}
 
+typedef struct stn_chain_economic_owned {
+    stn_economic_state state;
+    size_t references;
+    stn_economic_balance balances[];
+} stn_chain_economic_owned;
+static stn_chain_economic_owned *economic_new(void){stn_chain_economic_owned *o=(stn_chain_economic_owned *)calloc(1,sizeof(*o));if(o==NULL)return NULL;o->references=1;stn_economic_state_initialize(&o->state,NULL,0u);return o;}
+static stn_chain_economic_owned *economic_clone(const stn_chain_state *s){stn_chain_economic_owned *o;size_t capacity,bytes;if(s->economy==NULL || s->economy->balance_count>s->economy->balance_capacity || s->economy->balance_count>SIZE_MAX-STN_BLOCK_MAX_TRANSACTIONS)return NULL;capacity=s->economy->balance_count+STN_BLOCK_MAX_TRANSACTIONS;if(capacity>SIZE_MAX/sizeof(stn_economic_balance))return NULL;bytes=capacity*sizeof(stn_economic_balance);if(bytes>SIZE_MAX-sizeof(*o))return NULL;o=(stn_chain_economic_owned *)calloc(1,sizeof(*o)+bytes);if(o==NULL)return NULL;o->references=1;stn_economic_state_initialize(&o->state,o->balances,capacity);if(s->economy->balance_count!=0u){memcpy(o->balances,s->economy->balances,s->economy->balance_count*sizeof(*o->balances));o->state.balance_count=s->economy->balance_count;}o->state.total_supply=s->economy->total_supply;return o;}
+static void economic_destroy(stn_chain_economic_owned *o){free(o);}
+
 
 #ifdef STN_LIFECYCLE_TEST
 #include <stdatomic.h>
@@ -155,6 +165,7 @@ void stn_chain_state_release(stn_chain_state *state)
             if(o->references==0)abort();
             if(--o->references==0)compensation_destroy(o);
         }
+        if(state->economy!=NULL){stn_chain_economic_owned *o=(stn_chain_economic_owned *)state->economy;if(o->references==0)abort();if(--o->references==0)economic_destroy(o);}
         memset(state,0,sizeof(*state));
     }
 }
@@ -188,6 +199,7 @@ stn_data_status stn_chain_state_share(const stn_chain_state *source,stn_chain_st
         }
         ++o->references;
     }
+    if(source->economy!=NULL){stn_chain_economic_owned *o=(stn_chain_economic_owned *)source->economy;if(o->references==0 || o->references==SIZE_MAX)return o->references==SIZE_MAX?STN_DATA_CAPACITY:STN_DATA_ARGUMENT;++o->references;}
     if(source->contracts!=NULL && stn_contract_snapshot_share(source->contracts)==NULL){
         if(source->lifecycle!=NULL){
             stn_chain_lifecycle_owned *o=(stn_chain_lifecycle_owned *)source->lifecycle;
@@ -317,6 +329,7 @@ stn_data_status stn_chain_initialize(const stn_chain_context *context, stn_chain
                 stn_chain_compensation_owned *m=compensation_new();
                 if(m==NULL){share_destroy(q);stn_contract_snapshot_release(s.contracts);lifecycle_destroy(o);return STN_DATA_CAPACITY;}
                 s.compensation=&m->state;
+                {stn_chain_economic_owned *e=economic_new();if(e==NULL){compensation_destroy(m);share_destroy(q);stn_contract_snapshot_release(s.contracts);lifecycle_destroy(o);return STN_DATA_CAPACITY;}s.economy=&e->state;}
             }
         }
     }
@@ -523,7 +536,8 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
     stn_contract_snapshot *candidate_contracts=NULL;
     stn_chain_share_owned *candidate_shares=NULL;
     stn_chain_compensation_owned *candidate_compensation=NULL;
-    int has_lifecycle=0,has_contracts=0,has_shares=0,has_compensation=0,reused_lifecycle=0;
+    stn_chain_economic_owned *candidate_economy=NULL;
+    int has_lifecycle=0,has_contracts=0,has_shares=0,has_compensation=0,has_issuance=0,reused_lifecycle=0;
     stn_data_status status;
     uint8_t id[32];
     uint32_t i;
@@ -581,7 +595,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
         if(tx.type==STN_TX_CONTRACT_ACTION){has_contracts=1;}
         else if(tx.type==STN_TX_SHARE_EVIDENCE){has_shares=1;}
         else if(tx.type==STN_TX_COMPENSATION_DESTINATION){has_compensation=1;}
-        else if(tx.type==STN_TX_ISSUANCE){has_lifecycle=1;}
+        else if(tx.type==STN_TX_ISSUANCE){has_issuance=1;}
         else if(tx.type!=STN_TX_PUBLICATION){has_lifecycle=1;}
         else {
             if (memcmp(record.network_id,context->network_id,32)!=0) {
@@ -640,6 +654,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             r.body=STN_STAGE_ERROR;return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);
         }
     }
+    if(has_issuance){candidate_economy=economic_clone(prior);if(candidate_economy==NULL){if(has_lifecycle && !reused_lifecycle)lifecycle_destroy(candidate_lifecycle);if(has_shares)share_destroy(candidate_shares);if(has_compensation)compensation_destroy(candidate_compensation);r.body=STN_STAGE_ERROR;return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);}}
     if(has_contracts){
         candidate_contracts=stn_contract_snapshot_clone(prior->contracts);
         if(candidate_contracts==NULL){
@@ -647,7 +662,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             r.body=STN_STAGE_ERROR;return fail(r,STN_CHAIN_BODY,STN_DATA_PROVIDER_ERROR);
         }
     }
-    if(has_lifecycle || has_contracts || has_shares || has_compensation){
+    if(has_lifecycle || has_contracts || has_shares || has_compensation || has_issuance){
         stn_data_status failure=STN_DATA_OK;
         offset=0;
         for(i=0;i<b.header.transaction_count;++i){
@@ -659,10 +674,12 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             }
             offset+=n;
             if(tx.type==STN_TX_ISSUANCE){
-                /* Issuance is structurally canonical but is not consensus-active
-                 * until its evidence binding is validated below. */
-                failure=STN_DATA_UNRESOLVED;
-                break;
+                stn_issuance_record issuance;stn_address mapped;size_t hi,hj;int found=0;
+                if(stn_issuance_decode(tx.record_bytes,tx.record_length,&issuance)!=STN_DATA_OK || issuance.reason!=STN_ISSUANCE_REASON_SHARE){failure=STN_DATA_UNRESOLVED;break;}
+                if(stn_compensation_state_lookup(has_compensation?&candidate_compensation->state:prior->compensation,&issuance.destination.mining_identity,&mapped)!=STN_DATA_OK || memcmp(mapped.identifier,issuance.destination.wallet.identifier,32u)!=0){failure=STN_DATA_CONTENT;break;}
+                if(history==NULL){failure=STN_DATA_UNRESOLVED;break;}
+                for(hi=0;hi<history_count && !found;++hi){stn_block hb;size_t ho=0;if(stn_block_decode(history[hi].bytes,history[hi].length,&hb)!=STN_DATA_OK){failure=STN_DATA_CONTENT;break;}for(hj=0;hj<hb.header.transaction_count;++hj){uint32_t hn=(uint32_t)stn_wire_read(hb.body+ho,4);stn_transaction htx;ho+=4;if(stn_transaction_decode(hb.body+ho,hn,&htx)!=STN_DATA_OK){failure=STN_DATA_CONTENT;break;}if(htx.type==STN_TX_SHARE_EVIDENCE){stn_share_evidence share;if(stn_share_decode(htx.record_bytes,htx.record_length,&share)==STN_DATA_OK && stn_issuance_bind_share(&issuance,&share,has_compensation?&candidate_compensation->state:prior->compensation)==STN_DATA_OK){found=1;break;}}ho+=hn;}}
+                if(failure!=STN_DATA_OK)break;if(!found){failure=STN_DATA_CONTENT;break;}failure=stn_economic_state_apply(&candidate_economy->state,&issuance);if(failure!=STN_DATA_OK)break;continue;
             }
             if(tx.type==STN_TX_COMPENSATION_DESTINATION){
                 stn_compensation_destination destination;
@@ -761,6 +778,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             if(has_contracts)stn_contract_snapshot_release(candidate_contracts);
             if(has_shares)share_destroy(candidate_shares);
             if(has_compensation)compensation_destroy(candidate_compensation);
+            if(has_issuance)economic_destroy(candidate_economy);
             if(has_lifecycle && !reused_lifecycle)lifecycle_destroy(candidate_lifecycle);
             r.body=stage(failure);return fail(r,STN_CHAIN_BODY,failure);
         }
@@ -787,6 +805,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             if(--old->references==0)compensation_destroy(old);
             next.compensation=&candidate_compensation->state;
         }else next.compensation=shared.compensation;
+        if(has_issuance){stn_chain_economic_owned *old=(stn_chain_economic_owned *)shared.economy;if(--old->references==0)economic_destroy(old);next.economy=&candidate_economy->state;}else next.economy=shared.economy;
         if(has_shares){
             stn_chain_share_owned *old=(stn_chain_share_owned *)shared.shares;
             if(--old->references==0)share_destroy(old);
