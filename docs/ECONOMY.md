@@ -451,7 +451,7 @@ Before STNC issuance is activated, Chain development must define and test at lea
 6. The explicit relationship between compensated `stn0_` mining identity and `stnw0_` wallet destination. **IMPLEMENTED / QUALIFIED**
 7. Canonical economic record representation. **IMPLEMENTED / QUALIFIED**
 8. Integer balance and total-supply reconstruction. **IMPLEMENTED / CHAIN ACCEPTANCE QUALIFIED**
-9. Persistence and restart behavior.
+9. Persistence and restart behavior. **IMPLEMENTED / PRIMITIVE QUALIFIED**
 10. P2P synchronization and independent validation of economic history.
 11. Reorganization rollback/reconstruction behavior.
 12. Cross-platform deterministic tests. **ACTIVE — Windows/Linux x64 transfer acceptance qualified**
