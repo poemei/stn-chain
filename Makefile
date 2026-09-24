@@ -53,6 +53,7 @@ CORE_SOURCES := \
 	src/stn_economy.c \
 	src/stn_compensation.c \
 	src/stn_issuance.c \
+	src/stn_economic_state.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -251,3 +252,13 @@ test-issuance: $(BUILD_DIR)/test-issuance
 $(BUILD_DIR)/test-issuance: tests/test_issuance.c src/stn_issuance.c src/stn_compensation.c includes/stn_issuance.h includes/stn_compensation.h includes/stn_address.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_ISSUANCE_TEST_MAIN tests/test_issuance.c src/stn_issuance.c src/stn_compensation.c -o $@ $(LDLIBS)
+
+
+# Phase 19 deterministic accepted economic state qualification.
+.PHONY: test-economic-state
+test-economic-state: $(BUILD_DIR)/test-economic-state
+	$(BUILD_DIR)/test-economic-state
+
+$(BUILD_DIR)/test-economic-state: tests/test_economic_state.c src/stn_economic_state.c includes/stn_economic_state.h includes/stn_issuance.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_ECONOMIC_STATE_TEST_MAIN tests/test_economic_state.c src/stn_economic_state.c -o $@ $(LDLIBS)
