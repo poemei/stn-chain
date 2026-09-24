@@ -763,6 +763,11 @@ cl %CFLAGS% %INCLUDES% /DSTN_TRANSFER_TRANSACTION_TEST_MAIN ^
     src\stn_transfer.c ^
     src\stn_record.c ^
     src\stn_contract_transaction.c ^
+    src\stn_authority.c ^
+    src\stn_address.c ^
+    src\stn_block.c ^
+    src\stn_economy.c ^
+    src\stn_pow.c ^
     src\stn_contract.c ^
     src\stn_contract_lineage.c ^
     src\stn_contract_state.c ^
