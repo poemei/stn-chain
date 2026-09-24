@@ -92,7 +92,8 @@ static void vectors(void)
     changed=s;changed.template_header[119]^=1u;
     CHECK(stn_share_id(&changed,id2)==STN_DATA_OK && memcmp(id,id2,32)!=0);
     changed=s;changed.body_commitment[0]^=1u;
-    CHECK(stn_share_id(&changed,id2)==STN_DATA_OK && memcmp(id,id2,32)!=0);
+    CHECK(stn_share_id(&changed,id2)==STN_DATA_CONTENT);
+    CHECK(memcmp(id2,id,32)!=0);
 
     memset(saved,0xa5,sizeof(saved));memcpy(canonical,saved,sizeof(saved));
     CHECK(stn_share_encode(NULL,canonical)==STN_DATA_ARGUMENT);
