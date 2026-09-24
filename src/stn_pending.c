@@ -3,6 +3,7 @@
 #include "stn_lifecycle.h"
 #include "stn_sha256.h"
 #include "stn_wire_internal.h"
+#include "stn_share.h"
 #include <stdlib.h>
 #include <string.h>
 
