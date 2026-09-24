@@ -342,7 +342,7 @@ static int convergence_solve(uint8_t *p,const stn_hash_provider *hash)
 }
 static stn_rpc_code convergence_rpc(stn_mining_service *s,uint16_t method,const uint8_t *input,size_t length,uint8_t *out,size_t *n)
 {
-    uint8_t request[512],response[512];size_t rn,wn;stn_rpc_message q={1,0,STN_RPC_OK,1,NULL,0},r;
+    uint8_t request[STN_RPC_MAX_FRAME],response[512];size_t rn,wn;stn_rpc_message q={1,0,STN_RPC_OK,1,NULL,0},r;
     stn_rpc_service service={s,stn_mining_handle};q.method=method;q.payload=input;q.length=length;
     CHECK(stn_rpc_encode(&q,request,sizeof(request),&rn)==STN_RPC_OK);
     CHECK(stn_rpc_dispatch(request,rn,3,&service,response,sizeof(response),&wn)==STN_RPC_OK);
@@ -420,6 +420,16 @@ static void convergence(void)
             stn_storage_view_release(&view);CHECK(stn_chain_required_target(&c,&states[j],target[j])==STN_DATA_OK && memcmp(target[j],a[60]+120,32)==0);
         }
         if(!high){
+            stn_address miner_address={0};char miner_text[STN_ADDRESS_TEXT_CAPACITY];size_t miner_written=0;
+            /*
+             * MINING_TEMPLATE payload is tip[32] || work[32] || block_length[4] || block.
+             * SUBMIT_WORK additionally binds the canonical stn0_ identity before the block.
+             */
+            CHECK(n>=68u && n+STN_RPC_MINER_IDENTITY_SIZE<=sizeof(stale));
+            memmove(stale+STN_RPC_MINING_SUBMISSION_PREFIX,stale+68u,n-68u);
+            CHECK(stn_address_derive(STN_ADDRESS_IDENTITY,(const uint8_t *)"peer-convergence-miner",22u,&miner_address)==STN_DATA_OK);
+            CHECK(stn_address_encode(&miner_address,miner_text,sizeof(miner_text),&miner_written)==STN_DATA_OK && miner_written==STN_RPC_MINER_IDENTITY_SIZE);
+            memcpy(stale+68u,miner_text,STN_RPC_MINER_IDENTITY_SIZE);n+=STN_RPC_MINER_IDENTITY_SIZE;
             CHECK(convergence_rpc(&mining,STN_RPC_SUBMIT_WORK,stale,n,out,&w)==STN_RPC_STALE && w==0);
             CHECK(convergence_rpc(&mining,STN_RPC_MINING_TEMPLATE,NULL,0,fresh,&w)==STN_RPC_OK && memcmp(fresh+188,target[0],32)==0 && memcmp(fresh+32,stale+32,32)!=0);
         }
