@@ -30,9 +30,12 @@ sudo systemctl enable --now stn-chain
 
 systemd starts the node at boot, restarts failures and sends SIGTERM for shutdown.
 No login, terminal, genesis-generation command or mode flag is required.
-The service uses a system-managed unprivileged identity and persistent
-`/var/lib/stn-chain/chain.stns`. systemd creates the state directory. Logs are
-available with `journalctl -u stn-chain`.
+The service runs as the persistent `stnchain` identity and uses
+`/var/lib/stn-chain/chain.stns`. A persistent service identity is required
+because Chain deliberately refuses untrusted history/state paths; a dynamic UID
+can leave the existing state directory/history inaccessible after a reboot or
+service reinstall. systemd creates the state directory. Logs are available with
+`journalctl -u stn-chain`.
 
 The executable path follows Makefile BINDIR (default `/usr/local/bin`). Service
 state uses the fixed path above independently of Makefile DATADIR; use a systemd
