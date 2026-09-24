@@ -5,6 +5,9 @@
 #include "stn_wire_internal.h"
 #include <string.h>
 
+_Static_assert(STN_TX_SHARE_EVIDENCE_SIZE==STN_SHARE_CANONICAL_SIZE,
+    "share transaction size must match canonical share evidence");
+
 static const uint8_t magic[4] = {0x53, 0x54, 0x4e, 0x54};
 
 static size_t lifecycle_size(uint16_t type)
