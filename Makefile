@@ -263,9 +263,9 @@ $(BUILD_DIR)/test-issuance: tests/test_issuance.c src/stn_issuance.c src/stn_com
 test-economic-state: $(BUILD_DIR)/test-economic-state
 	$(BUILD_DIR)/test-economic-state
 
-$(BUILD_DIR)/test-economic-state: tests/test_economic_state.c src/stn_economic_state.c includes/stn_economic_state.h includes/stn_issuance.h
+$(BUILD_DIR)/test-economic-state: tests/test_economic_state.c src/stn_economic_state.c src/stn_transfer.c includes/stn_economic_state.h includes/stn_issuance.h includes/stn_transfer.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_ECONOMIC_STATE_TEST_MAIN tests/test_economic_state.c src/stn_economic_state.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_ECONOMIC_STATE_TEST_MAIN tests/test_economic_state.c src/stn_economic_state.c src/stn_transfer.c -o $@ $(LDLIBS)
 
 
 # Phase 19 deterministic accepted compensation mapping state qualification.
