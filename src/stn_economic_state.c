@@ -68,6 +68,63 @@ stn_data_status stn_economic_state_apply(
     return STN_DATA_OK;
 }
 
+
+stn_data_status stn_economic_state_apply_transfer(
+    stn_economic_state *state,
+    const stn_transfer *transfer)
+{
+    size_t source_at=0u,destination_at=0u,i;
+    int source_found=0,destination_found=0;
+    uint64_t destination_units=0u;
+
+    if(state==NULL || transfer==NULL)return STN_DATA_ARGUMENT;
+    if(transfer->source.type!=STN_ADDRESS_WALLET ||
+       transfer->destination.type!=STN_ADDRESS_WALLET)return STN_DATA_TYPE;
+    if(transfer->units==0u ||
+       memcmp(transfer->source.identifier,transfer->destination.identifier,
+              STN_ADDRESS_ID_SIZE)==0)return STN_DATA_CONTENT;
+    if(state->balance_count>state->balance_capacity ||
+       (state->balance_capacity!=0u && state->balances==NULL))return STN_DATA_ARGUMENT;
+
+    for(i=0u;i<state->balance_count;++i){
+        int source_cmp=memcmp(state->balances[i].wallet_id,
+            transfer->source.identifier,STN_ADDRESS_ID_SIZE);
+        int destination_cmp=memcmp(state->balances[i].wallet_id,
+            transfer->destination.identifier,STN_ADDRESS_ID_SIZE);
+        if(source_cmp==0){source_found=1;source_at=i;}
+        if(destination_cmp==0){destination_found=1;destination_at=i;}
+    }
+
+    if(!source_found || state->balances[source_at].units<transfer->units)
+        return STN_DATA_CONTENT;
+    if(destination_found){
+        destination_units=state->balances[destination_at].units;
+        if(UINT64_MAX-destination_units<transfer->units)return STN_DATA_OVERFLOW;
+        state->balances[source_at].units-=transfer->units;
+        state->balances[destination_at].units+=transfer->units;
+        return STN_DATA_OK;
+    }
+
+    if(state->balance_count==state->balance_capacity)return STN_DATA_CAPACITY;
+
+    destination_at=0u;
+    while(destination_at<state->balance_count &&
+          memcmp(state->balances[destination_at].wallet_id,
+                 transfer->destination.identifier,STN_ADDRESS_ID_SIZE)<0)
+        ++destination_at;
+
+    state->balances[source_at].units-=transfer->units;
+    if(destination_at<state->balance_count){
+        memmove(state->balances+destination_at+1u,state->balances+destination_at,
+            (state->balance_count-destination_at)*sizeof(*state->balances));
+    }
+    memcpy(state->balances[destination_at].wallet_id,
+           transfer->destination.identifier,STN_ADDRESS_ID_SIZE);
+    state->balances[destination_at].units=transfer->units;
+    ++state->balance_count;
+    return STN_DATA_OK;
+}
+
 stn_data_status stn_economic_state_balance(
     const stn_economic_state *state,
     const stn_address *wallet,
