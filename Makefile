@@ -442,3 +442,13 @@ test-peer: $(BUILD_DIR)/test-peer
 $(BUILD_DIR)/test-peer: tests/test_peer.c $(filter-out src/main.c platforms/linux/stn_app_linux.c,$(SOURCES))
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(PLATFORM_CFLAGS) -DSTN_LIFECYCLE_TEST -DSTN_PEER_TEST_MAIN tests/test_peer.c $(filter-out src/main.c platforms/linux/stn_app_linux.c,$(SOURCES)) -o $@ $(LDLIBS)
+
+
+# Existing fork/reorg qualification using authoritative full-history reconstruction.
+.PHONY: test-fork
+test-fork: $(BUILD_DIR)/test-fork
+	$(BUILD_DIR)/test-fork
+
+$(BUILD_DIR)/test-fork: tests/test_fork.c $(CHAIN_TEST_SOURCES) src/stn_fork.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_LIFECYCLE_TEST -DSTN_FORK_TEST_MAIN tests/test_fork.c src/stn_fork.c $(CHAIN_TEST_SOURCES) -o $@ $(LDLIBS)
