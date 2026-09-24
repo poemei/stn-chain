@@ -155,8 +155,28 @@ static void development_genesis(uint8_t *bytes)
     bytes[256] = 3;
 
     memcpy(bytes + 88, commitment, 32);
+
+    /*
+     * Bootstrap PoW must not use the protocol maximum target.  The former
+     * 0x7fff... target made roughly half of all hashes valid blocks, causing
+     * qualifying shares and replacement jobs to churn faster than miners
+     * could meaningfully work them.  This deterministic bootstrap target is
+     * approximately 2^-25 of the SHA-256 space.  Nonce 51449120 is the
+     * qualified genesis proof for this exact header.
+     */
     memset(bytes + 120, 255, 32);
-    bytes[120] = 127;
+    bytes[120] = 0;
+    bytes[121] = 0;
+    bytes[122] = 0;
+    bytes[123] = 127;
+    bytes[152] = 0;
+    bytes[153] = 0;
+    bytes[154] = 0;
+    bytes[155] = 0;
+    bytes[156] = 3;
+    bytes[157] = 17;
+    bytes[158] = 13;
+    bytes[159] = 32;
 }
 
 /* Recover the local anchor only; normal storage load still validates the full
