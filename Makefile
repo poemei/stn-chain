@@ -62,6 +62,7 @@ CORE_SOURCES := \
 	src/stn_transfer_binding.c \
 	src/stn_transfer_authorization.c \
 	src/stn_transfer_acceptance.c \
+	src/stn_transfer_envelope.c \
 	src/stn_fork.c \
 	src/stn_identity.c \
 	src/stn_sentinel_intelligence.c \
@@ -353,3 +354,13 @@ TRANSFER_ACCEPTANCE_SOURCES := src/stn_transfer_acceptance.c src/stn_transfer_au
 $(BUILD_DIR)/test-transfer-acceptance: tests/test_transfer_acceptance.c $(TRANSFER_ACCEPTANCE_SOURCES) includes/stn_transfer_acceptance.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_TRANSFER_ACCEPTANCE_TEST_MAIN tests/test_transfer_acceptance.c $(TRANSFER_ACCEPTANCE_SOURCES) -o $@ $(LDLIBS)
+
+
+# Phase 19 canonical transfer envelope qualification.
+.PHONY: test-transfer-envelope
+test-transfer-envelope: $(BUILD_DIR)/test-transfer-envelope
+	$(BUILD_DIR)/test-transfer-envelope
+
+$(BUILD_DIR)/test-transfer-envelope: tests/test_transfer_envelope.c src/stn_transfer_envelope.c src/stn_transfer.c includes/stn_transfer_envelope.h includes/stn_transfer.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_TEST_MAIN tests/test_transfer_envelope.c src/stn_transfer_envelope.c src/stn_transfer.c -o $@ $(LDLIBS)
