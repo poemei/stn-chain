@@ -206,9 +206,9 @@ $(BUILD_DIR)/test-contract-state: tests/test_contract_state.c src/stn_contract_s
 test-contract-snapshot: $(BUILD_DIR)/test-contract-snapshot
 	$(BUILD_DIR)/test-contract-snapshot
 
-$(BUILD_DIR)/test-contract-snapshot: tests/test_contract_snapshot.c src/stn_chain.c src/stn_block.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_pow.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract_snapshot.h
+$(BUILD_DIR)/test-contract-snapshot: tests/test_contract_snapshot.c src/stn_chain.c src/stn_block.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_pow.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract_snapshot.h src/stn_share.c src/stn_share_replay.c
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_CONTRACT_SNAPSHOT_TEST_MAIN tests/test_contract_snapshot.c src/stn_chain.c src/stn_block.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_pow.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_CONTRACT_SNAPSHOT_TEST_MAIN tests/test_contract_snapshot.c src/stn_share.c src/stn_share_replay.c src/stn_chain.c src/stn_block.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_pow.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
 
 
 # Phase 19 deterministic economy primitive qualification.
@@ -216,9 +216,9 @@ $(BUILD_DIR)/test-contract-snapshot: tests/test_contract_snapshot.c src/stn_chai
 test-economy: $(BUILD_DIR)/test-economy
 	$(BUILD_DIR)/test-economy
 
-$(BUILD_DIR)/test-economy: tests/test_economy.c src/stn_economy.c src/stn_pow.c includes/stn_economy.h includes/stn_pow.h
+$(BUILD_DIR)/test-economy: tests/test_economy.c src/stn_economy.c src/stn_pow.c includes/stn_economy.h includes/stn_pow.h src/stn_share.c src/stn_share_replay.c
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_ECONOMY_TEST_MAIN tests/test_economy.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_ECONOMY_TEST_MAIN tests/test_economy.c src/stn_share.c src/stn_share_replay.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
 
 
 # Phase 19 canonical qualifying-share evidence qualification.
@@ -226,9 +226,9 @@ $(BUILD_DIR)/test-economy: tests/test_economy.c src/stn_economy.c src/stn_pow.c 
 test-share: $(BUILD_DIR)/test-share
 	$(BUILD_DIR)/test-share
 
-$(BUILD_DIR)/test-share: tests/test_share.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_share.h
+$(BUILD_DIR)/test-share: tests/test_share.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_share.h src/stn_share_replay.c
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_SHARE_TEST_MAIN tests/test_share.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_SHARE_TEST_MAIN tests/test_share.c src/stn_share_replay.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
 
 
 # Phase 19 deterministic accepted-share replay qualification.
