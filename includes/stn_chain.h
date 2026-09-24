@@ -7,6 +7,7 @@
 #include "stn_authority.h"
 #include "stn_lifecycle.h"
 #include "stn_contract_snapshot.h"
+#include "stn_share_replay.h"
 
 #define STN_CHAIN_MAX_BATCH 64u
 
@@ -43,6 +44,7 @@ typedef struct stn_chain_state {
     size_t target_history_count;
     stn_lifecycle_state *lifecycle;
     stn_contract_snapshot *contracts;
+    stn_share_replay_state *shares;
     uint64_t publication_activation_height;
 } stn_chain_state;
 /* One local reference per owning state. Plain structure copies are BORROWS,
