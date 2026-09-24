@@ -158,9 +158,16 @@ static stn_peer_report sync_session(int established,uint32_t *capabilities,const
             }
             if(length<168 || memcmp(bytes,headers[i-page],168)!=0){r.status=STN_PEER_PROTOCOL;goto done;}
             if(length>w->candidate_capacity-offset){r.status=STN_PEER_CAPACITY;goto done;}
-            validation=stn_chain_validate_candidate(c,&checked,bytes,length,&checked);
-            if(validation.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){r.status=STN_PEER_VALIDATION;goto done;}
             memcpy(w->candidate+offset,bytes,length);blocks[i].bytes=w->candidate+offset;blocks[i].length=length;offset+=length;
+            /*
+             * Peer economic evidence can depend on earlier accepted history
+             * (share issuance and transfer replay). Reconstruct the exact
+             * received prefix instead of validating only against cached state.
+             * Peer claims remain evidence; Chain independently derives state.
+             */
+            stn_chain_state_release(&checked);
+            validation=stn_chain_reconstruct_history(c,blocks,i+1u,&checked);
+            if(validation.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){r.status=STN_PEER_VALIDATION;goto done;}
         }
     }
     if(w->pending!=NULL){
