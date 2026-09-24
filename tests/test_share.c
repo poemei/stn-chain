@@ -29,14 +29,8 @@ static void make_header(uint8_t bytes[STN_SHARE_TEMPLATE_HEADER_SIZE])
 static void set_work_id(stn_share_evidence *s)
 {
     static const uint8_t domain[]="STN-CHAIN:WORK:ID:1";
-    {
-        uint8_t bytes[STN_SHARE_TEMPLATE_HEADER_SIZE+STN_SHARE_BODY_COMMITMENT_SIZE];
-        memcpy(bytes,s->template_header,STN_SHARE_TEMPLATE_HEADER_SIZE);
-        memcpy(bytes+STN_SHARE_TEMPLATE_HEADER_SIZE,s->body_commitment,
-            STN_SHARE_BODY_COMMITMENT_SIZE);
-        CHECK(stn_sha256(NULL,domain,sizeof(domain),bytes,sizeof(bytes),
-            s->work_id)==STN_DATA_OK);
-    }
+    CHECK(stn_sha256(NULL,domain,sizeof(domain),s->template_header,
+        STN_SHARE_TEMPLATE_HEADER_SIZE,s->work_id)==STN_DATA_OK);
 }
 
 static void vectors(void)
