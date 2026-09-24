@@ -366,7 +366,6 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         }
 
         memset(&evidence,0,sizeof(evidence));
-        evidence.version=STN_SHARE_VERSION;
         memcpy(evidence.work_id,q->payload,32u);
         evidence.miner=miner;
         evidence.nonce=stn_wire_read(q->payload+101,8u);
@@ -389,7 +388,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
             goto done;
         }
 
-        if(stn_share_id(&evidence,&s->chain->hash_provider,p)!=STN_DATA_OK){
+        if(stn_share_id(&evidence,p)!=STN_DATA_OK){
             code=STN_RPC_PROVIDER;
             goto done;
         }
