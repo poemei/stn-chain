@@ -584,8 +584,26 @@ static void *outbound_thread(void *user)
 
         {
             int was_connected = runtime->manager.connected;
+            int step_due = !runtime->manager.started ||
+                now >= runtime->manager.last_step + STN_PEER_OUTBOUND_INTERVAL_MS;
+            size_t selected_index = runtime->manager.next;
             uint64_t before_height = runtime->mining->active.height;
             stn_peer_status peer_status;
+
+            if(step_due && !was_connected &&
+               selected_index < runtime->manager.candidates.count) {
+                const stn_peer_endpoint *endpoint =
+                    &runtime->manager.candidates.entries[selected_index];
+
+                report_event(
+                    STN_REPORT_PEER,
+                    "Connecting %u.%u.%u.%u:%u",
+                    (unsigned)endpoint->address[0],
+                    (unsigned)endpoint->address[1],
+                    (unsigned)endpoint->address[2],
+                    (unsigned)endpoint->address[3],
+                    (unsigned)endpoint->port);
+            }
 
             pthread_mutex_lock(runtime->lock);
 
@@ -601,6 +619,13 @@ static void *outbound_thread(void *user)
 
             if(!was_connected && runtime->manager.connected) {
                 report_event(STN_REPORT_PEER, "Connected");
+            } else if(step_due && !was_connected &&
+                      !runtime->manager.connected &&
+                      peer_status != STN_PEER_RETAINED) {
+                report_event(
+                    STN_REPORT_PEER,
+                    "Connection/sync failed status=%d",
+                    (int)peer_status);
             } else if(was_connected && !runtime->manager.connected) {
                 report_event(STN_REPORT_PEER, "Disconnected status=%d", (int)peer_status);
             }
