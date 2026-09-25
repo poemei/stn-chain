@@ -29,6 +29,13 @@
 #define APP_RPC_ACCEPT_POLL_MS 250u
 #define APP_RPC_IO_TIMEOUT_MS 60000u
 static volatile LONG stopping;
+static uint64_t chain_timestamp_now(void *user)
+{
+    time_t now;
+    (void)user;
+    now=time(NULL);
+    return now==(time_t)-1 || now<=0 ? 0u : (uint64_t)now;
+}
 static CRITICAL_SECTION report_lock;
 static int report_lock_ready;
 static FILE *report_log;
@@ -372,7 +379,7 @@ int stn_windows_app(int argc,char **argv)
         if(mining.snapshot==NULL || mining.workspace.current_bytes==NULL || mining.workspace.next_bytes==NULL){goto cleanup;}
         mining.snapshot_capacity=cap;mining.workspace.current_capacity=cap;mining.workspace.next_capacity=cap;
     }
-    mining.chain=&chain;mining.storage=&storage;mining.body=body;mining.body_length=4+transaction_length;mining.transaction_count=1;
+    mining.chain=&chain;mining.storage=&storage;mining.timestamp_now=chain_timestamp_now;mining.body=body;mining.body_length=4+transaction_length;mining.transaction_count=1;
     if(!dev){mining.pending=&pending;mining.pending_body=body;mining.pending_body_capacity=STN_BLOCK_MAX_BODY;mining.body=NULL;mining.body_length=0;mining.transaction_count=0;}
     mining.template_capacity=STN_BLOCK_MAX_SIZE;mining.owns_buffers=1;
 #ifdef STN_PHASE9_TEST_RUNTIME
