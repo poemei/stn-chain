@@ -39,6 +39,10 @@ typedef enum stn_rpc_method {
     STN_RPC_CHECK_INTELLIGENCE=0x1000,STN_RPC_SUBMIT_INTELLIGENCE=0x1001,
     STN_RPC_INTELLIGENCE_ID=0x1002,STN_RPC_INTELLIGENCE_CURSOR=0x1003,
     STN_RPC_PENDING=0x1004,STN_RPC_SUBMIT_TRANSACTION=0x1005,
+    /* SUBMIT_BLOCK_EVIDENCE request: one exact canonical block retrieved as
+     * untrusted evidence. Chain validates it against the current accepted tip
+     * before any atomic storage extension. Success returns tip/height/work. */
+    STN_RPC_SUBMIT_BLOCK_EVIDENCE=0x1006,
     STN_RPC_MINING_CONTEXT=0x2000,STN_RPC_CHECK_WORK_BASE=0x2001,
     STN_RPC_MINING_TEMPLATE=0x2002,STN_RPC_SUBMIT_WORK=0x2003,STN_RPC_SUBMIT_SHARE=0x2004,
     STN_RPC_ADMIN_CONTROL=0x3000
