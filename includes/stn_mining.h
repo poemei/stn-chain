@@ -17,6 +17,7 @@ typedef struct stn_suffix_stage {
     uint32_t prefix_count;
     uint32_t expected_count;
     uint32_t received_count;
+    size_t received_bytes;
     stn_block_span *blocks;
     uint8_t **owned;
     int active;
@@ -53,6 +54,7 @@ typedef struct stn_mining_service {
 /* Transient staged recovery is deliberately bounded independently of the
  * accepted Chain length. Long recovery may be retried in bounded windows. */
 #define STN_SUFFIX_STAGE_MAX_BLOCKS 4096u
+#define STN_SUFFIX_STAGE_MAX_BYTES (64u * 1024u * 1024u)
 /* Template response remains 68-byte prefix + block. Solved submission is
  * parent[32] + work ID[32] + block length[4] + canonical stn0_ identity[69]
  * + block. Only block bytes 152..159 may change: unsigned big-endian nonce. */
