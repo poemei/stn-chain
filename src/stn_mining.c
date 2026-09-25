@@ -254,6 +254,33 @@ static void suffix_stage_clear(stn_suffix_stage *stage)
     free(stage->owned);free(stage->blocks);memset(stage,0,sizeof(*stage));
 }
 
+void stn_mining_session_init(stn_mining_session *session,stn_mining_service *service)
+{
+    if(session==NULL)return;
+    memset(session,0,sizeof(*session));session->service=service;
+}
+void stn_mining_session_release(stn_mining_session *session)
+{
+    if(session==NULL)return;
+    suffix_stage_clear(&session->suffix_stage);session->service=NULL;
+}
+stn_rpc_code stn_mining_session_handle(void *user,const stn_rpc_message *q,
+    uint8_t *p,size_t cap,size_t *written)
+{
+    stn_mining_session *session=(stn_mining_session *)user;
+    stn_mining_service *service;stn_rpc_code code;
+    if(written!=NULL)*written=0u;
+    if(session==NULL||session->service==NULL)return STN_RPC_UNAVAILABLE;
+    service=session->service;
+    if(service->suffix_stage.active)return STN_RPC_UNAVAILABLE;
+    service->suffix_stage=session->suffix_stage;
+    memset(&session->suffix_stage,0,sizeof(session->suffix_stage));
+    code=stn_mining_handle(service,q,p,cap,written);
+    session->suffix_stage=service->suffix_stage;
+    memset(&service->suffix_stage,0,sizeof(service->suffix_stage));
+    return code;
+}
+
 stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t cap,size_t *written)
 {
     stn_mining_service *s=user;stn_storage_view v={0};stn_rpc_code code;size_t n=0,required=0;stn_chain_state accepted={0};
