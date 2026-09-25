@@ -202,11 +202,14 @@ connection's transient stage. Accepted Chain state and fork evaluation remain
 shared Chain authority.
 
 BEGIN is also resource-bounded: one stage may declare at most
-`STN_SUFFIX_STAGE_MAX_BLOCKS` (currently 4096) suffix blocks. Larger recovery
-must proceed through additional bounded recovery work rather than an unbounded
-allocation. Terminal COMMIT outcomes and ABORT clear staged ownership. The
-protocol does not increase the global STNC payload ceiling merely to accommodate
-long forks.
+`STN_SUFFIX_STAGE_MAX_BLOCKS` (currently 4096) suffix blocks, and APPEND may
+retain at most `STN_SUFFIX_STAGE_MAX_BYTES` (currently 64 MiB) of canonical
+block evidence for that stage. Exceeding either ceiling fails closed rather than
+performing an unbounded allocation. A divergence beyond these staging ceilings
+requires a separate bounded reconstruction/recovery mechanism; it is not
+silently split into independently evaluated fork fragments. Terminal COMMIT
+outcomes and ABORT clear staged ownership. The protocol does not increase the
+global STNC payload ceiling merely to accommodate long forks.
 
 Peer discovery is outside this authority boundary. The stn-chain.org ChAoS MVC
 `/peers` endpoint and STNP peer discovery identify candidate endpoints only;
