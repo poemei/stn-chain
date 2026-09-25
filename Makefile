@@ -147,6 +147,12 @@ install: $(TARGET_PATH)
 	install -m 0755 $(TARGET_PATH) $(DESTDIR)$(BINDIR)/$(TARGET)
 	install -d $(DESTDIR)$(DATADIR)
 	install -d $(DESTDIR)$(LOGDIR)
+	install -d $(DESTDIR)/etc/stn-chain
+	@if [ ! -e "$(DESTDIR)/etc/stn-chain/chain_config.json" ]; then \
+		install -m 0644 config/chain_config.json $(DESTDIR)/etc/stn-chain/chain_config.json; \
+	else \
+		echo "Preserving existing /etc/stn-chain/chain_config.json"; \
+	fi
 	install -d $(DESTDIR)/etc/systemd/system
 	sed 's|@BINDIR@|$(BINDIR)|g' platforms/linux/stn-chain.service.in > $(BUILD_DIR)/stn-chain.service
 	install -m 0644 $(BUILD_DIR)/stn-chain.service $(DESTDIR)/etc/systemd/system/stn-chain.service
@@ -161,6 +167,7 @@ install: $(TARGET_PATH)
 	@echo "Installed:"
 	@echo "  Application: $(BINDIR)/$(TARGET)"
 	@echo "  Service:     /etc/systemd/system/stn-chain.service"
+	@echo "  Config:      /etc/stn-chain/chain_config.json"
 	@echo "  Data:        $(DATADIR)"
 	@echo "  Logs:        $(LOGDIR)"
 
