@@ -350,6 +350,31 @@ int test_mining(void)
             w==0u && s.suffix_stage.active && s.suffix_stage.received_count==0u);
         CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_ABORT,NULL,0u,out,&w)==STN_RPC_OK &&
             w==0u && !s.suffix_stage.active);
+
+        /* A malformed later block in one APPEND rolls back every block copied
+         * by that APPEND while preserving the active empty stage. */
+        stn_wire_write(begin,4u,3u);stn_wire_write(begin+4u,4u,2u);
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_BEGIN,begin,sizeof(begin),out,&w)==STN_RPC_OK);
+        {
+            uint8_t pair[8u+2u*(4u+364u)];
+            size_t pn=0u;
+            stn_wire_write(pair+pn,4u,0u);pn+=4u;
+            stn_wire_write(pair+pn,4u,2u);pn+=4u;
+            stn_wire_write(pair+pn,4u,364u);pn+=4u;
+            memcpy(pair+pn,changed,364u);pn+=364u;
+            stn_wire_write(pair+pn,4u,364u);pn+=4u;
+            memcpy(pair+pn,changed,364u);pair[pn+40u]^=1u;pn+=364u;
+            /* Direct handler call reaches defensive append validation after
+             * the first block has been copied; RPC framing rejects it earlier. */
+            {
+                stn_rpc_message q={1,STN_RPC_SUFFIX_STAGE_APPEND,STN_RPC_OK,99u,pair,pn};
+                CHECK(stn_mining_handle(&s,&q,out,sizeof(out),&w)==STN_RPC_INVALID &&
+                    w==0u && s.suffix_stage.active && s.suffix_stage.received_count==0u &&
+                    s.suffix_stage.owned[0]==NULL && s.suffix_stage.blocks[0].bytes==NULL);
+            }
+        }
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_ABORT,NULL,0u,out,&w)==STN_RPC_OK &&
+            !s.suffix_stage.active);
     }
 
     stn_storage_view_release(&view);stn_chain_state_release(&s.active);
