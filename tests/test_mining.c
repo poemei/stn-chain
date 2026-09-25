@@ -323,6 +323,10 @@ int test_mining(void)
         uint8_t begin[8u],append[8u+4u+364u];
         size_t at=0u;
 
+        stn_wire_write(begin,4u,3u);stn_wire_write(begin+4u,4u,STN_SUFFIX_STAGE_MAX_BLOCKS+1u);
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_BEGIN,begin,sizeof(begin),out,&w)==STN_RPC_REJECTED &&
+            w==0u && !s.suffix_stage.active);
+
         stn_wire_write(begin,4u,3u);stn_wire_write(begin+4u,4u,1u);
         CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_BEGIN,begin,sizeof(begin),out,&w)==STN_RPC_OK &&
             w==0u && s.suffix_stage.active && s.suffix_stage.received_count==0u);
@@ -375,6 +379,22 @@ int test_mining(void)
         }
         CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_ABORT,NULL,0u,out,&w)==STN_RPC_OK &&
             !s.suffix_stage.active);
+
+        /* Staged evidence belongs to the initiating STNC session. A second
+         * session cannot observe, append to, or abort the first session's stage. */
+        {
+            stn_mining_session a,b;
+            stn_rpc_message q={1,STN_RPC_SUFFIX_STAGE_BEGIN,STN_RPC_OK,101u,begin,sizeof(begin)};
+            stn_mining_session_init(&a,&s);stn_mining_session_init(&b,&s);
+            stn_wire_write(begin,4u,3u);stn_wire_write(begin+4u,4u,1u);
+            CHECK(stn_mining_session_handle(&a,&q,out,sizeof(out),&w)==STN_RPC_OK &&
+                a.suffix_stage.active && !b.suffix_stage.active && !s.suffix_stage.active);
+            q.method=STN_RPC_SUFFIX_STAGE_ABORT;q.payload=NULL;q.length=0u;
+            CHECK(stn_mining_session_handle(&b,&q,out,sizeof(out),&w)==STN_RPC_OK &&
+                a.suffix_stage.active && !b.suffix_stage.active && !s.suffix_stage.active);
+            stn_mining_session_release(&b);stn_mining_session_release(&a);
+            CHECK(!s.suffix_stage.active);
+        }
     }
 
     stn_storage_view_release(&view);stn_chain_state_release(&s.active);
