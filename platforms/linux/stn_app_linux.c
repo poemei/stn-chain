@@ -578,6 +578,9 @@ static int serve_once(
 
     free(request);
     free(response);
+    pthread_mutex_lock(dispatch_lock);
+    stn_mining_session_release(&session);
+    pthread_mutex_unlock(dispatch_lock);
 
     stn_linux_peer_close(&peer);
 
