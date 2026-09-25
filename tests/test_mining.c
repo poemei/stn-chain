@@ -32,6 +32,10 @@ static stn_rpc_code rpc(stn_mining_service *s,uint16_t method,const uint8_t *p,s
 }
 static void put64(uint8_t *p,uint64_t value)
 {size_t i;for(i=8;i!=0;){--i;p[i]=(uint8_t)value;value>>=8;}}
+static uint64_t test_timestamp_now(void *user)
+{
+    return *(const uint64_t *)user;
+}
 static int solve_block(uint8_t *p,size_t n,const stn_hash_provider *hash)
 {uint64_t nonce;uint8_t digest[32];for(nonce=UINT64_C(4294967296);nonce<UINT64_C(4295032832);++nonce){put64(p+152,nonce);if(stn_pow_verify(p,n,hash,digest)==STN_DATA_OK){return 1;}}return 0;}
 
@@ -150,6 +154,18 @@ int test_mining(void)
     CHECK(stn_storage_create(&c,&provider,history,1,next,sizeof(next),&s.active)==STN_STORAGE_OK);
     before=s.active;disk_n=store.n;memcpy(disk_before,store.bytes,disk_n);
     CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,work,&n)==STN_RPC_OK && n==432);
+    {
+        uint64_t supplied_time=UINT64_C(1700000000);
+        s.timestamp_now=test_timestamp_now;s.timestamp_user=&supplied_time;
+        CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,again,&w)==STN_RPC_OK &&
+            stn_wire_read(again+68+80,8)==supplied_time);
+        supplied_time=0;
+        CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,again,&w)==STN_RPC_UNAVAILABLE && w==0);
+        supplied_time=before.timestamp>0 ? before.timestamp-1u : 1u;
+        CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,again,&w)==STN_RPC_OK &&
+            stn_wire_read(again+68+80,8)>=before.timestamp);
+        s.timestamp_now=NULL;s.timestamp_user=NULL;
+    }
     CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,again,&w)==STN_RPC_OK && n==w && memcmp(work,again,n)==0);
     CHECK(memcmp(work,before.tip_id,32)==0 && memcmp(work+32,expected,32)==0);
     CHECK(memcmp(work+68+120,policy.fixed_target,32)==0 && work[68+79]==1 && work[67]==108 && work[66]==1);
