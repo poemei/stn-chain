@@ -338,7 +338,6 @@ int stn_windows_app(int argc,char **argv)
     stn_chain_context chain={0};stn_pow_policy policy;stn_mining_service mining={0};stn_pending pending={0};
     stn_windows_storage disk;stn_storage_provider storage;stn_storage_view view;
     stn_windows_peer listener={0};uint16_t bound;stn_storage_status status;
-    stn_rpc_service service={&mining,stn_mining_handle};
     rpc_client *clients=NULL;CRITICAL_SECTION dispatch_lock;int lock_ready=0;
     outbound_runtime outbound={0};internal_miner_runtime internal_miner={0};stn_peer_candidates candidates={0};stn_config config={0};
     InterlockedExchange(&stopping,0);
