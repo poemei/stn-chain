@@ -102,7 +102,7 @@ static void fixture(uint8_t p[364])
 static unsigned signature_calls;
 static stn_stage_status signature(void *u,const uint8_t *d,size_t dn,const uint8_t *b,size_t n,const uint8_t key[32],const uint8_t sig[64])
 { (void)u;(void)d;(void)dn;(void)b;(void)n;(void)key;(void)sig;++signature_calls;return STN_STAGE_PASS; }
-static stn_stage_status authority(void *u,const stn_record *r,const stn_intelligence *i){(void)u;(void)r;(void)i;return STN_STAGE_PASS;}
+static stn_stage_status authority(void *u,const stn_record *r,const stn_sentinel_intelligence *i){(void)u;(void)r;(void)i;return STN_STAGE_PASS;}
 static stn_stage_status replay(void *u,const stn_record *r){(void)u;(void)r;return STN_STAGE_PASS;}
 static void node(void)
 {
