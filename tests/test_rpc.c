@@ -186,3 +186,10 @@ int test_rpc(void)
     codecs();node();printf("RPC/node interface: %u checks, %u failures (in-process integration).\n",checks,failures);
     return failures==0 ? 0 : 1;
 }
+
+#ifdef STN_RPC_TEST_MAIN
+int main(void)
+{
+    return test_rpc();
+}
+#endif
