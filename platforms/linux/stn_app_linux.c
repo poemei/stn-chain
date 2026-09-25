@@ -332,7 +332,8 @@ typedef struct rpc_client {
     pthread_t thread;
     stn_linux_peer peer;
     stn_peer_transport transport;
-    const stn_rpc_service *service;
+    stn_rpc_service service;
+    stn_mining_session mining_session;
     pthread_mutex_t *dispatch_lock;
     int done;
     pthread_mutex_t done_lock;
@@ -412,7 +413,7 @@ static void *rpc_client_thread(void *user)
                 request,
                 24 + payload_length,
                 STN_RPC_READ | STN_RPC_SUBMISSION,
-                client->service,
+                &client->service,
                 response,
                 STN_RPC_MAX_FRAME,
                 &response_length);
@@ -434,6 +435,9 @@ static void *rpc_client_thread(void *user)
 
     free(request);
     free(response);
+    pthread_mutex_lock(client->dispatch_lock);
+    stn_mining_session_release(&client->mining_session);
+    pthread_mutex_unlock(client->dispatch_lock);
 
     client_set_done(client);
 
@@ -1750,7 +1754,9 @@ int stn_linux_app(int argc, char **argv)
         client->peer = peer;
         client->transport = transport;
         client->transport.user = &client->peer;
-        client->service = &service;
+        stn_mining_session_init(&client->mining_session, &mining);
+        client->service.user = &client->mining_session;
+        client->service.handle = stn_mining_session_handle;
         client->dispatch_lock = &dispatch_lock;
 
         if(pthread_mutex_init(
