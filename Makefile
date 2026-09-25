@@ -472,6 +472,19 @@ $(BUILD_DIR)/test-fork: tests/test_fork.c $(CHAIN_TEST_SOURCES) src/stn_fork.c
 	$(CC) $(CFLAGS) -DSTN_LIFECYCLE_TEST -DSTN_FORK_TEST_MAIN tests/test_fork.c src/stn_fork.c $(CHAIN_TEST_SOURCES) -o $@ $(LDLIBS)
 
 
+
+# STNC RPC/node interface qualification, including accepted wallet balance
+# and Contract state reads. Uses the production Linux storage backend.
+.PHONY: test-rpc
+test-rpc: $(BUILD_DIR)/test-rpc
+	$(BUILD_DIR)/test-rpc
+
+RPC_TEST_SOURCES := $(filter-out src/main.c src/stn_internal_miner.c src/stn_peer.c src/stn_report.c src/stn_config.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) platforms/linux/stn_sha256.c platforms/linux/stn_linux_storage.c
+
+$(BUILD_DIR)/test-rpc: tests/test_rpc.c $(RPC_TEST_SOURCES)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(PLATFORM_CFLAGS) -DSTN_LIFECYCLE_TEST -DSTN_RPC_TEST_MAIN tests/test_rpc.c $(RPC_TEST_SOURCES) -o $@ $(LDLIBS)
+
 # Operational reporting qualification.
 test-report: $(BUILD_DIR)/test-report
 	$(BUILD_DIR)/test-report
