@@ -47,6 +47,7 @@ endif
 CORE_SOURCES := \
 	src/main.c \
 	src/stn_address.c \
+	src/stn_config.c \
 	src/stn_authority.c \
 	src/stn_block.c \
 	src/stn_chain.c \
@@ -482,3 +483,13 @@ INTERNAL_MINER_TEST_SOURCES := $(filter-out src/main.c src/stn_peer.c src/stn_re
 $(BUILD_DIR)/test-internal-miner: tests/test_internal_miner.c $(INTERNAL_MINER_TEST_SOURCES) includes/stn_internal_miner.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_INTERNAL_MINER_TEST_MAIN tests/test_internal_miner.c $(INTERNAL_MINER_TEST_SOURCES) -o $@ $(LDLIBS)
+
+
+# Strict bounded JSON runtime configuration qualification.
+.PHONY: test-config
+test-config: $(BUILD_DIR)/test-config
+	$(BUILD_DIR)/test-config
+
+$(BUILD_DIR)/test-config: tests/test_config.c src/stn_config.c src/stn_address.c includes/stn_config.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_CONFIG_TEST_MAIN tests/test_config.c src/stn_config.c src/stn_address.c -o $@ $(LDLIBS)
