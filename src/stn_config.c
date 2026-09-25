@@ -12,7 +12,7 @@ static int str(parser *q,char *out,size_t cap,size_t *n){
  if(q->p>=q->end)return 0;++q->p;out[k]='\0';*n=k;return 1;
 }
 stn_data_status stn_config_decode(const uint8_t *bytes,size_t length,stn_config *out){
- parser q;stn_config v={0};int seen_miner=0,seen_enabled=0,seen_identity=0;
+ parser q;stn_config v={0};int seen_miner=0,seen_enabled=0,seen_wallet=0;
  if(bytes==NULL||out==NULL)return STN_DATA_ARGUMENT;
  if(length==0u||length>STN_CONFIG_MAX_BYTES)return STN_DATA_CONTENT;
  q.p=bytes;q.end=bytes+length;if(!ch(&q,'{'))return STN_DATA_CONTENT;ws(&q);
@@ -27,10 +27,10 @@ stn_data_status stn_config_decode(const uint8_t *bytes,size_t length,stn_config 
     if(mn==7u&&memcmp(mk,"enabled",7u)==0){
      if(seen_enabled++)return STN_DATA_CONTENT;
      if(lit(&q,"true"))v.internal_miner_enabled=1;else if(lit(&q,"false"))v.internal_miner_enabled=0;else return STN_DATA_CONTENT;
-    }else if(mn==8u&&memcmp(mk,"identity",8u)==0){
-     if(seen_identity++||!str(&q,value,sizeof(value),&vn))return STN_DATA_CONTENT;
-     if(stn_address_decode(value,vn,&v.miner_identity)!=STN_DATA_OK||v.miner_identity.type!=STN_ADDRESS_IDENTITY)return STN_DATA_TYPE;
-     v.has_miner_identity=1;
+    }else if(mn==6u&&memcmp(mk,"wallet",6u)==0){
+     if(seen_wallet++||!str(&q,value,sizeof(value),&vn))return STN_DATA_CONTENT;
+     if(stn_address_decode(value,vn,&v.miner_wallet)!=STN_DATA_OK||v.miner_wallet.type!=STN_ADDRESS_WALLET)return STN_DATA_TYPE;
+     v.has_miner_wallet=1;
     }else return STN_DATA_CONTENT;
     ws(&q);if(q.p<q.end&&*q.p==','){++q.p;continue;}if(!ch(&q,'}'))return STN_DATA_CONTENT;break;
    }
@@ -38,6 +38,6 @@ stn_data_status stn_config_decode(const uint8_t *bytes,size_t length,stn_config 
   ws(&q);if(q.p<q.end&&*q.p==','){++q.p;continue;}if(!ch(&q,'}'))return STN_DATA_CONTENT;break;
  }
  ws(&q);if(q.p!=q.end)return STN_DATA_CONTENT;
- if(v.internal_miner_enabled&&!v.has_miner_identity)return STN_DATA_CONTENT;
+ if(v.internal_miner_enabled&&!v.has_miner_wallet)return STN_DATA_CONTENT;
  *out=v;return STN_DATA_OK;
 }
