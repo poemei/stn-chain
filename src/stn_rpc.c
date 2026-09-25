@@ -251,7 +251,7 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
 static int recovery_response(uint16_t method,stn_rpc_code code,const uint8_t *p,size_t n)
 {
     stn_chain_cursor cursor;
-    if(code==STN_RPC_CURRENT)return (method==7 || method==8 || method==STN_RPC_SUBMIT_SUFFIX_EVIDENCE) && n==0;
+    if(code==STN_RPC_CURRENT)return (method==7 || method==8 || method==STN_RPC_SUBMIT_SUFFIX_EVIDENCE || method==STN_RPC_SUFFIX_STAGE_COMMIT) && n==0;
     if(code==STN_RPC_COMMON_ANCESTOR)return method==7 && n==40 && p!=NULL;
     if(code==STN_RPC_NO_COMMON_ANCESTOR)return method==7 && n==0;
     if(code==STN_RPC_RECOVER_FROM_START)return method==8 && n==40 && p!=NULL;
