@@ -37,7 +37,22 @@ static uint64_t test_timestamp_now(void *user)
     return *(const uint64_t *)user;
 }
 static int solve_block(uint8_t *p,size_t n,const stn_hash_provider *hash)
-{uint64_t nonce;uint8_t digest[32];for(nonce=UINT64_C(4294967296);nonce<UINT64_C(4295032832);++nonce){put64(p+152,nonce);if(stn_pow_verify(p,n,hash,digest)==STN_DATA_OK){return 1;}}return 0;}
+{uint64_t nonce;uint8_t digest[32];for(nonce=UINT64_C(4294967296);nonce<UINT64_C(4295032832);++nonce){put64(p+152,nonce);if(stn_pow_verify(p,n,hash,digest)==STN_DATA_OK){return 1;}}{
+        uint8_t block[STN_BLOCK_HEADER_SIZE]={0};
+        uint8_t frame[STN_RPC_HEADER_SIZE+STN_BLOCK_HEADER_SIZE];
+        stn_rpc_message request={0},decoded={0};
+        size_t written=0;
+        block[0]=0;block[1]=3;
+        request.kind=1u;
+        request.method=STN_RPC_SUBMIT_BLOCK_EVIDENCE;
+        request.code=STN_RPC_OK;
+        request.request_id=91u;
+        request.payload=block;
+        request.length=sizeof(block);
+        CHECK(stn_rpc_encode(&request,frame,sizeof(frame),&written)==STN_RPC_INVALID);
+        CHECK(written==0u);
+    }
+    return 0;}
 
 static void activated_difficulty(void)
 {
