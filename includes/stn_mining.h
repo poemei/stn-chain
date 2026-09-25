@@ -50,6 +50,9 @@ typedef struct stn_mining_service {
 #define STN_MINING_SUBMISSION_PREFIX STN_RPC_MINING_SUBMISSION_PREFIX
 #define STN_MINING_NONCE_OFFSET 152u
 #define STN_MINING_NONCE_SIZE 8u
+/* Transient staged recovery is deliberately bounded independently of the
+ * accepted Chain length. Long recovery may be retried in bounded windows. */
+#define STN_SUFFIX_STAGE_MAX_BLOCKS 4096u
 /* Template response remains 68-byte prefix + block. Solved submission is
  * parent[32] + work ID[32] + block length[4] + canonical stn0_ identity[69]
  * + block. Only block bytes 152..159 may change: unsigned big-endian nonce. */
