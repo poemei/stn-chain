@@ -5,6 +5,18 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+
+### Post-production STNC synchronization and recovery hardening - 2026-09-25
+
+- Extended STNC v2 with Chain-owned peer-evidence ingestion for STNC Core without transferring consensus authority to the client.
+- Added `SUBMIT_BLOCK_EVIDENCE (0x1006)`, bounded whole-history `0x1007`, bounded divergent-suffix `0x1008`, and staged suffix recovery `0x1009..0x100C`.
+- Staged recovery uses BEGIN, ordered bounded APPEND, COMMIT, and ABORT. Only COMMIT may invoke Chain fork evaluation and atomic accepted-state adoption.
+- Failed APPEND operations roll back that complete APPEND while preserving prior successful staging. Valid nonpreferred evidence returns CURRENT rather than being treated as malformed.
+- The global STNC payload ceiling was not enlarged for long forks; staging exists to keep recovery bounded.
+- Added RPC/mining tests for framing, lifecycle, incomplete commit, ordering, CURRENT, abort cleanup and partial-append rollback.
+- This is post-Phase-20 production capability development, not a newly numbered phase. Chain remains consensus authority; peers and the stn-chain.org ChAoS MVC `/peers` directory provide discovery/evidence only.
+- Full cross-platform qualification of the new staged-recovery path remains pending; this entry records implemented source, protocol and tests only.
+
 ### Phase 20 production qualification completed - 2026-09-24
 
 - Completed the bounded Phase 20 Windows x64/Linux x64 production-qualification
