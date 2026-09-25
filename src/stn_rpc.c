@@ -20,7 +20,7 @@ static uint32_t capability(uint16_t method)
     switch(method){
     case STN_RPC_GET_CURSOR_REORG_STATUS:case STN_RPC_GET_CONSUMER_RECOVERY_PLAN:
     case STN_RPC_GET_FIRST_ACCEPTED_RECORD:case STN_RPC_GET_NEXT_ACCEPTED_RECORD:
-    case STN_RPC_DERIVE_ADDRESS:
+    case STN_RPC_DERIVE_ADDRESS:case STN_RPC_BALANCE:case STN_RPC_CONTRACT_STATE:
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:case STN_RPC_GET_ACCEPTED_RECORD:
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_INTELLIGENCE_CURSOR:
     case STN_RPC_MINING_CONTEXT:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_MINING_TEMPLATE:return STN_RPC_READ;
@@ -42,6 +42,18 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
              stn_wire_read(p,2)==STN_ADDRESS_CONTRACT ||
              stn_wire_read(p,2)==STN_ADDRESS_WALLET) &&
             stn_wire_read(p+2,4)==n-6;
+    case STN_RPC_BALANCE:{
+        stn_address address;
+        return n==70 &&
+            stn_address_decode((const char *)p,n,&address)==STN_DATA_OK &&
+            address.type==STN_ADDRESS_WALLET;
+    }
+    case STN_RPC_CONTRACT_STATE:{
+        stn_address address;
+        return n==70 &&
+            stn_address_decode((const char *)p,n,&address)==STN_DATA_OK &&
+            address.type==STN_ADDRESS_CONTRACT;
+    }
     case STN_RPC_SUBMIT_TRANSACTION:return n<=STN_TX_MAX_SIZE;
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_MINING_CONTEXT:case STN_RPC_MINING_TEMPLATE:case STN_RPC_ADMIN_CONTROL:return n==0;
     case STN_RPC_BLOCK_HEIGHT:return n==8;
@@ -99,6 +111,18 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
         return (n==69 || n==70) &&
             stn_address_decode((const char *)p,n,&address)==STN_DATA_OK;
     }
+
+    case STN_RPC_BALANCE:
+        return n==8;
+
+    case STN_RPC_CONTRACT_STATE:
+        return n==26 &&
+            stn_wire_read(p,2)>=STN_CONTRACT_STATE_DRAFT &&
+            stn_wire_read(p,2)<=STN_CONTRACT_STATE_CLOSED &&
+            stn_wire_read(p+2,2)>=STN_CONTRACT_GENERIC &&
+            stn_wire_read(p+2,2)<=STN_CONTRACT_SERVICE_AGREEMENT &&
+            stn_wire_read(p+20,2)<=STN_CONTRACT_MAX_PARTICIPANTS &&
+            stn_wire_read(p+22,4)<=STN_CONTRACT_MAX_TERMS;
 
     case STN_RPC_SUBMIT_TRANSACTION:
         return n==36 &&
