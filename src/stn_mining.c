@@ -343,7 +343,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         if(q->payload==NULL||q->length!=8u){code=STN_RPC_INVALID;goto done;}
         prefix=(uint32_t)stn_wire_read(q->payload,4u);
         total=(uint32_t)stn_wire_read(q->payload+4u,4u);
-        if(prefix==0u||total==0u||prefix>v.count){code=STN_RPC_REJECTED;goto done;}
+        if(prefix==0u||total==0u||total>STN_SUFFIX_STAGE_MAX_BLOCKS||prefix>v.count){code=STN_RPC_REJECTED;goto done;}
         suffix_stage_clear(&s->suffix_stage);
         s->suffix_stage.blocks=(stn_block_span *)calloc((size_t)total,sizeof(*s->suffix_stage.blocks));
         s->suffix_stage.owned=(uint8_t **)calloc((size_t)total,sizeof(*s->suffix_stage.owned));
