@@ -1,5 +1,6 @@
 {
   "internal_miner": {
-    "enabled": false
+    "enabled": false,
+    "wallet": "stnw0_0000000000000000000000000000000000000000000000000000000000000000"
   }
 }
