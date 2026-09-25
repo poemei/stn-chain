@@ -335,6 +335,13 @@ stn_pending_result stn_pending_admit_transaction(stn_pending *p,const uint8_t *b
         if(balance<envelope.transfer.units){
             report->acceptance=STN_ACCEPTANCE_REJECTED;return STN_PENDING_INVALID;
         }
+        if(stn_transaction_id(bytes,length,hash,id)!=STN_DATA_OK){
+            report->acceptance=STN_ACCEPTANCE_ERROR;return STN_PENDING_PROVIDER;
+        }
+        i=find_id(p,id);
+        if(i<p->count && memcmp(p->entries[i].id,id,32)==0){
+            report->acceptance=STN_ACCEPTANCE_REJECTED;return STN_PENDING_DUPLICATE;
+        }
         for(i=0;i<p->count;++i){
             if(same_nonce(&p->entries[i],envelope.controller,envelope.nonce)){
                 report->replay=STN_STAGE_REJECT;report->acceptance=STN_ACCEPTANCE_REJECTED;return STN_PENDING_REPLAY;
