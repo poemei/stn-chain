@@ -98,9 +98,11 @@ implicit fields, locale-dependent text, floating point or struct serialization.
 | 20 | 4 | Exact payload length |
 | 24 | length | Payload; trailing bytes prohibited |
 
-Maximum payload is 1,051,948 bytes (68 + maximum canonical block); maximum
-frame is 1,051,972. Minimum frame is 24. The largest supported successful
-response is a mining template, 1,051,948 payload bytes, matching the solved-work request bound. Encoded sizes do not depend on pointers, padding or ABI.
+Maximum payload is bounded by `STN_RPC_MAX_PAYLOAD`, currently the mining
+submission prefix plus the maximum canonical block (1,070,465 bytes); maximum
+frame adds the fixed 24-byte STNC header. Minimum frame is 24 bytes. Recovery
+methods use the same global bound; staged suffix recovery exists specifically so
+a divergent history is never forced into one oversized STNC frame. Encoded sizes do not depend on pointers, padding or ABI.
 
 Decode checks bounds before accessing variable spans. Known request/response
 payload lengths are enforced. Embedded record/block bytes are evidence, whose
@@ -141,6 +143,13 @@ This classification is not authentication. No remote policy is configured.
 | 0x1003 INTELLIGENCE_CURSOR | READ | Snapshot tip 32, block index u32, transaction index u32 | UNAVAILABLE; accepted-intelligence cursor behavior is reserved |
 | 0x1004 PENDING | READ | empty | 16-byte pending count, entry capacity, byte usage, byte capacity |
 | 0x1005 SUBMIT_TRANSACTION | SUBMISSION | Whole canonical STNT transaction, at most 65,728 bytes | 36-byte versioned admission result and canonical transaction ID |
+| 0x1006 SUBMIT_BLOCK_EVIDENCE | SUBMISSION | One canonical block | Chain validates a current-tip extension and returns accepted state (80 bytes) on adoption |
+| 0x1007 SUBMIT_HISTORY_EVIDENCE | SUBMISSION | u32 block count followed by length-prefixed canonical blocks | Legacy bounded whole-history fork evidence; accepted state (80 bytes) on adoption |
+| 0x1008 SUBMIT_SUFFIX_EVIDENCE | SUBMISSION | u32 accepted-prefix count, u32 suffix count, then length-prefixed canonical blocks | Bounded divergent-suffix evidence; Chain performs fork evaluation and returns accepted state on adoption or CURRENT when accepted state remains preferred |
+| 0x1009 SUFFIX_STAGE_BEGIN | SUBMISSION | u32 accepted-prefix count, u32 expected suffix block count | Opens Chain-owned transient staging; no accepted-state mutation |
+| 0x100A SUFFIX_STAGE_APPEND | SUBMISSION | u32 suffix offset, u32 block count, then length-prefixed canonical blocks | Atomically appends the next ordered bounded evidence batch; failed append retains none of that batch |
+| 0x100B SUFFIX_STAGE_COMMIT | SUBMISSION | empty | Chain alone evaluates the completed staged candidate; adoption returns accepted state, nonpreferred valid evidence returns CURRENT; staging is cleared on terminal evaluation |
+| 0x100C SUFFIX_STAGE_ABORT | SUBMISSION | empty | Discards Chain-owned transient staged evidence without accepted-state mutation |
 | 0x2000 MINING_CONTEXT | READ | empty | 76-byte tip/target/height context, template availability=1 when configured (0 in snapshot-only adapter) |
 | 0x2001 CHECK_WORK_BASE | READ | Base tip 32 | Current mining context if matching; otherwise STALE |
 | 0x2002 MINING_TEMPLATE | READ | empty | Parent 32, work ID 32, block length u32, canonical block |
@@ -151,6 +160,49 @@ SUBMIT_WORK requires the nested block length to match the remaining payload
 and the current canonical block size bounds. Template identity and nonce mutation are defined in [MINING_WORK.md](MINING_WORK.md).
 Reserved methods never return successful empty placeholders. Production identity
 providers and administrative actions remain unimplemented.
+
+## Post-production synchronization and recovery evidence
+
+STNC recovery submission methods are application-facing evidence transport. They
+do not transfer consensus authority to STNC Core or any other caller. Peer data
+remains evidence until Chain validates it against the current accepted history,
+normal block rules, cumulative work, fork choice and persistence rules.
+
+`SUBMIT_BLOCK_EVIDENCE (0x1006)` is the linear-extension path. It accepts one
+canonical peer block and may extend only the current accepted tip.
+
+`SUBMIT_HISTORY_EVIDENCE (0x1007)` is retained as the older bounded
+whole-history interface. It is not the normal production path for long
+divergence because a complete history must fit one STNC frame.
+
+`SUBMIT_SUFFIX_EVIDENCE (0x1008)` carries a known common-prefix count plus a
+bounded divergent suffix. Chain reconstructs the candidate from its own accepted
+prefix and the supplied suffix, evaluates the fork independently, and atomically
+applies a preferred candidate. A valid candidate that does not displace accepted
+state returns CURRENT rather than being classified as malformed peer evidence.
+
+For divergent suffixes larger than one STNC frame, `0x1009..0x100C` provide a
+bounded staged lifecycle:
+
+1. BEGIN declares the accepted-prefix count and exact expected suffix block count.
+2. APPEND supplies the next contiguous suffix offset and one or more canonical
+   blocks. Offsets must be ordered. An APPEND is atomic with respect to staging:
+   if any block in that APPEND fails, none of that APPEND remains staged.
+3. COMMIT is permitted only after the declared suffix is complete. Chain
+   reconstructs and evaluates the candidate and is the only component permitted
+   to change accepted state.
+4. ABORT destroys the transient stage without evaluating or changing accepted
+   state.
+
+Staging is transient Chain-owned evidence, not accepted state or a second
+consensus database. BEGIN and APPEND cannot activate state. Terminal COMMIT
+outcomes and ABORT clear staged ownership. The protocol does not increase the
+global STNC payload ceiling merely to accommodate long forks.
+
+Peer discovery is outside this authority boundary. The stn-chain.org ChAoS MVC
+`/peers` endpoint and STNP peer discovery identify candidate endpoints only;
+directory approval, bootstrap position, transport success or peer selection does
+not establish trust or authority over accepted Chain state.
 
 ## Canonical identity-address derivation
 
