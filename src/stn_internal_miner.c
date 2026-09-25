@@ -1,6 +1,5 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_internal_miner.h"
-#include "stn_wire.h"
 #include <string.h>
 
 stn_data_status stn_internal_miner_search(
@@ -116,7 +115,10 @@ stn_data_status stn_internal_miner_worker_step(
         STN_DATA_UNRESOLVED : STN_DATA_CONTENT;
     if(response_length<STN_MINING_PREFIX+STN_BLOCK_HEADER_SIZE)
         return STN_DATA_CONTENT;
-    block_length=stn_wire_read(template_response+64u,4u);
+    block_length=((size_t)template_response[64u]<<24) |
+        ((size_t)template_response[65u]<<16) |
+        ((size_t)template_response[66u]<<8) |
+        (size_t)template_response[67u];
     if(block_length<STN_BLOCK_HEADER_SIZE || block_length>STN_BLOCK_MAX_SIZE ||
        response_length!=STN_MINING_PREFIX+block_length)
         return STN_DATA_CONTENT;
