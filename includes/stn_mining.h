@@ -22,6 +22,11 @@ typedef struct stn_suffix_stage {
     int active;
 } stn_suffix_stage;
 
+typedef struct stn_mining_session {
+    struct stn_mining_service *service;
+    stn_suffix_stage suffix_stage;
+} stn_mining_session;
+
 typedef struct stn_mining_service {
     const stn_chain_context *chain;
     const stn_storage_provider *storage;
@@ -49,6 +54,13 @@ typedef struct stn_mining_service {
  * parent[32] + work ID[32] + block length[4] + canonical stn0_ identity[69]
  * + block. Only block bytes 152..159 may change: unsigned big-endian nonce. */
 stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *request,
+    uint8_t *payload,size_t capacity,size_t *written);
+/* Bind one instance to one long-lived STNC connection. Staged suffix evidence
+ * is connection-owned; accepted Chain state remains shared in service. Caller
+ * serializes all session handlers against service mutations. */
+void stn_mining_session_init(stn_mining_session *session,stn_mining_service *service);
+void stn_mining_session_release(stn_mining_session *session);
+stn_rpc_code stn_mining_session_handle(void *user,const stn_rpc_message *request,
     uint8_t *payload,size_t capacity,size_t *written);
 
 /* In-process callers use the exact same validated mining service path as STNC.
