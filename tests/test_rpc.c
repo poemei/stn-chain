@@ -157,8 +157,8 @@ static void node(void)
     memcpy(id,r.payload,32);r=call(STN_RPC_CHECK_WORK_BASE,id,32,STN_RPC_READ,&service);CHECK(r.code==STN_RPC_OK);
     id[0]^=1;r=call(STN_RPC_CHECK_WORK_BASE,id,32,STN_RPC_READ,&service);CHECK(r.code==STN_RPC_STALE);id[0]^=1;
     memcpy(work,id,32);
+    work[66]=1;work[67]=108;
     memcpy(work+68,derived_addresses[STN_ADDRESS_IDENTITY-1],STN_RPC_MINER_IDENTITY_SIZE);
-    work[135]=1;work[136]=108;
     memcpy(work+137,child,364);
     r=call(STN_RPC_SUBMIT_WORK,work,sizeof(work),STN_RPC_READ,&service);CHECK(r.code==STN_RPC_FORBIDDEN);
     r=call(STN_RPC_SUBMIT_WORK,work,sizeof(work),STN_RPC_SUBMISSION,&service);CHECK(r.code==STN_RPC_UNAVAILABLE);
