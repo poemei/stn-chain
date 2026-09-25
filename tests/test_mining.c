@@ -282,6 +282,41 @@ int test_mining(void)
             w==0u);
         history_evidence[4u+4u+40u]^=1u;
     }
+    /* Bounded suffix evidence carries only blocks after a caller-identified
+     * common prefix. Chain supplies that prefix from its own accepted storage,
+     * reconstructs the candidate, and alone decides whether it is preferred. */
+    {
+        uint8_t suffix_evidence[8u+4u+364u];
+        size_t at=0u;
+
+        memcpy(changed,grand,364u);
+        memcpy(changed+40u,s.active.tip_id,32u);
+        put64(changed+72u,3u);
+        CHECK(solve_block(changed,364u,&c.hash_provider));
+
+        stn_wire_write(suffix_evidence+at,4u,3u);at+=4u;
+        stn_wire_write(suffix_evidence+at,4u,1u);at+=4u;
+        stn_wire_write(suffix_evidence+at,4u,364u);at+=4u;
+        memcpy(suffix_evidence+at,changed,364u);at+=364u;
+
+        CHECK(rpc(&s,STN_RPC_SUBMIT_SUFFIX_EVIDENCE,suffix_evidence,at,out,&w)==STN_RPC_OK &&
+            w==80u && stn_wire_read(out+32u,8u)==3u);
+        CHECK(rpc(&s,STN_RPC_SUBMIT_SUFFIX_EVIDENCE,suffix_evidence,at,out,&w)==STN_RPC_REJECTED &&
+            w==0u);
+
+        /* A claimed prefix outside accepted storage is never guessed. */
+        stn_wire_write(suffix_evidence,4u,99u);
+        CHECK(rpc(&s,STN_RPC_SUBMIT_SUFFIX_EVIDENCE,suffix_evidence,at,out,&w)==STN_RPC_REJECTED &&
+            w==0u);
+        stn_wire_write(suffix_evidence,4u,3u);
+
+        /* Structurally framed but ancestry-corrupt suffix evidence is rejected. */
+        suffix_evidence[12u+40u]^=1u;
+        CHECK(rpc(&s,STN_RPC_SUBMIT_SUFFIX_EVIDENCE,suffix_evidence,at,out,&w)==STN_RPC_REJECTED &&
+            w==0u);
+        suffix_evidence[12u+40u]^=1u;
+    }
+
     stn_storage_view_release(&view);stn_chain_state_release(&s.active);
     activated_difficulty();
     printf("Mining work: %u checks, %u failures.\n",checks,failures);return failures!=0;
