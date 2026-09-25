@@ -401,11 +401,12 @@ append_fail:
         }
         prefix=(size_t)s->suffix_stage.prefix_count;count=(size_t)s->suffix_stage.expected_count;
         if(prefix>v.count||prefix>SIZE_MAX-count){code=STN_RPC_REJECTED;goto stage_commit_done;}
+        fork=stn_fork_evaluate_suffix(s->chain,v.blocks,v.count,prefix,
+            s->suffix_stage.blocks,count,&plan);
         candidate=(stn_block_span *)calloc(prefix+count,sizeof(*candidate));
         if(candidate==NULL){code=STN_RPC_CAPACITY;goto stage_commit_done;}
         for(i=0u;i<prefix;i++)candidate[i]=v.blocks[i];
         for(i=0u;i<count;i++)candidate[prefix+i]=s->suffix_stage.blocks[i];
-        fork=stn_fork_evaluate_history(s->chain,v.blocks,v.count,candidate,prefix+count,&plan);
         if(fork.result==STN_FORK_CURRENT||fork.result==STN_FORK_TIE){
             code=STN_RPC_CURRENT;goto stage_commit_done;
         }
@@ -477,8 +478,8 @@ stage_commit_done:
         }
         if(at!=q->length){code=STN_RPC_INVALID;goto suffix_done;}
 
-        fork=stn_fork_evaluate_history(s->chain,accepted_view.blocks,accepted_view.count,
-            candidate,prefix+count,&plan);
+        fork=stn_fork_evaluate_suffix(s->chain,accepted_view.blocks,accepted_view.count,
+            prefix,candidate+prefix,count,&plan);
         if(fork.result==STN_FORK_CURRENT||fork.result==STN_FORK_TIE){
             /* Valid evidence that does not displace accepted state is not a
              * malformed or hostile peer condition. Report CURRENT distinctly
