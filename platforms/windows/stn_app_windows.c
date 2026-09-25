@@ -15,6 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <stdarg.h>
+#include <time.h>
 #ifdef STN_PHASE9_TEST_RUNTIME
 #include "../../tests/stn_phase9_runtime.h"
 #endif
@@ -22,10 +24,41 @@
 #define APP_RPC_ACCEPT_POLL_MS 250u
 #define APP_RPC_IO_TIMEOUT_MS 60000u
 static volatile LONG stopping;
+static CRITICAL_SECTION report_lock;
+static int report_lock_ready;
+static FILE *report_log;
 static BOOL WINAPI stop(DWORD event)
 {
     if(event==CTRL_C_EVENT || event==CTRL_BREAK_EVENT){InterlockedExchange(&stopping,1);return TRUE;}
     return FALSE;
+}
+static int report_open(void)
+{
+    char directory[MAX_PATH];
+    char path[MAX_PATH];
+    const char *program_data=getenv("ProgramData");
+    if(program_data==NULL || *program_data=='\0'){program_data="C:\\ProgramData";}
+    if(_snprintf_s(directory,sizeof(directory),_TRUNCATE,"%s\\STN Chain",program_data)<0){return 0;}
+    if(!CreateDirectoryA(directory,NULL) && GetLastError()!=ERROR_ALREADY_EXISTS){return 0;}
+    if(_snprintf_s(path,sizeof(path),_TRUNCATE,"%s\\stn-chain.log",directory)<0){return 0;}
+    return fopen_s(&report_log,path,"a")==0 && report_log!=NULL;
+}
+static void report_close(void)
+{
+    if(report_log!=NULL){fclose(report_log);report_log=NULL;}
+    if(report_lock_ready){DeleteCriticalSection(&report_lock);report_lock_ready=0;}
+}
+static void report_line(const char *event,const char *format,...)
+{
+    char message[1024],stamp[32];time_t now;struct tm local;va_list args;
+    now=time(NULL);
+    if(localtime_s(&local,&now)==0){strftime(stamp,sizeof(stamp),"%Y-%m-%dT%H:%M:%S",&local);}
+    else{strcpy_s(stamp,sizeof(stamp),"unknown-time");}
+    va_start(args,format);vsnprintf_s(message,sizeof(message),_TRUNCATE,format,args);va_end(args);
+    if(report_lock_ready){EnterCriticalSection(&report_lock);}
+    fprintf(stdout,"[%s] %s\n",event,message);fflush(stdout);
+    if(report_log!=NULL){fprintf(report_log,"%s [%s] %s\n",stamp,event,message);fflush(report_log);}
+    if(report_lock_ready){LeaveCriticalSection(&report_lock);}
 }
 static int read_file(const char *path,uint8_t *bytes,size_t cap,size_t *n)
 {
@@ -179,6 +212,7 @@ typedef struct outbound_runtime {
 static DWORD WINAPI outbound_thread(void *user)
 {
     outbound_runtime *runtime=user;
+    report_line("PEER","Outbound peer manager started.");
     while(InterlockedCompareExchange(&stopping,0,0)==0){
         EnterCriticalSection(runtime->lock);
         runtime->socket.operation_deadline_ms=GetTickCount64()+5000;
@@ -186,7 +220,7 @@ static DWORD WINAPI outbound_thread(void *user)
             runtime->mining->storage,&runtime->workspace,&runtime->mining->active);
         LeaveCriticalSection(runtime->lock);Sleep(100);
     }
-    stn_peer_outbound_close(&runtime->manager);return 0;
+    stn_peer_outbound_close(&runtime->manager);report_line("PEER","Outbound peer manager stopped.");return 0;
 }
 static int candidate_argument(const char *text,stn_peer_candidates *set)
 {
@@ -215,6 +249,8 @@ static int candidate_argument(const char *text,stn_peer_candidates *set)
 
 int stn_windows_app(int argc,char **argv)
 {
+    InitializeCriticalSection(&report_lock);report_lock_ready=1;
+    if(!report_open()){report_line("ERROR","Cannot open persistent log; terminal reporting remains active.");}
     const char *data="stn-chain-dev.stns",*genesis_path=NULL,*transaction_path=NULL;
     int dev=0,once=0,i,result=EXIT_FAILURE;unsigned long port=18473;char *end;
     wchar_t relative[260],absolute[260];DWORD path_length;
@@ -284,7 +320,7 @@ int stn_windows_app(int argc,char **argv)
     if(stn_windows_peer_listen((uint16_t)port,&listener,&bound)!=STN_PEER_OK){fprintf(stderr,"Cannot bind loopback RPC port.\n");goto cleanup;}
     if(!SetConsoleCtrlHandler(stop,TRUE)){goto cleanup;}
     InitializeCriticalSection(&dispatch_lock);lock_ready=1;
-    printf("STN Chain development node; RPC 127.0.0.1:%u; height %llu\n",(unsigned)bound,(unsigned long long)mining.active.height);
+    report_line("START","RPC 127.0.0.1:%u height=%llu",(unsigned)bound,(unsigned long long)mining.active.height);
     if(dev){puts("DEVELOPMENT FIXTURE: repeated structural test transaction; no signed intelligence admission or coin.");}
     puts("RPC v1 binary STNC; concurrent loopback clients limited only by host resources; read + solved-work submission. Ctrl+C stops.");fflush(stdout);
     result=EXIT_SUCCESS;
@@ -299,6 +335,7 @@ int stn_windows_app(int argc,char **argv)
         if(outbound.workspace.storage.current_bytes==NULL || outbound.workspace.storage.next_bytes==NULL ||
             outbound.workspace.candidate==NULL || outbound.workspace.frame==NULL ||
             stn_peer_outbound_init(&outbound.manager,&candidates,&connector)!=STN_PEER_OK){result=EXIT_FAILURE;goto shutdown;}
+        report_line("PEER","Starting outbound peer manager with %u candidate(s).",(unsigned)candidates.count);
         outbound.thread=CreateThread(NULL,0,outbound_thread,&outbound,0,NULL);
         if(outbound.thread==NULL){result=EXIT_FAILURE;goto shutdown;}
     }
@@ -334,6 +371,7 @@ cleanup:
     stn_windows_peer_close(&listener);if(lock_ready){DeleteCriticalSection(&dispatch_lock);}
     free(outbound.workspace.storage.current_bytes);free(outbound.workspace.storage.next_bytes);free(outbound.workspace.candidate);free(outbound.workspace.frame);
     stn_chain_state_release(&mining.active);stn_pending_clear(&pending);free(genesis);free(body);free(mining.snapshot);free(mining.workspace.current_bytes);free(mining.workspace.next_bytes);free(mining.template_bytes);
+    report_line("STOP","STN Chain Windows stopped.");report_close();
     return result;
 usage:
     puts("Usage: stn-chain [--data PATH] [--rpc-port 18473]\nResume saved history or initialize the built-in genesis if absent.\nOptional --dev enables the repeated development transaction.\n"
