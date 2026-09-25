@@ -46,6 +46,19 @@ claim.
 See [Economy](docs/ECONOMY.md), [Contracts](docs/CONTRACTS.md), the
 [current roadmap](docs/ROADMAP.md), and the
 [typed address foundation](docs/ADDRESSES.md).
+
+The Chain runtime also includes a bounded low-level internal miner for node
+operators. It uses the same canonical mining service and validated submission
+path as external miners, is capped at a 2% duty setting with a 256-nonce
+bounded worker step, and does not receive a privileged target or consensus
+bypass. Operator configuration uses the existing `stnw0_` wallet namespace
+through `config/chain_config.json`. Linux qualification currently records
+Chain JSON configuration **6 checks, 0 failures** and internal miner primitive
+**26 checks, 0 failures**. Runtime startup has been observed on both Linux and
+Windows. Windows reports major runtime activity to the terminal and to
+`%ProgramData%\\STN Chain\\stn-chain.log`, including internal-miner status
+and peer/synchronization activity when configured.
+
 The old Go prototype is not a compatibility requirement.
 
 ## Build
