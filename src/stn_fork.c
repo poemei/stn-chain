@@ -98,7 +98,7 @@ stn_fork_report stn_fork_evaluate_suffix(const stn_chain_context *context,
     const stn_block_span *suffix,size_t suffix_count,stn_reorg_plan *out)
 {
     stn_fork_report r={0};stn_reorg_plan plan={0};stn_chain_state state={0};
-    size_t i;uint8_t left[32],right[32];
+    size_t i;
     r.validation.failing_index=SIZE_MAX;
     if(context==NULL||current==NULL||out==NULL||prefix_count==0u||
        prefix_count>current_count||suffix==NULL||suffix_count==0u){
@@ -119,13 +119,6 @@ stn_fork_report stn_fork_evaluate_suffix(const stn_chain_context *context,
         stn_chain_state_move(&state,&next);
     }
     stn_chain_state_move(&plan.candidate,&state);
-    if(stn_chain_block_id(current[prefix_count-1u].bytes,current[prefix_count-1u].length,
-            &context->hash_provider,left)!=STN_DATA_OK||
-       stn_chain_block_id(prefix_count==1u?current[0].bytes:suffix[0].bytes,
-            prefix_count==1u?current[0].length:suffix[0].length,
-            &context->hash_provider,right)!=STN_DATA_OK){
-        r=failure(r,0,STN_DATA_PROVIDER_ERROR);goto done;
-    }
     /* Candidate reconstruction already proves ancestry through previous_hash.
      * The accepted prefix itself supplies the common ancestor. */
     plan.ancestor_index=prefix_count-1u;
