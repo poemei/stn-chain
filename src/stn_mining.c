@@ -336,19 +336,27 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
            count>(size_t)s->suffix_stage.expected_count-start){code=STN_RPC_REJECTED;goto done;}
         for(i=0u;i<count;i++){
             uint8_t *copy;
-            if(at>q->length||q->length-at<4u){code=STN_RPC_INVALID;goto done;}
+            if(at>q->length||q->length-at<4u){code=STN_RPC_INVALID;goto append_fail;}
             length=(size_t)stn_wire_read(q->payload+at,4u);at+=4u;
             if(length<STN_BLOCK_HEADER_SIZE||length>STN_BLOCK_MAX_SIZE||length>q->length-at){
-                code=STN_RPC_INVALID;goto done;
+                code=STN_RPC_INVALID;goto append_fail;
             }
-            copy=(uint8_t *)malloc(length);if(copy==NULL){code=STN_RPC_CAPACITY;goto done;}
+            copy=(uint8_t *)malloc(length);if(copy==NULL){code=STN_RPC_CAPACITY;goto append_fail;}
             memcpy(copy,q->payload+at,length);at+=length;
             s->suffix_stage.owned[start+(uint32_t)i]=copy;
             s->suffix_stage.blocks[start+(uint32_t)i].bytes=copy;
             s->suffix_stage.blocks[start+(uint32_t)i].length=length;
         }
-        if(at!=q->length){code=STN_RPC_INVALID;goto done;}
+        if(at!=q->length){code=STN_RPC_INVALID;goto append_fail;}
         s->suffix_stage.received_count+=(uint32_t)count;code=STN_RPC_OK;goto done;
+append_fail:
+        while(i!=0u){
+            --i;free(s->suffix_stage.owned[start+(uint32_t)i]);
+            s->suffix_stage.owned[start+(uint32_t)i]=NULL;
+            s->suffix_stage.blocks[start+(uint32_t)i].bytes=NULL;
+            s->suffix_stage.blocks[start+(uint32_t)i].length=0u;
+        }
+        goto done;
     }
 
     if(q->method==STN_RPC_SUFFIX_STAGE_COMMIT){
