@@ -477,6 +477,8 @@ $(BUILD_DIR)/test-report: tests/test_report.c src/stn_report.c includes/stn_repo
 test-internal-miner: $(BUILD_DIR)/test-internal-miner
 	$(BUILD_DIR)/test-internal-miner
 
-$(BUILD_DIR)/test-internal-miner: tests/test_internal_miner.c src/stn_internal_miner.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_address.c platforms/linux/stn_sha256.c includes/stn_internal_miner.h
+INTERNAL_MINER_TEST_SOURCES := $(filter-out src/main.c src/stn_mining.c src/stn_node_service.c src/stn_peer.c src/stn_pending.c src/stn_report.c src/stn_rpc.c src/stn_storage.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) platforms/linux/stn_sha256.c
+
+$(BUILD_DIR)/test-internal-miner: tests/test_internal_miner.c $(INTERNAL_MINER_TEST_SOURCES) includes/stn_internal_miner.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_INTERNAL_MINER_TEST_MAIN tests/test_internal_miner.c src/stn_internal_miner.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_compensation_state.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_INTERNAL_MINER_TEST_MAIN tests/test_internal_miner.c $(INTERNAL_MINER_TEST_SOURCES) -o $@ $(LDLIBS)
