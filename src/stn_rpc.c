@@ -25,7 +25,9 @@ static uint32_t capability(uint16_t method)
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:case STN_RPC_GET_ACCEPTED_RECORD:
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_INTELLIGENCE_CURSOR:
     case STN_RPC_MINING_CONTEXT:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_MINING_TEMPLATE:return STN_RPC_READ;
-    case STN_RPC_SUBMIT_TRANSACTION:case STN_RPC_SUBMIT_BLOCK_EVIDENCE:case STN_RPC_SUBMIT_HISTORY_EVIDENCE:case STN_RPC_SUBMIT_SUFFIX_EVIDENCE:case STN_RPC_SUBMIT_INTELLIGENCE:case STN_RPC_SUBMIT_WORK:case STN_RPC_SUBMIT_SHARE:return STN_RPC_SUBMISSION;
+    case STN_RPC_SUBMIT_TRANSACTION:case STN_RPC_SUBMIT_BLOCK_EVIDENCE:case STN_RPC_SUBMIT_HISTORY_EVIDENCE:case STN_RPC_SUBMIT_SUFFIX_EVIDENCE:
+    case STN_RPC_SUFFIX_STAGE_BEGIN:case STN_RPC_SUFFIX_STAGE_APPEND:case STN_RPC_SUFFIX_STAGE_COMMIT:case STN_RPC_SUFFIX_STAGE_ABORT:
+    case STN_RPC_SUBMIT_INTELLIGENCE:case STN_RPC_SUBMIT_WORK:case STN_RPC_SUBMIT_SHARE:return STN_RPC_SUBMISSION;
     case STN_RPC_ADMIN_CONTROL:return STN_RPC_ADMIN;
     default:return 0;
     }
@@ -109,6 +111,25 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
         }
         return at==n;
     }
+    case STN_RPC_SUFFIX_STAGE_BEGIN:
+        return p!=NULL&&n==8u&&stn_wire_read(p,4)>0u&&stn_wire_read(p+4,4)>0u;
+    case STN_RPC_SUFFIX_STAGE_APPEND:{
+        size_t at=8u,i,count,length;
+        if(p==NULL||n<8u)return 0;
+        count=(size_t)stn_wire_read(p+4,4);
+        if(count==0u)return 0;
+        for(i=0u;i<count;i++){
+            if(at>n||n-at<4u)return 0;
+            length=(size_t)stn_wire_read(p+at,4);at+=4u;
+            if(length<STN_BLOCK_HEADER_SIZE||length>STN_BLOCK_MAX_SIZE||
+               length>n-at||stn_block_validate_structure(p+at,length)!=STN_DATA_OK)return 0;
+            at+=length;
+        }
+        return at==n;
+    }
+    case STN_RPC_SUFFIX_STAGE_COMMIT:
+    case STN_RPC_SUFFIX_STAGE_ABORT:
+        return n==0u;
     default:return 1;
     }
 }
@@ -161,7 +182,12 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
     case STN_RPC_SUBMIT_BLOCK_EVIDENCE:
     case STN_RPC_SUBMIT_HISTORY_EVIDENCE:
     case STN_RPC_SUBMIT_SUFFIX_EVIDENCE:
+    case STN_RPC_SUFFIX_STAGE_COMMIT:
         return n==80;
+    case STN_RPC_SUFFIX_STAGE_BEGIN:
+    case STN_RPC_SUFFIX_STAGE_APPEND:
+    case STN_RPC_SUFFIX_STAGE_ABORT:
+        return n==0u;
 
     case STN_RPC_SUBMIT_TRANSACTION:
         return n==36 &&
