@@ -53,6 +53,13 @@ stn_fork_report stn_fork_evaluate(const stn_chain_context *context,
 stn_fork_report stn_fork_evaluate_history(const stn_chain_context *context,
     const stn_block_span *current,size_t current_count,
     const stn_block_span *candidate,size_t candidate_count,stn_reorg_plan *out);
+/* Evaluate a candidate assembled from an already accepted immutable prefix plus
+ * an untrusted suffix without allocating a second complete span table. The
+ * prefix is still revalidated from genesis as part of candidate reconstruction;
+ * no cached state or caller work claim is authoritative. */
+stn_fork_report stn_fork_evaluate_suffix(const stn_chain_context *context,
+    const stn_block_span *current,size_t current_count,size_t prefix_count,
+    const stn_block_span *suffix,size_t suffix_count,stn_reorg_plan *out);
 typedef enum stn_cursor_reorg_result {
     STN_CURSOR_REORG_CURRENT=0, STN_CURSOR_REORG_COMMON_ANCESTOR,
     STN_CURSOR_REORG_NO_COMMON_ANCESTOR, STN_CURSOR_REORG_MALFORMED,
