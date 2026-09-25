@@ -63,6 +63,23 @@ static void codecs(void)
     r=call(STN_RPC_INFO,NULL,0,8,&service);CHECK(r.code==STN_RPC_FORBIDDEN && s.calls==0);
     r=call(STN_RPC_ADMIN_CONTROL,NULL,0,STN_RPC_READ,&service);CHECK(r.code==STN_RPC_FORBIDDEN && s.calls==0);
     r=call(STN_RPC_SUBMIT_INTELLIGENCE,large,180,STN_RPC_READ,&service);CHECK(r.code==STN_RPC_FORBIDDEN && s.calls==0);
+    {
+        uint8_t stage_begin[8]={0,0,0,1,0,0,0,2};
+        uint8_t stage_append[8u+4u+STN_BLOCK_HEADER_SIZE]={0};
+        stn_wire_write(stage_append,4u,0u);
+        stn_wire_write(stage_append+4u,4u,1u);
+        stn_wire_write(stage_append+8u,4u,STN_BLOCK_HEADER_SIZE);
+        r=call(STN_RPC_SUFFIX_STAGE_BEGIN,stage_begin,sizeof(stage_begin),STN_RPC_SUBMISSION,&service);
+        CHECK(r.code==STN_RPC_OK && s.calls==1);
+        /* APPEND requires canonical block structure; an all-zero header is rejected before service. */
+        r=call(STN_RPC_SUFFIX_STAGE_APPEND,stage_append,sizeof(stage_append),STN_RPC_SUBMISSION,&service);
+        CHECK(r.code==STN_RPC_INVALID && s.calls==1);
+        r=call(STN_RPC_SUFFIX_STAGE_COMMIT,NULL,0,STN_RPC_SUBMISSION,&service);
+        CHECK(r.code==STN_RPC_OK && s.calls==2);
+        r=call(STN_RPC_SUFFIX_STAGE_ABORT,NULL,0,STN_RPC_SUBMISSION,&service);
+        CHECK(r.code==STN_RPC_OK && s.calls==3);
+        s.calls=0;
+    }
     r=call(STN_RPC_INFO,NULL,0,STN_RPC_READ,&service);CHECK(r.code==STN_RPC_OK && s.calls==1);
     for(s.mode=1;s.mode<=3;++s.mode){r=call(STN_RPC_INFO,NULL,0,STN_RPC_READ,&service);CHECK(r.code==(s.mode==3?STN_RPC_REJECTED:STN_RPC_PROVIDER) && r.length==0);}
     r=call(STN_RPC_INFO,NULL,0,STN_RPC_READ,NULL);CHECK(r.code==STN_RPC_UNAVAILABLE);
