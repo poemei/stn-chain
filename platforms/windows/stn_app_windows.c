@@ -374,8 +374,9 @@ cleanup:
     report_line("STOP","STN Chain Windows stopped.");report_close();
     return result;
 usage:
-    puts("Usage: stn-chain [--data PATH] [--rpc-port 18473]\nResume saved history or initialize the built-in genesis if absent.\nOptional --dev enables the repeated development transaction.\n"
-         "   or: stn-chain --genesis BLOCK --data PATH [--rpc-port PORT]\n"
-         "Explicit selected content: --dev --genesis BLOCK --transaction STNT.\nRepeat --peer IPv4:PORT for automatic outbound P2P (not with --once).\nLoopback RPC only. --once serves one connection. Port 0 chooses a free port.");
+    puts("Usage: stn-chain [--data PATH] [--rpc-port PORT] [--peer HOST:PORT]\n"
+         "Resume saved history or initialize the built-in genesis if absent.\n"
+         "Repeat --peer HOST:PORT for automatic outbound P2P. Host may be DNS or IPv4.\n"
+         "Loopback RPC only. Ctrl+C stops.");
     return argc==1 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
