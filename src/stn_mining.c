@@ -368,8 +368,12 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
             if(length<STN_BLOCK_HEADER_SIZE||length>STN_BLOCK_MAX_SIZE||length>q->length-at){
                 code=STN_RPC_INVALID;goto append_fail;
             }
+            if(length>STN_SUFFIX_STAGE_MAX_BYTES-s->suffix_stage.received_bytes){
+                code=STN_RPC_CAPACITY;goto append_fail;
+            }
             copy=(uint8_t *)malloc(length);if(copy==NULL){code=STN_RPC_CAPACITY;goto append_fail;}
             memcpy(copy,q->payload+at,length);at+=length;
+            s->suffix_stage.received_bytes+=length;
             s->suffix_stage.owned[start+(uint32_t)i]=copy;
             s->suffix_stage.blocks[start+(uint32_t)i].bytes=copy;
             s->suffix_stage.blocks[start+(uint32_t)i].length=length;
@@ -378,7 +382,9 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         s->suffix_stage.received_count+=(uint32_t)count;code=STN_RPC_OK;goto done;
 append_fail:
         while(i!=0u){
-            --i;free(s->suffix_stage.owned[start+(uint32_t)i]);
+            --i;
+            s->suffix_stage.received_bytes-=s->suffix_stage.blocks[start+(uint32_t)i].length;
+            free(s->suffix_stage.owned[start+(uint32_t)i]);
             s->suffix_stage.owned[start+(uint32_t)i]=NULL;
             s->suffix_stage.blocks[start+(uint32_t)i].bytes=NULL;
             s->suffix_stage.blocks[start+(uint32_t)i].length=0u;
