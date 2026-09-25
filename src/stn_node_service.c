@@ -103,7 +103,8 @@ static stn_rpc_code handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t
         store=stn_contract_snapshot_const_state(state->contracts);
         if(store==NULL)return STN_RPC_UNAVAILABLE;
         status=stn_contract_state_find(store,contract.identifier,&at);
-        if(status!=STN_CONTRACT_OK)return STN_RPC_NOT_FOUND;
+        if(status==STN_CONTRACT_ADDRESS_ERROR)return STN_RPC_NOT_FOUND;
+        if(status!=STN_CONTRACT_OK)return STN_RPC_PROVIDER;
         if(at>=store->entry_count)return STN_RPC_PROVIDER;
         entry=&store->entries[at];
         if(cap<26)return STN_RPC_CAPACITY;
