@@ -2,6 +2,7 @@
 #include "stn_rpc.h"
 #include "stn_node_service.h"
 #include "stn_sha256.h"
+#include "stn_address.h"
 #include <stdio.h>
 #include <string.h>
 static unsigned checks,failures;
@@ -105,8 +106,14 @@ static stn_stage_status authority(void *u,const stn_record *r,const stn_intellig
 static stn_stage_status replay(void *u,const stn_record *r){(void)u;(void)r;return STN_STAGE_PASS;}
 static void node(void)
 {
+    static const char *const derived_addresses[]={
+        "stn0_ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        "stnc0_ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        "stnw0_ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    };
     static const uint8_t intel[232]={ [0]='S',[1]='T',[2]='N',[3]='R',[5]=1,[7]=1,[8]=1,[40]=2,[72]=3,[111]=10,[115]=52,[117]=1,[125]=5,[126]=1,[128]=1,[129]='a',[131]=1,[132]='b',[134]=1,[135]='c',[136]=1,[168]=4 };
-    uint8_t genesis[364],child[364],old[364],id[32],height[8]={0},bad[232],work[432]={0};
+    uint8_t genesis[364],child[364],old[364],id[32],height[8]={0},bad[232],work[432]={0},address_request[9]={0};
+    size_t address_type;
     stn_chain_context c={0};stn_pow_policy policy;stn_validation_context v={0};stn_rpc_message r;
     stn_block_span blocks[2];stn_node_service node_service;stn_rpc_service service;
     fixture(genesis);memcpy(policy.fixed_target,genesis+120,32);
@@ -116,6 +123,14 @@ static void node(void)
     blocks[0].bytes=genesis;blocks[0].length=364;blocks[1].bytes=child;blocks[1].length=364;
     node_service.chain=&c;node_service.blocks=blocks;node_service.count=2;node_service.intelligence=&v;
     service.user=&node_service;service.handle=stn_node_service_handle;
+    memcpy(address_request+6,"abc",3);address_request[5]=3;
+    for(address_type=STN_ADDRESS_IDENTITY;address_type<=STN_ADDRESS_WALLET;++address_type){
+        address_request[0]=0;address_request[1]=(uint8_t)address_type;
+        r=call(STN_RPC_DERIVE_ADDRESS,address_request,sizeof(address_request),STN_RPC_READ,&service);
+        CHECK(r.code==STN_RPC_OK &&
+            r.length==strlen(derived_addresses[address_type-1]) &&
+            memcmp(r.payload,derived_addresses[address_type-1],r.length)==0);
+    }
     r=call(STN_RPC_INFO,NULL,0,STN_RPC_READ,&service);
     CHECK(r.code==STN_RPC_OK && r.length==184 && r.payload[71]==1 && r.payload[143]==4 && r.payload[183]==2);
     CHECK(memcmp(r.payload,c.network_id,32)==0 && memcmp(r.payload+32,id,32)==0);

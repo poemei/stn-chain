@@ -9,7 +9,9 @@
  * validation has the historical evidence required by consensus rules.
  * GET_ACCEPTED_RECORD reconstructs historical production eligibility and
  * returns exact canonical transaction evidence; pending is never consulted.
- * Intelligence context is a separate existing staged-validation snapshot. */
+ * Intelligence context is a separate existing staged-validation snapshot.
+ * DERIVE_ADDRESS is stateless and supports the three canonical typed address
+ * namespaces without consulting or mutating accepted Chain state. */
 typedef struct stn_node_service {
     const stn_chain_context *chain;
     const stn_block_span *blocks;

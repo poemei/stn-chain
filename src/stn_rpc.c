@@ -38,7 +38,9 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
     case STN_RPC_GET_NEXT_ACCEPTED_RECORD:return n==45;
     case STN_RPC_DERIVE_ADDRESS:
         return n>=6 &&
-            stn_wire_read(p,2)==STN_ADDRESS_IDENTITY &&
+            (stn_wire_read(p,2)==STN_ADDRESS_IDENTITY ||
+             stn_wire_read(p,2)==STN_ADDRESS_CONTRACT ||
+             stn_wire_read(p,2)==STN_ADDRESS_WALLET) &&
             stn_wire_read(p+2,4)==n-6;
     case STN_RPC_SUBMIT_TRANSACTION:return n<=STN_TX_MAX_SIZE;
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_MINING_CONTEXT:case STN_RPC_MINING_TEMPLATE:case STN_RPC_ADMIN_CONTROL:return n==0;
@@ -94,9 +96,8 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
 
     case STN_RPC_DERIVE_ADDRESS:{
         stn_address address;
-        return n==69 &&
-            stn_address_decode((const char *)p,n,&address)==STN_DATA_OK &&
-            address.type==STN_ADDRESS_IDENTITY;
+        return (n==69 || n==70) &&
+            stn_address_decode((const char *)p,n,&address)==STN_DATA_OK;
     }
 
     case STN_RPC_SUBMIT_TRANSACTION:

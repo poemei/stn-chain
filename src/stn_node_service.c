@@ -25,19 +25,23 @@ static stn_rpc_code handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t
 
     if(q->method==STN_RPC_DERIVE_ADDRESS){
         stn_address address;
+        stn_address_type type;
         stn_data_status status;
         size_t source_length;
         size_t encoded=0;
         char text[STN_ADDRESS_TEXT_CAPACITY];
 
         if(q->payload==NULL || q->length<6){return STN_RPC_INVALID;}
-        if(stn_wire_read(q->payload,2)!=STN_ADDRESS_IDENTITY){return STN_RPC_INVALID;}
+        type=(stn_address_type)stn_wire_read(q->payload,2);
+        if(type!=STN_ADDRESS_IDENTITY &&
+            type!=STN_ADDRESS_CONTRACT &&
+            type!=STN_ADDRESS_WALLET){return STN_RPC_INVALID;}
 
         source_length=(size_t)stn_wire_read(q->payload+2,4);
         if(source_length!=q->length-6){return STN_RPC_INVALID;}
 
         status=stn_address_derive(
-            STN_ADDRESS_IDENTITY,
+            type,
             q->payload+6,
             source_length,
             &address);
@@ -54,7 +58,8 @@ static stn_rpc_code handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t
             sizeof(text),
             &encoded);
 
-        if(status!=STN_DATA_OK || encoded!=69){
+        if(status!=STN_DATA_OK ||
+            encoded!=(type==STN_ADDRESS_IDENTITY ? 69u : 70u)){
             return status==STN_DATA_CAPACITY
                 ? STN_RPC_CAPACITY
                 : STN_RPC_PROVIDER;

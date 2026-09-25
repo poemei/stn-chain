@@ -26,6 +26,9 @@ typedef enum stn_rpc_method {
     STN_RPC_GET_ACCEPTED_RECORD=4,
     STN_RPC_GET_FIRST_ACCEPTED_RECORD=5,STN_RPC_GET_NEXT_ACCEPTED_RECORD=6,
     STN_RPC_GET_CURSOR_REORG_STATUS=7,STN_RPC_GET_CONSUMER_RECOVERY_PLAN=8,
+    /* DERIVE_ADDRESS request: u16 typed namespace, u32 source length, then
+     * exact canonical source bytes. Supported types are Identity, Contract,
+     * and Wallet. Success returns the full canonical typed address text. */
     STN_RPC_DERIVE_ADDRESS=9,
     STN_RPC_CHECK_INTELLIGENCE=0x1000,STN_RPC_SUBMIT_INTELLIGENCE=0x1001,
     STN_RPC_INTELLIGENCE_ID=0x1002,STN_RPC_INTELLIGENCE_CURSOR=0x1003,
