@@ -3,8 +3,12 @@
 #include "stn_node_service.h"
 #include "stn_sha256.h"
 #include "stn_address.h"
+#include "stn_pending.h"
+#include "stn_wallet.h"
+#include "stn_transfer_envelope_authorization.h"
 #include <stdio.h>
 #include <string.h>
+int stn_ed25519_sign(const uint8_t *,size_t,const uint8_t[32],const uint8_t[32],uint8_t[64]);
 static unsigned checks,failures;
 #define CHECK(e) do { ++checks; if(!(e)){++failures;fprintf(stderr,"rpc line %d: %s\n",__LINE__,#e);} } while(0)
 static uint8_t request[STN_RPC_MAX_FRAME+8],response[STN_RPC_MAX_FRAME+8],large[STN_RPC_MAX_PAYLOAD];
@@ -183,10 +187,63 @@ static void node(void)
     c.hash_provider.hash=NULL;r=call(STN_RPC_INFO,NULL,0,STN_RPC_READ,&service);CHECK(r.code==STN_RPC_UNAVAILABLE);
     CHECK(memcmp(old,child,364)==0);
 }
+static void transfer_admission_checks(void)
+{
+    static const uint8_t sk[32]={0x9d,0x61,0xb1,0x9d,0xef,0xfd,0x5a,0x60,0xba,0x84,0x4a,0xf4,0x92,0xec,0x2c,0xc4,0x44,0x49,0xc5,0x69,0x7b,0x32,0x69,0x19,0x70,0x3b,0xac,0x03,0x1c,0xae,0x7f,0x60};
+    static const uint8_t pk[32]={0xd7,0x5a,0x98,0x01,0x82,0xb1,0x0a,0xb7,0xd5,0x4b,0xfe,0xd3,0xc9,0x64,0x07,0x3a,0x0e,0xe1,0x72,0xf3,0xda,0xa6,0x23,0x25,0xaf,0x02,0x1a,0x68,0xf7,0x07,0x51,0x1a};
+    stn_pending pool={0};
+    stn_storage_view active={0};
+    stn_economic_state economy={0};
+    stn_economic_balance balances[2];
+    stn_transfer_envelope envelope={0};
+    stn_transaction tx={0};
+    stn_validation_report report;
+    stn_hash_provider hash={stn_sha256,NULL};
+    stn_address identity={0};
+    uint8_t statement[STN_TRANSFER_ENVELOPE_AUTHORIZATION_STATEMENT_SIZE];
+    uint8_t canonical[STN_TRANSFER_ENVELOPE_CANONICAL_SIZE];
+    uint8_t transaction[STN_TX_HEADER_SIZE+STN_TRANSFER_ENVELOPE_CANONICAL_SIZE];
+    uint8_t id[32];
+    size_t written=0;
+    unsigned initial_checks=checks,initial_failures=failures;
+
+    identity.type=STN_ADDRESS_IDENTITY;memcpy(identity.identifier,pk,32);
+    memcpy(envelope.controller,pk,32);envelope.nonce[31]=1;
+    CHECK(stn_wallet_derive(&identity,&envelope.transfer.source)==STN_DATA_OK);
+    envelope.transfer.destination.type=STN_ADDRESS_WALLET;
+    memset(envelope.transfer.destination.identifier,0x44,32);
+    envelope.transfer.units=25;
+    memset(balances,0,sizeof(balances));
+    memcpy(balances[0].wallet_id,envelope.transfer.source.identifier,32);balances[0].units=100;
+    economy.balances=balances;economy.balance_count=1;economy.balance_capacity=2;
+    active.state.economy=&economy;
+    CHECK(stn_transfer_envelope_authorization_statement(&envelope,statement)==STN_DATA_OK);
+    CHECK(stn_ed25519_sign(statement,sizeof(statement),pk,sk,envelope.signature)==0);
+    CHECK(stn_transfer_envelope_encode(&envelope,canonical)==STN_DATA_OK);
+    tx.version=1;tx.type=STN_TX_TRANSFER;tx.record_bytes=canonical;tx.record_length=sizeof(canonical);
+    CHECK(stn_transaction_encode(&tx,transaction,sizeof(transaction),&written)==STN_DATA_OK);
+    CHECK(stn_pending_admit_transaction(&pool,transaction,written,NULL,&active,&hash,&report,id)==STN_PENDING_ACCEPTED);
+    CHECK(pool.count==1 && report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+    CHECK(stn_pending_admit_transaction(&pool,transaction,written,NULL,&active,&hash,&report,id)==STN_PENDING_REPLAY);
+    stn_pending_clear(&pool);
+    envelope.transfer.units=101;envelope.nonce[31]=2;
+    CHECK(stn_transfer_envelope_authorization_statement(&envelope,statement)==STN_DATA_OK);
+    CHECK(stn_ed25519_sign(statement,sizeof(statement),pk,sk,envelope.signature)==0);
+    CHECK(stn_transfer_envelope_encode(&envelope,canonical)==STN_DATA_OK);
+    CHECK(stn_transaction_encode(&tx,transaction,sizeof(transaction),&written)==STN_DATA_OK);
+    CHECK(stn_pending_admit_transaction(&pool,transaction,written,NULL,&active,&hash,&report,id)==STN_PENDING_INVALID);
+    envelope.transfer.units=25;envelope.signature[0]^=1;
+    CHECK(stn_transfer_envelope_encode(&envelope,canonical)==STN_DATA_OK);
+    CHECK(stn_transaction_encode(&tx,transaction,sizeof(transaction),&written)==STN_DATA_OK);
+    CHECK(stn_pending_admit_transaction(&pool,transaction,written,NULL,&active,&hash,&report,id)==STN_PENDING_SIGNATURE);
+    stn_pending_clear(&pool);
+    printf("Transfer submission admission: %u checks, %u failures.\n",checks-initial_checks,failures-initial_failures);
+}
+
 int test_rpc(void);
 int test_rpc(void)
 {
-    codecs();node();printf("RPC/node interface: %u checks, %u failures (in-process integration).\n",checks,failures);
+    codecs();node();transfer_admission_checks();printf("RPC/node interface: %u checks, %u failures (in-process integration).\n",checks,failures);
     return failures==0 ? 0 : 1;
 }
 
