@@ -224,7 +224,7 @@ static void transfer_admission_checks(void)
     CHECK(stn_transaction_encode(&tx,transaction,sizeof(transaction),&written)==STN_DATA_OK);
     CHECK(stn_pending_admit_transaction(&pool,transaction,written,NULL,&active,&hash,&report,id)==STN_PENDING_ACCEPTED);
     CHECK(pool.count==1 && report.acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
-    CHECK(stn_pending_admit_transaction(&pool,transaction,written,NULL,&active,&hash,&report,id)==STN_PENDING_REPLAY);
+    CHECK(stn_pending_admit_transaction(&pool,transaction,written,NULL,&active,&hash,&report,id)==STN_PENDING_DUPLICATE);
     stn_pending_clear(&pool);
     envelope.transfer.units=101;envelope.nonce[31]=2;
     CHECK(stn_transfer_envelope_authorization_statement(&envelope,statement)==STN_DATA_OK);
