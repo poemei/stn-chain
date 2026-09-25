@@ -240,6 +240,48 @@ int test_mining(void)
     CHECK(rpc(&s,STN_RPC_SUBMIT_BLOCK_EVIDENCE,second_work+68u,364u,out,&w)==STN_RPC_REJECTED &&
         w==0u);
     second_work[68u+40u]^=1u;
+
+    /* Complete competing history remains untrusted evidence. A valid preferred
+     * history is adopted by Chain fork choice; the same now-current history is
+     * not preferred and therefore cannot be used as an adoption credential. */
+    {
+        uint8_t history_evidence[4u+3u*(4u+364u)];
+        size_t at=0u;
+        stn_chain_state candidate_state={0};
+
+        /* Current accepted history is genesis + the just-adopted child.
+         * Build a valid longer candidate from the same genesis. */
+        history[0].bytes=genesis;history[0].length=364u;
+        memcpy(alt,genesis,364u);
+        memcpy(alt+40u,genesis+40u,32u);
+        CHECK(stn_chain_block_id(genesis,364u,&c.hash_provider,alt+40u)==STN_DATA_OK);
+        put64(alt+72u,1u);
+        CHECK(solve_block(alt,364u,&c.hash_provider));
+        history[1].bytes=alt;history[1].length=364u;
+
+        CHECK(stn_chain_reconstruct_history(&c,history,2u,&candidate_state).acceptance==STN_ACCEPTANCE_UNDER_CONTEXT);
+        memcpy(grand,alt,364u);
+        memcpy(grand+40u,candidate_state.tip_id,32u);
+        put64(grand+72u,2u);
+        CHECK(solve_block(grand,364u,&c.hash_provider));
+        stn_chain_state_release(&candidate_state);
+        history[2].bytes=grand;history[2].length=364u;
+
+        stn_wire_write(history_evidence+at,4u,3u);at+=4u;
+        for(i=0u;i<3u;i++){
+            stn_wire_write(history_evidence+at,4u,history[i].length);at+=4u;
+            memcpy(history_evidence+at,history[i].bytes,history[i].length);at+=history[i].length;
+        }
+        CHECK(rpc(&s,STN_RPC_SUBMIT_HISTORY_EVIDENCE,history_evidence,at,out,&w)==STN_RPC_OK &&
+            w==80u && stn_wire_read(out+32u,8u)==2u);
+        CHECK(rpc(&s,STN_RPC_SUBMIT_HISTORY_EVIDENCE,history_evidence,at,out,&w)==STN_RPC_REJECTED &&
+            w==0u);
+
+        history_evidence[4u+4u+40u]^=1u;
+        CHECK(rpc(&s,STN_RPC_SUBMIT_HISTORY_EVIDENCE,history_evidence,at,out,&w)==STN_RPC_REJECTED &&
+            w==0u);
+        history_evidence[4u+4u+40u]^=1u;
+    }
     stn_storage_view_release(&view);stn_chain_state_release(&s.active);
     activated_difficulty();
     printf("Mining work: %u checks, %u failures.\n",checks,failures);return failures!=0;
