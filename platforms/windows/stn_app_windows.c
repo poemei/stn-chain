@@ -212,10 +212,10 @@ static void stop_clients(rpc_client **head)
         free(client);
     }
 }
-static int serve_once(stn_windows_peer *listener,const stn_rpc_service *service)
+static int serve_once(stn_windows_peer *listener,stn_mining_service *mining,CRITICAL_SECTION *dispatch_lock)
 {
-    stn_windows_peer peer={0};stn_peer_transport transport;uint8_t *request=NULL,*response=NULL;int ok=0;
-    if(stn_windows_peer_accept(listener,APP_RPC_IO_TIMEOUT_MS,&peer,&transport)!=STN_PEER_OK){return 0;}
+    stn_windows_peer peer={0};stn_peer_transport transport;uint8_t *request=NULL,*response=NULL;int ok=0;\n    stn_mining_session session;stn_rpc_service service;
+    if(stn_windows_peer_accept(listener,APP_RPC_IO_TIMEOUT_MS,&peer,&transport)!=STN_PEER_OK){return 0;}\n    stn_mining_session_init(&session,mining);service.user=&session;service.handle=stn_mining_session_handle;
     request=(uint8_t*)malloc(STN_RPC_MAX_FRAME);response=(uint8_t*)malloc(STN_RPC_MAX_FRAME);
     if(request!=NULL && response!=NULL){
         for(;;){
@@ -223,11 +223,11 @@ static int serve_once(stn_windows_peer *listener,const stn_rpc_service *service)
             if(io==STN_PEER_TIMEOUT){continue;}if(io!=STN_PEER_OK){ok=1;break;}
             if(memcmp(request,"STNC",4)!=0 || stn_rpc_payload_length(request,24,&n)!=STN_RPC_OK){break;}
             if(rpc_transfer(&peer,&transport,request+24,n,0,0)!=STN_PEER_OK){break;}
-            if(stn_rpc_dispatch(request,24+n,STN_RPC_READ|STN_RPC_SUBMISSION,service,response,STN_RPC_MAX_FRAME,&w)!=STN_RPC_OK ||
-               rpc_transfer(&peer,&transport,response,w,1,0)!=STN_PEER_OK){break;}
+            EnterCriticalSection(dispatch_lock);\n            { stn_rpc_code dispatch=stn_rpc_dispatch(request,24+n,STN_RPC_READ|STN_RPC_SUBMISSION,&service,response,STN_RPC_MAX_FRAME,&w);\n              LeaveCriticalSection(dispatch_lock);\n              if(dispatch!=STN_RPC_OK ||
+               rpc_transfer(&peer,&transport,response,w,1,0)!=STN_PEER_OK){break;} }
         }
     }
-    free(request);free(response);stn_windows_peer_close(&peer);return ok;
+    free(request);free(response);EnterCriticalSection(dispatch_lock);stn_mining_session_release(&session);LeaveCriticalSection(dispatch_lock);stn_windows_peer_close(&peer);return ok;
 }
 /* Optional outbound lane with private scratch and existing dispatch exclusion. */
 typedef struct outbound_runtime {
@@ -427,7 +427,7 @@ int stn_windows_app(int argc,char **argv)
         outbound.thread=CreateThread(NULL,0,outbound_thread,&outbound,0,NULL);
         if(outbound.thread==NULL){result=EXIT_FAILURE;goto shutdown;}
     }
-    if(once){if(!serve_once(&listener,&service)){result=EXIT_FAILURE;}goto shutdown;}
+    if(once){if(!serve_once(&listener,&mining,&dispatch_lock)){result=EXIT_FAILURE;}goto shutdown;}
     while(InterlockedCompareExchange(&stopping,0,0)==0){
 #ifdef STN_PHASE9_TEST_RUNTIME
         if(WaitForSingleObject(phase9_stop_event,0)==WAIT_OBJECT_0){break;}
