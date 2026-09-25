@@ -159,6 +159,8 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
             stn_wire_read(p+22,4)<=STN_CONTRACT_MAX_TERMS;
 
     case STN_RPC_SUBMIT_BLOCK_EVIDENCE:
+    case STN_RPC_SUBMIT_HISTORY_EVIDENCE:
+    case STN_RPC_SUBMIT_SUFFIX_EVIDENCE:
         return n==80;
 
     case STN_RPC_SUBMIT_TRANSACTION:
