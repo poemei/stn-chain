@@ -131,6 +131,20 @@ static void node(void)
             r.length==strlen(derived_addresses[address_type-1]) &&
             memcmp(r.payload,derived_addresses[address_type-1],r.length)==0);
     }
+    r=call(STN_RPC_BALANCE,
+        (const uint8_t *)derived_addresses[STN_ADDRESS_WALLET-1],
+        strlen(derived_addresses[STN_ADDRESS_WALLET-1]),
+        STN_RPC_READ,&service);
+    CHECK(r.code==STN_RPC_OK && r.length==8 &&
+        r.payload[0]==0 && r.payload[1]==0 && r.payload[2]==0 && r.payload[3]==0 &&
+        r.payload[4]==0 && r.payload[5]==0 && r.payload[6]==0 && r.payload[7]==0);
+
+    r=call(STN_RPC_CONTRACT_STATE,
+        (const uint8_t *)derived_addresses[STN_ADDRESS_CONTRACT-1],
+        strlen(derived_addresses[STN_ADDRESS_CONTRACT-1]),
+        STN_RPC_READ,&service);
+    CHECK(r.code==STN_RPC_NOT_FOUND && r.length==0);
+
     r=call(STN_RPC_INFO,NULL,0,STN_RPC_READ,&service);
     CHECK(r.code==STN_RPC_OK && r.length==184 && r.payload[71]==1 && r.payload[143]==4 && r.payload[183]==2);
     CHECK(memcmp(r.payload,c.network_id,32)==0 && memcmp(r.payload+32,id,32)==0);
