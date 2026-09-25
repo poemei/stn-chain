@@ -72,6 +72,50 @@ static stn_rpc_code handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t
         return STN_RPC_OK;
     }
 
+    if(q->method==STN_RPC_BALANCE){
+        stn_address wallet;
+        uint64_t units=0;
+        stn_data_status status;
+        code=snapshot(s,state);
+        if(code!=STN_RPC_OK)return code;
+        if(q->payload==NULL || q->length!=70 ||
+           stn_address_decode((const char *)q->payload,q->length,&wallet)!=STN_DATA_OK ||
+           wallet.type!=STN_ADDRESS_WALLET)return STN_RPC_INVALID;
+        if(state->economy==NULL)return STN_RPC_UNAVAILABLE;
+        status=stn_economic_state_balance(state->economy,&wallet,&units);
+        if(status!=STN_DATA_OK)return status==STN_DATA_UNRESOLVED?STN_RPC_UNAVAILABLE:STN_RPC_PROVIDER;
+        if(cap<8)return STN_RPC_CAPACITY;
+        stn_wire_write(p,8,units);*written=8;return STN_RPC_OK;
+    }
+
+    if(q->method==STN_RPC_CONTRACT_STATE){
+        stn_address contract;
+        const stn_contract_state_store *store;
+        const stn_contract_state_entry *entry;
+        size_t at=0;
+        stn_contract_status status;
+        code=snapshot(s,state);
+        if(code!=STN_RPC_OK)return code;
+        if(q->payload==NULL || q->length!=70 ||
+           stn_address_decode((const char *)q->payload,q->length,&contract)!=STN_DATA_OK ||
+           contract.type!=STN_ADDRESS_CONTRACT)return STN_RPC_INVALID;
+        if(state->contracts==NULL)return STN_RPC_UNAVAILABLE;
+        store=stn_contract_snapshot_const_state(state->contracts);
+        if(store==NULL)return STN_RPC_UNAVAILABLE;
+        status=stn_contract_state_find(store,contract.identifier,&at);
+        if(status!=STN_CONTRACT_OK)return STN_RPC_NOT_FOUND;
+        if(at>=store->entry_count)return STN_RPC_PROVIDER;
+        entry=&store->entries[at];
+        if(cap<26)return STN_RPC_CAPACITY;
+        stn_wire_write(p,2,entry->current.state);
+        stn_wire_write(p+2,2,entry->current.type);
+        stn_wire_write(p+4,8,entry->current.sequence);
+        stn_wire_write(p+12,8,entry->current.created_at);
+        stn_wire_write(p+20,2,entry->current.participant_count);
+        stn_wire_write(p+22,4,entry->current.terms_length);
+        *written=26;return STN_RPC_OK;
+    }
+
     if(q->method==STN_RPC_PENDING || q->method==STN_RPC_ADMIN_CONTROL || q->method==STN_RPC_INTELLIGENCE_ID ||
         q->method==STN_RPC_INTELLIGENCE_CURSOR || q->method==STN_RPC_MINING_TEMPLATE){return STN_RPC_UNAVAILABLE;}
     if(q->method==STN_RPC_CHECK_INTELLIGENCE || q->method==STN_RPC_SUBMIT_INTELLIGENCE){
