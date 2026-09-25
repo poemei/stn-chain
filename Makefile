@@ -477,7 +477,7 @@ $(BUILD_DIR)/test-report: tests/test_report.c src/stn_report.c includes/stn_repo
 test-internal-miner: $(BUILD_DIR)/test-internal-miner
 	$(BUILD_DIR)/test-internal-miner
 
-INTERNAL_MINER_TEST_SOURCES := $(filter-out src/main.c src/stn_mining.c src/stn_node_service.c src/stn_peer.c src/stn_pending.c src/stn_report.c src/stn_rpc.c src/stn_storage.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) platforms/linux/stn_sha256.c
+INTERNAL_MINER_TEST_SOURCES := $(filter-out src/main.c src/stn_peer.c src/stn_report.c src/stn_rpc.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) platforms/linux/stn_sha256.c
 
 $(BUILD_DIR)/test-internal-miner: tests/test_internal_miner.c $(INTERNAL_MINER_TEST_SOURCES) includes/stn_internal_miner.h
 	@mkdir -p $(BUILD_DIR)
