@@ -4,6 +4,8 @@
 #include "stn_sha256.h"
 #include "stn_wire_internal.h"
 #include "stn_share.h"
+#include "stn_transfer_envelope.h"
+#include "stn_transfer_envelope_authorization.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -40,6 +42,12 @@ stn_pending_result stn_pending_insert(stn_pending *p,const uint8_t *bytes,
             size_t i;
             for(i=0;i<8u;++i){entry.nonce[24u+i]=(uint8_t)(share.nonce>>(56u-8u*i));}
         }
+    }
+    else if(tx.type==STN_TX_TRANSFER){
+        stn_transfer_envelope envelope;
+        if(stn_transfer_envelope_decode(tx.record_bytes,tx.record_length,&envelope)!=STN_DATA_OK)return STN_PENDING_INVALID;
+        memcpy(entry.signer,envelope.controller,32);
+        memcpy(entry.nonce,envelope.nonce,32);
     }
     else {const uint8_t *signer=tx.record_bytes+1;if(tx.type==STN_TX_AUTHORITY_GRANT){if(stn_authority_grant_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_GRANT)return STN_PENDING_INVALID;}
         else if(tx.type==STN_TX_AUTHORITY_REVOKE){if(stn_authority_revocation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_REVOCATION)return STN_PENDING_INVALID;}
@@ -124,6 +132,11 @@ static stn_data_status scan(const stn_pending *p,const stn_storage_view *v,uint8
                     size_t z;
                     for(z=0;z<8u;++z){nonce[24u+z]=(uint8_t)(share.nonce>>(56u-8u*z));}
                 }
+            }
+            else if(tx.type==STN_TX_TRANSFER){
+                stn_transfer_envelope envelope;
+                if(stn_transfer_envelope_decode(tx.record_bytes,tx.record_length,&envelope)!=STN_DATA_OK)return STN_DATA_CONTENT;
+                memcpy(signer,envelope.controller,32);memcpy(nonce,envelope.nonce,32);lifecycle=0;
             }
             else if(!lifecycle){if(stn_record_decode(tx.record_bytes,tx.record_length,&r)!=STN_RECORD_OK)return STN_DATA_CONTENT;memcpy(signer,r.signer_public_key,32);memcpy(nonce,r.nonce,32);}
             else {memcpy(signer,tx.record_bytes+1,32);if(hash!=NULL){if(tx.type==STN_TX_AUTHORITY_GRANT){if(stn_authority_grant_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_GRANT)return STN_DATA_CONTENT;}else if(tx.type==STN_TX_AUTHORITY_REVOKE){if(stn_authority_revocation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_REVOCATION)return STN_DATA_CONTENT;}else if(tx.type==STN_TX_IDENTITY_ROTATE){if(stn_identity_rotation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_ROTATION)return STN_DATA_CONTENT;}else return STN_DATA_CONTENT;if(stn_lifecycle_replay_nonce(tx.type,statement,written,hash,nonce)!=STN_LIFECYCLE_OK)return STN_DATA_CONTENT;}}
@@ -299,6 +312,47 @@ stn_pending_result stn_pending_admit_transaction(stn_pending *p,const uint8_t *b
         }
         report->acceptance=STN_ACCEPTANCE_REJECTED;
         return lifecycle_result;
+    }
+    if(tx.type==STN_TX_TRANSFER){
+        stn_transfer_envelope envelope;
+        uint64_t balance=0;
+        stn_pending probe={0};
+        uint8_t mask[STN_PENDING_MAX_ENTRIES];
+        size_t i;
+        if(p==NULL || active==NULL || hash==NULL || active->state.economy==NULL){
+            report->acceptance=STN_ACCEPTANCE_UNRESOLVED;return STN_PENDING_UNAVAILABLE;
+        }
+        if(stn_transfer_envelope_decode(tx.record_bytes,tx.record_length,&envelope)!=STN_DATA_OK){
+            report->structure=STN_STAGE_REJECT;report->acceptance=STN_ACCEPTANCE_REJECTED;return STN_PENDING_INVALID;
+        }
+        if(stn_transfer_envelope_authorization_verify(&envelope)!=STN_DATA_OK){
+            report->signature=STN_STAGE_REJECT;report->acceptance=STN_ACCEPTANCE_REJECTED;return STN_PENDING_UNAUTHORIZED;
+        }
+        report->signature=STN_STAGE_PASS;
+        if(stn_economic_state_balance(active->state.economy,&envelope.transfer.source,&balance)!=STN_DATA_OK){
+            report->acceptance=STN_ACCEPTANCE_ERROR;return STN_PENDING_PROVIDER;
+        }
+        if(balance<envelope.transfer.units){
+            report->acceptance=STN_ACCEPTANCE_REJECTED;return STN_PENDING_INVALID;
+        }
+        for(i=0;i<p->count;++i){
+            if(same_nonce(&p->entries[i],envelope.controller,envelope.nonce)){
+                report->replay=STN_STAGE_REJECT;report->acceptance=STN_ACCEPTANCE_REJECTED;return STN_PENDING_REPLAY;
+            }
+        }
+        memcpy(probe.entries[0].signer,envelope.controller,32);
+        memcpy(probe.entries[0].nonce,envelope.nonce,32);
+        probe.count=1;
+        if(scan(&probe,active,mask,1,hash)!=STN_DATA_OK){
+            report->acceptance=STN_ACCEPTANCE_ERROR;return STN_PENDING_PROVIDER;
+        }
+        if(mask[0]){
+            report->replay=STN_STAGE_REJECT;report->acceptance=STN_ACCEPTANCE_REJECTED;return STN_PENDING_REPLAY;
+        }
+        report->replay=STN_STAGE_PASS;
+        lifecycle_result=stn_pending_insert(p,bytes,length,hash,id);
+        if(lifecycle_result==STN_PENDING_ACCEPTED){report->acceptance=STN_ACCEPTANCE_UNDER_CONTEXT;return lifecycle_result;}
+        report->acceptance=STN_ACCEPTANCE_REJECTED;return lifecycle_result;
     }
     if(tx.type!=STN_TX_PUBLICATION){
         if(c==NULL || active==NULL || memcmp(c->expected_network,active->state.network_id,32)!=0){report->acceptance=STN_ACCEPTANCE_UNRESOLVED;return STN_PENDING_UNAVAILABLE;}
