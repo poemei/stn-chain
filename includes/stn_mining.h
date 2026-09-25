@@ -38,4 +38,15 @@ typedef struct stn_mining_service {
  * + block. Only block bytes 152..159 may change: unsigned big-endian nonce. */
 stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *request,
     uint8_t *payload,size_t capacity,size_t *written);
+
+/* In-process callers use the exact same validated mining service path as STNC.
+ * These helpers do not bypass storage, pending admission, target validation or
+ * consensus. Caller serializes access to the service. */
+stn_rpc_code stn_mining_template_local(stn_mining_service *service,
+    uint8_t *payload,size_t capacity,size_t *written);
+stn_rpc_code stn_mining_submit_share_local(stn_mining_service *service,
+    const stn_share_evidence *evidence,uint8_t share_id[STN_SHARE_ID_SIZE]);
+stn_rpc_code stn_mining_submit_work_local(stn_mining_service *service,
+    const stn_address *miner,const uint8_t parent[32],const uint8_t work_id[32],
+    const uint8_t *block,size_t block_length);
 #endif
