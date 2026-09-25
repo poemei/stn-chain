@@ -4,6 +4,7 @@
 #include "stn_sha256.h"
 #include "stn_sentinel_intelligence.h"
 #include "stn_address.h"
+#include "stn_contract.h"
 #include <string.h>
 
 stn_rpc_code stn_rpc_payload_length(const uint8_t *p,size_t n,size_t *payload_length)
