@@ -1004,9 +1004,9 @@ static void *internal_miner_thread(void *user)
         }
 
         if(mined == STN_INTERNAL_MINER_SHARE) {
-            report_event(STN_REPORT_MINING, "Internal miner submitted share.");
+            report_event(STN_REPORT_BLOCK, "Internal miner submitted share.");
         } else if(mined == STN_INTERNAL_MINER_BLOCK) {
-            report_event(STN_REPORT_MINING, "Internal miner submitted block.");
+            report_event(STN_REPORT_BLOCK, "Internal miner submitted block.");
         }
 
         elapsed = monotonic_ms() - started;
@@ -1575,7 +1575,9 @@ int stn_linux_app(int argc, char **argv)
 
     if(config.internal_miner_enabled) {
         internal_miner.worker.service = &mining;
-        internal_miner.worker.miner = config.miner_identity;
+        internal_miner.worker.miner.type = STN_ADDRESS_IDENTITY;
+        memcpy(internal_miner.worker.miner.identifier,
+            config.miner_wallet.identifier, STN_ADDRESS_ID_SIZE);
         internal_miner.worker.nonce_budget = STN_INTERNAL_MINER_DEFAULT_NONCE_BUDGET;
         internal_miner.worker.duty_permille = STN_INTERNAL_MINER_DEFAULT_DUTY_PERMILLE;
         internal_miner.lock = &dispatch_lock;
