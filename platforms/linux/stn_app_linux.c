@@ -567,6 +567,7 @@ typedef struct inbound_runtime {
     stn_linux_peer listener;
     stn_mining_service *mining;
     pthread_mutex_t *lock;
+    const stn_peer_candidates *known;
     pthread_t thread;
     int thread_started;
     uint16_t bound;
@@ -577,6 +578,7 @@ typedef struct inbound_client {
     stn_peer_transport transport;
     stn_mining_service *mining;
     pthread_mutex_t *lock;
+    const stn_peer_candidates *known;
 } inbound_client;
 
 static void *inbound_client_thread(void *user)
@@ -591,6 +593,7 @@ static void *inbound_client_thread(void *user)
     stn_storage_status storage_status = STN_STORAGE_ARGUMENT;
     size_t needed = 0;
 
+    session.known = client->known;
     client->peer.io_timeout_ms = APP_P2P_IO_TIMEOUT_MS;
     report_event(STN_REPORT_PEER, "Inbound P2P connection accepted.");
 
@@ -768,6 +771,7 @@ static void *inbound_thread(void *user)
         client->transport.user = &client->peer;
         client->mining = runtime->mining;
         client->lock = runtime->lock;
+        client->known = runtime->known;
 
         if(pthread_create(
                &thread,
@@ -1512,6 +1516,7 @@ int stn_linux_app(int argc, char **argv)
 
     inbound.mining = &mining;
     inbound.lock = &dispatch_lock;
+    inbound.known = &candidates;
 
     if(pthread_create(
            &inbound.thread,
