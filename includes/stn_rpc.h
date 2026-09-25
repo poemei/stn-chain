@@ -47,6 +47,11 @@ typedef enum stn_rpc_method {
      * repeated u32 block length + canonical block bytes. Chain alone validates
      * fork preference and performs atomic adoption. */
     STN_RPC_SUBMIT_HISTORY_EVIDENCE=0x1007,
+    /* Candidate suffix evidence. Payload: u32 common-prefix block count,
+     * u32 suffix count, then repeated u32 block length + canonical block.
+     * Chain verifies the accepted prefix under storage exclusion, reconstructs
+     * the full candidate internally, and alone determines fork preference. */
+    STN_RPC_SUBMIT_SUFFIX_EVIDENCE=0x1008,
     STN_RPC_MINING_CONTEXT=0x2000,STN_RPC_CHECK_WORK_BASE=0x2001,
     STN_RPC_MINING_TEMPLATE=0x2002,STN_RPC_SUBMIT_WORK=0x2003,STN_RPC_SUBMIT_SHARE=0x2004,
     STN_RPC_ADMIN_CONTROL=0x3000
