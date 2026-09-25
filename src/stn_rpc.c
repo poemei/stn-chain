@@ -25,7 +25,7 @@ static uint32_t capability(uint16_t method)
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:case STN_RPC_GET_ACCEPTED_RECORD:
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_INTELLIGENCE_CURSOR:
     case STN_RPC_MINING_CONTEXT:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_MINING_TEMPLATE:return STN_RPC_READ;
-    case STN_RPC_SUBMIT_TRANSACTION:case STN_RPC_SUBMIT_BLOCK_EVIDENCE:case STN_RPC_SUBMIT_HISTORY_EVIDENCE:case STN_RPC_SUBMIT_INTELLIGENCE:case STN_RPC_SUBMIT_WORK:case STN_RPC_SUBMIT_SHARE:return STN_RPC_SUBMISSION;
+    case STN_RPC_SUBMIT_TRANSACTION:case STN_RPC_SUBMIT_BLOCK_EVIDENCE:case STN_RPC_SUBMIT_HISTORY_EVIDENCE:case STN_RPC_SUBMIT_SUFFIX_EVIDENCE:case STN_RPC_SUBMIT_INTELLIGENCE:case STN_RPC_SUBMIT_WORK:case STN_RPC_SUBMIT_SHARE:return STN_RPC_SUBMISSION;
     case STN_RPC_ADMIN_CONTROL:return STN_RPC_ADMIN;
     default:return 0;
     }
@@ -92,6 +92,22 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
             stn_wire_read(p+64,4)==n-STN_RPC_MINING_SUBMISSION_PREFIX &&
             stn_address_decode((const char *)(p+68),STN_RPC_MINER_IDENTITY_SIZE,&miner)==STN_DATA_OK &&
             miner.type==STN_ADDRESS_IDENTITY;
+    }
+    case STN_RPC_SUBMIT_SUFFIX_EVIDENCE:{
+        size_t at=8u,i,count,length;
+        uint32_t prefix;
+        if(p==NULL||n<8u)return 0;
+        prefix=(uint32_t)stn_wire_read(p,4);
+        count=(size_t)stn_wire_read(p+4,4);
+        if(prefix==0u||count==0u)return 0;
+        for(i=0;i<count;i++){
+            if(at>n||n-at<4u)return 0;
+            length=(size_t)stn_wire_read(p+at,4);at+=4u;
+            if(length<STN_BLOCK_HEADER_SIZE||length>STN_BLOCK_MAX_SIZE||
+               length>n-at||stn_block_validate_structure(p+at,length)!=STN_DATA_OK)return 0;
+            at+=length;
+        }
+        return at==n;
     }
     default:return 1;
     }
