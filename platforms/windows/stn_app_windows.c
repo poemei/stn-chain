@@ -214,8 +214,10 @@ static void stop_clients(rpc_client **head)
 }
 static int serve_once(stn_windows_peer *listener,stn_mining_service *mining,CRITICAL_SECTION *dispatch_lock)
 {
-    stn_windows_peer peer={0};stn_peer_transport transport;uint8_t *request=NULL,*response=NULL;int ok=0;\n    stn_mining_session session;stn_rpc_service service;
-    if(stn_windows_peer_accept(listener,APP_RPC_IO_TIMEOUT_MS,&peer,&transport)!=STN_PEER_OK){return 0;}\n    stn_mining_session_init(&session,mining);service.user=&session;service.handle=stn_mining_session_handle;
+    stn_windows_peer peer={0};stn_peer_transport transport;uint8_t *request=NULL,*response=NULL;int ok=0;
+    stn_mining_session session;stn_rpc_service service;
+    if(stn_windows_peer_accept(listener,APP_RPC_IO_TIMEOUT_MS,&peer,&transport)!=STN_PEER_OK){return 0;}
+    stn_mining_session_init(&session,mining);service.user=&session;service.handle=stn_mining_session_handle;
     request=(uint8_t*)malloc(STN_RPC_MAX_FRAME);response=(uint8_t*)malloc(STN_RPC_MAX_FRAME);
     if(request!=NULL && response!=NULL){
         for(;;){
@@ -223,7 +225,10 @@ static int serve_once(stn_windows_peer *listener,stn_mining_service *mining,CRIT
             if(io==STN_PEER_TIMEOUT){continue;}if(io!=STN_PEER_OK){ok=1;break;}
             if(memcmp(request,"STNC",4)!=0 || stn_rpc_payload_length(request,24,&n)!=STN_RPC_OK){break;}
             if(rpc_transfer(&peer,&transport,request+24,n,0,0)!=STN_PEER_OK){break;}
-            EnterCriticalSection(dispatch_lock);\n            { stn_rpc_code dispatch=stn_rpc_dispatch(request,24+n,STN_RPC_READ|STN_RPC_SUBMISSION,&service,response,STN_RPC_MAX_FRAME,&w);\n              LeaveCriticalSection(dispatch_lock);\n              if(dispatch!=STN_RPC_OK ||
+            EnterCriticalSection(dispatch_lock);
+            { stn_rpc_code dispatch=stn_rpc_dispatch(request,24+n,STN_RPC_READ|STN_RPC_SUBMISSION,&service,response,STN_RPC_MAX_FRAME,&w);
+              LeaveCriticalSection(dispatch_lock);
+              if(dispatch!=STN_RPC_OK ||
                rpc_transfer(&peer,&transport,response,w,1,0)!=STN_PEER_OK){break;} }
         }
     }
