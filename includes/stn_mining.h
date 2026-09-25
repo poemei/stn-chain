@@ -13,6 +13,15 @@
  * internal messages. Work submission defensively checks its nested shape.
  * Production SHA-256 is required. Active state changes only after persistence.
  * A snapshot is freshly loaded for each call; no process-local work cache. */
+typedef struct stn_suffix_stage {
+    uint32_t prefix_count;
+    uint32_t expected_count;
+    uint32_t received_count;
+    stn_block_span *blocks;
+    uint8_t **owned;
+    int active;
+} stn_suffix_stage;
+
 typedef struct stn_mining_service {
     const stn_chain_context *chain;
     const stn_storage_provider *storage;
@@ -29,6 +38,7 @@ typedef struct stn_mining_service {
     int owns_buffers; /* Opt in only for malloc/realloc-owned scratch. */
     uint64_t (*timestamp_now)(void *user);
     void *timestamp_user;
+    stn_suffix_stage suffix_stage;
 } stn_mining_service;
 #define STN_MINING_PREFIX 68u
 #define STN_MINING_IDENTITY_SIZE STN_RPC_MINER_IDENTITY_SIZE
