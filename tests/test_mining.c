@@ -301,7 +301,7 @@ int test_mining(void)
 
         CHECK(rpc(&s,STN_RPC_SUBMIT_SUFFIX_EVIDENCE,suffix_evidence,at,out,&w)==STN_RPC_OK &&
             w==80u && stn_wire_read(out+32u,8u)==3u);
-        CHECK(rpc(&s,STN_RPC_SUBMIT_SUFFIX_EVIDENCE,suffix_evidence,at,out,&w)==STN_RPC_REJECTED &&
+        CHECK(rpc(&s,STN_RPC_SUBMIT_SUFFIX_EVIDENCE,suffix_evidence,at,out,&w)==STN_RPC_CURRENT &&
             w==0u);
 
         /* A claimed prefix outside accepted storage is never guessed. */
