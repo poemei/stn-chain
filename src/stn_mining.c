@@ -297,6 +297,70 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         goto done;
     }
 
+    if(q->method==STN_RPC_SUBMIT_HISTORY_EVIDENCE){
+        stn_block_span *candidate=NULL;
+        stn_reorg_plan plan={0};
+        stn_fork_report fork;
+        size_t at=4u,i,count,length,total=STN_STORAGE_OVERHEAD;
+        uint8_t reorg_remove[STN_PENDING_MAX_ENTRIES]={0};
+
+        if(q->payload==NULL||q->length<4u){code=STN_RPC_INVALID;goto done;}
+        count=(size_t)stn_wire_read(q->payload,4u);
+        if(count==0u||count>SIZE_MAX/sizeof(*candidate)){code=STN_RPC_INVALID;goto done;}
+        candidate=(stn_block_span *)calloc(count,sizeof(*candidate));
+        if(candidate==NULL){code=STN_RPC_CAPACITY;goto done;}
+
+        for(i=0;i<count;i++){
+            if(at>q->length||q->length-at<4u){code=STN_RPC_INVALID;goto history_done;}
+            length=(size_t)stn_wire_read(q->payload+at,4u);at+=4u;
+            if(length<STN_BLOCK_HEADER_SIZE||length>STN_BLOCK_MAX_SIZE||length>q->length-at){
+                code=STN_RPC_INVALID;goto history_done;
+            }
+            candidate[i].bytes=q->payload+at;candidate[i].length=length;at+=length;
+            if(total>SIZE_MAX-4u||length>SIZE_MAX-total-4u){code=STN_RPC_CAPACITY;goto history_done;}
+            total+=4u+length;
+        }
+        if(at!=q->length){code=STN_RPC_INVALID;goto history_done;}
+
+        fork=stn_fork_evaluate_history(s->chain,v.blocks,v.count,candidate,count,&plan);
+        if(fork.result==STN_FORK_CURRENT||fork.result==STN_FORK_TIE){
+            code=STN_RPC_REJECTED;goto history_done;
+        }
+        if(fork.result==STN_FORK_UNRESOLVED){code=STN_RPC_UNAVAILABLE;goto history_done;}
+        if(fork.result!=STN_FORK_CANDIDATE){code=STN_RPC_REJECTED;goto history_done;}
+
+        if(total>SIZE_MAX-32u){code=STN_RPC_CAPACITY;goto history_done;}
+        total+=32u;
+        if(!ensure_storage_capacity(s,total)){code=STN_RPC_CAPACITY;goto history_done;}
+        if(stn_chain_state_share(&v.state,&accepted)!=STN_DATA_OK){code=STN_RPC_CAPACITY;goto history_done;}
+
+        if(s->pending!=NULL){
+            stn_storage_view candidate_view={0};
+            candidate_view.blocks=candidate;candidate_view.count=count;
+            if(stn_pending_inclusions(s->pending,&candidate_view,&s->chain->hash_provider,reorg_remove)!=STN_DATA_OK){
+                code=STN_RPC_PROVIDER;goto history_done;
+            }
+        }
+
+        code=storage_code(stn_storage_apply(
+            s->chain,s->storage,candidate,count,&plan,&s->workspace,&accepted));
+        if(code!=STN_RPC_OK)goto history_done;
+
+        stn_chain_state_move(&s->active,&accepted);
+        if(s->pending!=NULL)stn_pending_prune(s->pending,reorg_remove);
+
+        if(cap<80u){code=STN_RPC_CAPACITY;goto history_done;}
+        memcpy(p,s->active.tip_id,32u);
+        stn_wire_write(p+32u,8u,s->active.height);
+        memcpy(p+40u,s->active.cumulative_work.bytes,STN_WORK_SIZE);
+        *written=80u;code=STN_RPC_OK;
+
+history_done:
+        stn_reorg_plan_release(&plan);
+        free(candidate);
+        goto done;
+    }
+
     if(q->method==STN_RPC_SUBMIT_BLOCK_EVIDENCE){
         stn_block_span evidence;
         stn_storage_view inclusion={0};
