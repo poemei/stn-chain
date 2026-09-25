@@ -326,7 +326,7 @@ stn_pending_result stn_pending_admit_transaction(stn_pending *p,const uint8_t *b
             report->structure=STN_STAGE_REJECT;report->acceptance=STN_ACCEPTANCE_REJECTED;return STN_PENDING_INVALID;
         }
         if(stn_transfer_envelope_authorization_verify(&envelope)!=STN_DATA_OK){
-            report->signature=STN_STAGE_REJECT;report->acceptance=STN_ACCEPTANCE_REJECTED;return STN_PENDING_UNAUTHORIZED;
+            report->signature=STN_STAGE_REJECT;report->acceptance=STN_ACCEPTANCE_REJECTED;return STN_PENDING_SIGNATURE;
         }
         report->signature=STN_STAGE_PASS;
         if(stn_economic_state_balance(active->state.economy,&envelope.transfer.source,&balance)!=STN_DATA_OK){
