@@ -30,6 +30,12 @@ typedef enum stn_rpc_method {
      * exact canonical source bytes. Supported types are Identity, Contract,
      * and Wallet. Success returns the full canonical typed address text. */
     STN_RPC_DERIVE_ADDRESS=9,
+    /* BALANCE request: exact 70-byte canonical stnw0_ address text.
+     * Success returns accepted balance as one big-endian u64. */
+    STN_RPC_BALANCE=10,
+    /* CONTRACT_STATE request: exact 70-byte canonical stnc0_ address text.
+     * Success returns state/type/sequence/created_at/participant_count/terms_length. */
+    STN_RPC_CONTRACT_STATE=11,
     STN_RPC_CHECK_INTELLIGENCE=0x1000,STN_RPC_SUBMIT_INTELLIGENCE=0x1001,
     STN_RPC_INTELLIGENCE_ID=0x1002,STN_RPC_INTELLIGENCE_CURSOR=0x1003,
     STN_RPC_PENDING=0x1004,STN_RPC_SUBMIT_TRANSACTION=0x1005,
