@@ -317,6 +317,42 @@ int test_mining(void)
         suffix_evidence[12u+40u]^=1u;
     }
 
+    /* Staged suffix recovery preserves the same Chain-owned fork choice while
+     * allowing the suffix to arrive across bounded STNC frames. */
+    {
+        uint8_t begin[8u],append[8u+4u+364u];
+        size_t at=0u;
+
+        memcpy(changed,changed,364u);
+        stn_wire_write(begin,4u,3u);stn_wire_write(begin+4u,4u,1u);
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_BEGIN,begin,sizeof(begin),out,&w)==STN_RPC_OK &&
+            w==0u && s.suffix_stage.active && s.suffix_stage.received_count==0u);
+
+        /* Commit before the declared suffix is complete fails closed and
+         * leaves the stage available for the missing evidence. */
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_COMMIT,NULL,0u,out,&w)==STN_RPC_REJECTED &&
+            w==0u && s.suffix_stage.active);
+
+        stn_wire_write(append+at,4u,0u);at+=4u;
+        stn_wire_write(append+at,4u,1u);at+=4u;
+        stn_wire_write(append+at,4u,364u);at+=4u;
+        memcpy(append+at,changed,364u);at+=364u;
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_APPEND,append,at,out,&w)==STN_RPC_OK &&
+            w==0u && s.suffix_stage.received_count==1u);
+
+        /* The already accepted block is valid evidence but cannot displace
+         * accepted state. CURRENT is terminal and destroys the transient stage. */
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_COMMIT,NULL,0u,out,&w)==STN_RPC_CURRENT &&
+            w==0u && !s.suffix_stage.active);
+
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_BEGIN,begin,sizeof(begin),out,&w)==STN_RPC_OK);
+        stn_wire_write(append,4u,1u);
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_APPEND,append,at,out,&w)==STN_RPC_REJECTED &&
+            w==0u && s.suffix_stage.active && s.suffix_stage.received_count==0u);
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_ABORT,NULL,0u,out,&w)==STN_RPC_OK &&
+            w==0u && !s.suffix_stage.active);
+    }
+
     stn_storage_view_release(&view);stn_chain_state_release(&s.active);
     activated_difficulty();
     printf("Mining work: %u checks, %u failures.\n",checks,failures);return failures!=0;
