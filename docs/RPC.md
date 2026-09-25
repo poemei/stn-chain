@@ -195,9 +195,18 @@ bounded staged lifecycle:
    state.
 
 Staging is transient Chain-owned evidence, not accepted state or a second
-consensus database. BEGIN and APPEND cannot activate state. Terminal COMMIT
-outcomes and ABORT clear staged ownership. The protocol does not increase the
-global STNC payload ceiling merely to accommodate long forks.
+consensus database. BEGIN and APPEND cannot activate state. Each long-lived STNC
+connection owns its own incomplete suffix stage; another connection cannot
+append to, abort, replace, or commit that stage. Disconnect destroys only that
+connection's transient stage. Accepted Chain state and fork evaluation remain
+shared Chain authority.
+
+BEGIN is also resource-bounded: one stage may declare at most
+`STN_SUFFIX_STAGE_MAX_BLOCKS` (currently 4096) suffix blocks. Larger recovery
+must proceed through additional bounded recovery work rather than an unbounded
+allocation. Terminal COMMIT outcomes and ABORT clear staged ownership. The
+protocol does not increase the global STNC payload ceiling merely to accommodate
+long forks.
 
 Peer discovery is outside this authority boundary. The stn-chain.org ChAoS MVC
 `/peers` endpoint and STNP peer discovery identify candidate endpoints only;
