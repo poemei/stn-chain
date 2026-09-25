@@ -156,7 +156,8 @@ typedef struct rpc_client {
     HANDLE thread;
     stn_windows_peer peer;
     stn_peer_transport transport;
-    const stn_rpc_service *service;
+    stn_rpc_service service;
+    stn_mining_session mining_session;
     CRITICAL_SECTION *dispatch_lock;
     volatile LONG done;
     struct rpc_client *next;
@@ -175,12 +176,13 @@ static DWORD WINAPI rpc_client_thread(void *user)
             if(io!=STN_PEER_OK){break;}
             EnterCriticalSection(client->dispatch_lock);
             dispatch=stn_rpc_dispatch(request,24+n,STN_RPC_READ|STN_RPC_SUBMISSION,
-                client->service,response,STN_RPC_MAX_FRAME,&w);
+                &client->service,response,STN_RPC_MAX_FRAME,&w);
             LeaveCriticalSection(client->dispatch_lock);
             if(dispatch!=STN_RPC_OK || rpc_transfer(&client->peer,&client->transport,response,w,1,0)!=STN_PEER_OK){break;}
         }
     }
     free(request);free(response);
+    EnterCriticalSection(client->dispatch_lock);stn_mining_session_release(&client->mining_session);LeaveCriticalSection(client->dispatch_lock);
     InterlockedExchange(&client->done,1);return 0;
 }
 static void reap_clients(rpc_client **head)
@@ -438,7 +440,7 @@ int stn_windows_app(int argc,char **argv)
         client=(rpc_client*)calloc(1,sizeof(*client));
         if(client==NULL){stn_windows_peer_close(&peer);continue;}
         client->peer=peer;client->transport=transport;client->transport.user=&client->peer;
-        client->service=&service;client->dispatch_lock=&dispatch_lock;client->done=0;
+        stn_mining_session_init(&client->mining_session,&mining);client->service.user=&client->mining_session;client->service.handle=stn_mining_session_handle;client->dispatch_lock=&dispatch_lock;client->done=0;
         client->thread=CreateThread(NULL,0,rpc_client_thread,client,0,NULL);
         if(client->thread==NULL){stn_windows_peer_close(&client->peer);free(client);continue;}
         client->next=clients;clients=client;reap_clients(&clients);
