@@ -93,6 +93,57 @@ done:
 }
 
 
+stn_fork_report stn_fork_evaluate_suffix(const stn_chain_context *context,
+    const stn_block_span *current,size_t current_count,size_t prefix_count,
+    const stn_block_span *suffix,size_t suffix_count,stn_reorg_plan *out)
+{
+    stn_fork_report r={0};stn_reorg_plan plan={0};stn_chain_state state={0};
+    size_t i;uint8_t left[32],right[32];
+    r.validation.failing_index=SIZE_MAX;
+    if(context==NULL||current==NULL||out==NULL||prefix_count==0u||
+       prefix_count>current_count||suffix==NULL||suffix_count==0u){
+        r.validation.detail=STN_DATA_ARGUMENT;return failure(r,0,STN_DATA_ARGUMENT);
+    }
+    if(context->pow_policy==NULL){r.result=STN_FORK_UNSUPPORTED;return r;}
+    r=history(context,current,current_count,1,&plan.current);
+    if(r.result!=STN_FORK_TIE)goto done;
+    r=history(context,current,prefix_count,2,&state);
+    if(r.result!=STN_FORK_TIE)goto done;
+    for(i=0u;i<suffix_count;i++){
+        stn_chain_state next={0};
+        r.validation=stn_chain_validate_candidate(context,&state,
+            suffix[i].bytes,suffix[i].length,&next);
+        if(r.validation.acceptance!=STN_ACCEPTANCE_UNDER_CONTEXT){
+            stn_chain_state_release(&next);r=failure(r,2,r.validation.detail);goto done;
+        }
+        stn_chain_state_move(&state,&next);
+    }
+    stn_chain_state_move(&plan.candidate,&state);
+    if(stn_chain_block_id(current[prefix_count-1u].bytes,current[prefix_count-1u].length,
+            &context->hash_provider,left)!=STN_DATA_OK||
+       stn_chain_block_id(prefix_count==1u?current[0].bytes:suffix[0].bytes,
+            prefix_count==1u?current[0].length:suffix[0].length,
+            &context->hash_provider,right)!=STN_DATA_OK){
+        r=failure(r,0,STN_DATA_PROVIDER_ERROR);goto done;
+    }
+    /* Candidate reconstruction already proves ancestry through previous_hash.
+     * The accepted prefix itself supplies the common ancestor. */
+    plan.ancestor_index=prefix_count-1u;
+    if(stn_chain_block_id(current[plan.ancestor_index].bytes,current[plan.ancestor_index].length,
+            &context->hash_provider,plan.ancestor_id)!=STN_DATA_OK){
+        r=failure(r,0,STN_DATA_PROVIDER_ERROR);goto done;
+    }
+    plan.detach_begin=prefix_count;plan.detach_end=current_count;
+    plan.attach_begin=prefix_count;plan.attach_end=prefix_count+suffix_count;
+    plan.detached_count=current_count-prefix_count;plan.attached_count=suffix_count;
+    (void)stn_work_order(&plan.current.cumulative_work,&plan.candidate.cumulative_work,&r.result);
+    plan.actionable=r.result==STN_FORK_CANDIDATE;
+    plan.resulting_height=plan.actionable?plan.candidate.height:plan.current.height;
+    *out=plan;memset(&plan,0,sizeof(plan));
+done:
+    stn_chain_state_release(&state);stn_reorg_plan_release(&plan);return r;
+}
+
 stn_fork_report stn_fork_evaluate(const stn_chain_context *context,
     const stn_block_span *current,size_t current_count,
     const stn_block_span *candidate,size_t candidate_count,stn_reorg_plan *out)
