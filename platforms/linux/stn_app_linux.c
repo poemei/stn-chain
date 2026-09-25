@@ -3,6 +3,8 @@
 #include "stn_linux_storage.h"
 #include "stn_linux_peer.h"
 #include "stn_mining.h"
+#include "stn_internal_miner.h"
+#include "stn_config.h"
 #include "stn_sha256.h"
 #include "../../src/stn_wire_internal.h"
 #include "stn_report.h"
@@ -970,11 +972,78 @@ static int candidate_argument(
     return accepted;
 }
 
+
+typedef struct internal_miner_runtime {
+    stn_internal_miner_worker worker;
+    pthread_mutex_t *lock;
+    pthread_t thread;
+    int thread_started;
+} internal_miner_runtime;
+
+static void *internal_miner_thread(void *user)
+{
+    internal_miner_runtime *runtime = (internal_miner_runtime *)user;
+
+    report_event(STN_REPORT_START, "Internal miner started duty=2%% nonce_budget=%llu.",
+        (unsigned long long)runtime->worker.nonce_budget);
+
+    while(!stopping) {
+        stn_internal_miner_result mined = STN_INTERNAL_MINER_IDLE;
+        stn_data_status status;
+        uint64_t started = monotonic_ms();
+        uint64_t elapsed;
+
+        pthread_mutex_lock(runtime->lock);
+        status = stn_internal_miner_worker_step(&runtime->worker, &mined);
+        pthread_mutex_unlock(runtime->lock);
+
+        if(status != STN_DATA_OK) {
+            report_event(STN_REPORT_ERROR, "Internal miner step failed status=%d.", (int)status);
+            sleep_ms(1000u);
+            continue;
+        }
+
+        if(mined == STN_INTERNAL_MINER_SHARE) {
+            report_event(STN_REPORT_MINING, "Internal miner submitted share.");
+        } else if(mined == STN_INTERNAL_MINER_BLOCK) {
+            report_event(STN_REPORT_MINING, "Internal miner submitted block.");
+        }
+
+        elapsed = monotonic_ms() - started;
+        /* At most 2% wall-clock duty: each work interval is followed by at
+         * least 49 equal idle intervals.  A zero-millisecond bounded step
+         * still yields for one millisecond. */
+        if(elapsed == 0u) {
+            sleep_ms(1u);
+        } else if(elapsed <= UINT64_MAX / 49u) {
+            uint64_t idle = elapsed * 49u;
+            sleep_ms((unsigned)(idle > 60000u ? 60000u : idle));
+        } else {
+            sleep_ms(60000u);
+        }
+    }
+
+    return NULL;
+}
+
+static int load_chain_config(const char *path, stn_config *config)
+{
+    uint8_t bytes[STN_CONFIG_MAX_BYTES];
+    size_t length = 0;
+
+    if(!read_file(path, bytes, sizeof(bytes), &length)) {
+        return 0;
+    }
+
+    return stn_config_decode(bytes, length, config) == STN_DATA_OK;
+}
+
 int stn_linux_app(int argc, char **argv)
 {
     const char *data = "stn-chain-dev.stns";
     const char *genesis_path = NULL;
     const char *transaction_path = NULL;
+    const char *config_path = "/etc/stn-chain/chain_config.json";
 
     int dev = 0;
     int once = 0;
@@ -1018,6 +1087,8 @@ int stn_linux_app(int argc, char **argv)
     pthread_mutex_t dispatch_lock;
 
     outbound_runtime outbound;
+    internal_miner_runtime internal_miner;
+    stn_config config = {0};
     stn_peer_candidates candidates = {0};
 
     memset(&disk, 0, sizeof(disk));
@@ -1030,6 +1101,7 @@ int stn_linux_app(int argc, char **argv)
     inbound.listener.socket = -1;
 
     memset(&outbound, 0, sizeof(outbound));
+    memset(&internal_miner, 0, sizeof(internal_miner));
     outbound.socket.socket = -1;
 
     stopping = 0;
@@ -1049,6 +1121,9 @@ int stn_linux_app(int argc, char **argv)
             }
         } else if(strcmp(argv[i], "--once") == 0) {
             once = 1;
+        } else if(strcmp(argv[i], "--config") == 0 &&
+                  i + 1 < argc) {
+            config_path = argv[++i];
         } else if(strcmp(argv[i], "--data") == 0 &&
                   i + 1 < argc) {
             data = argv[++i];
@@ -1493,6 +1568,26 @@ int stn_linux_app(int argc, char **argv)
 
     lock_ready = 1;
 
+    if(!load_chain_config(config_path, &config)) {
+        fprintf(stderr, "Cannot read valid Chain configuration: %s\n", config_path);
+        goto cleanup;
+    }
+
+    if(config.internal_miner_enabled) {
+        internal_miner.worker.service = &mining;
+        internal_miner.worker.miner = config.miner_identity;
+        internal_miner.worker.nonce_budget = STN_INTERNAL_MINER_DEFAULT_NONCE_BUDGET;
+        internal_miner.worker.duty_permille = STN_INTERNAL_MINER_DEFAULT_DUTY_PERMILLE;
+        internal_miner.lock = &dispatch_lock;
+
+        if(pthread_create(&internal_miner.thread, NULL,
+               internal_miner_thread, &internal_miner) != 0) {
+            fprintf(stderr, "Cannot start internal miner.\n");
+            goto cleanup;
+        }
+        internal_miner.thread_started = 1;
+    }
+
     report_event(
         STN_REPORT_START,
         "RPC 0.0.0.0:%u P2P 0.0.0.0:%u height=%llu",
@@ -1700,6 +1795,12 @@ shutdown:
     if(outbound.thread_started) {
         (void)pthread_join(
             outbound.thread,
+            NULL);
+    }
+
+    if(internal_miner.thread_started) {
+        (void)pthread_join(
+            internal_miner.thread,
             NULL);
     }
 
