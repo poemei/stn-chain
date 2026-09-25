@@ -297,6 +297,84 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         goto done;
     }
 
+    if(q->method==STN_RPC_SUBMIT_SUFFIX_EVIDENCE){
+        stn_storage_view accepted_view={0};
+        stn_block_span *candidate=NULL;
+        stn_reorg_plan plan={0};
+        stn_fork_report fork;
+        size_t at=8u,i,prefix,count,length,total=STN_STORAGE_OVERHEAD;
+        uint8_t reorg_remove[STN_PENDING_MAX_ENTRIES]={0};
+
+        if(q->payload==NULL||q->length<8u){code=STN_RPC_INVALID;goto done;}
+        prefix=(size_t)stn_wire_read(q->payload,4u);
+        count=(size_t)stn_wire_read(q->payload+4u,4u);
+        if(prefix==0u||count==0u||prefix>SIZE_MAX-count){code=STN_RPC_INVALID;goto done;}
+
+        if(stn_storage_load(s->chain,s->storage,s->workspace.current_bytes,
+                s->workspace.current_capacity,&accepted_view)!=STN_STORAGE_OK){
+            code=STN_RPC_UNAVAILABLE;goto suffix_done;
+        }
+        if(prefix>accepted_view.count){code=STN_RPC_REJECTED;goto suffix_done;}
+        candidate=(stn_block_span *)calloc(prefix+count,sizeof(*candidate));
+        if(candidate==NULL){code=STN_RPC_CAPACITY;goto suffix_done;}
+        for(i=0u;i<prefix;i++)candidate[i]=accepted_view.blocks[i];
+
+        for(i=0u;i<count;i++){
+            if(at>q->length||q->length-at<4u){code=STN_RPC_INVALID;goto suffix_done;}
+            length=(size_t)stn_wire_read(q->payload+at,4u);at+=4u;
+            if(length<STN_BLOCK_HEADER_SIZE||length>STN_BLOCK_MAX_SIZE||length>q->length-at){
+                code=STN_RPC_INVALID;goto suffix_done;
+            }
+            candidate[prefix+i].bytes=q->payload+at;
+            candidate[prefix+i].length=length;at+=length;
+        }
+        if(at!=q->length){code=STN_RPC_INVALID;goto suffix_done;}
+
+        fork=stn_fork_evaluate_history(s->chain,accepted_view.blocks,accepted_view.count,
+            candidate,prefix+count,&plan);
+        if(fork.result==STN_FORK_CURRENT||fork.result==STN_FORK_TIE){
+            code=STN_RPC_REJECTED;goto suffix_done;
+        }
+        if(fork.result==STN_FORK_UNRESOLVED){code=STN_RPC_UNAVAILABLE;goto suffix_done;}
+        if(fork.result!=STN_FORK_CANDIDATE){code=STN_RPC_REJECTED;goto suffix_done;}
+
+        for(i=0u;i<prefix+count;i++){
+            if(total>SIZE_MAX-4u||candidate[i].length>SIZE_MAX-total-4u){
+                code=STN_RPC_CAPACITY;goto suffix_done;
+            }
+            total+=4u+candidate[i].length;
+        }
+        if(total>SIZE_MAX-32u){code=STN_RPC_CAPACITY;goto suffix_done;}
+        total+=32u;
+        if(!ensure_storage_capacity(s,total)){code=STN_RPC_CAPACITY;goto suffix_done;}
+        if(stn_chain_state_share(&accepted_view.state,&accepted)!=STN_DATA_OK){
+            code=STN_RPC_CAPACITY;goto suffix_done;
+        }
+        if(s->pending!=NULL){
+            stn_storage_view candidate_view={0};
+            candidate_view.blocks=candidate;candidate_view.count=prefix+count;
+            if(stn_pending_inclusions(s->pending,&candidate_view,&s->chain->hash_provider,reorg_remove)!=STN_DATA_OK){
+                code=STN_RPC_PROVIDER;goto suffix_done;
+            }
+        }
+        code=storage_code(stn_storage_apply(s->chain,s->storage,candidate,prefix+count,
+            &plan,&s->workspace,&accepted));
+        if(code!=STN_RPC_OK)goto suffix_done;
+        stn_chain_state_move(&s->active,&accepted);
+        if(s->pending!=NULL)stn_pending_prune(s->pending,reorg_remove);
+        if(cap<80u){code=STN_RPC_CAPACITY;goto suffix_done;}
+        memcpy(p,s->active.tip_id,32u);stn_wire_write(p+32u,8u,s->active.height);
+        memcpy(p+40u,s->active.cumulative_work.bytes,STN_WORK_SIZE);
+        *written=80u;code=STN_RPC_OK;
+
+suffix_done:
+        stn_chain_state_release(&accepted);
+        stn_reorg_plan_release(&plan);
+        free(candidate);
+        stn_storage_view_release(&accepted_view);
+        goto done;
+    }
+
     if(q->method==STN_RPC_SUBMIT_HISTORY_EVIDENCE){
         stn_block_span *candidate=NULL;
         stn_reorg_plan plan={0};
