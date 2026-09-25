@@ -85,3 +85,70 @@ stn_data_status stn_internal_miner_search(
     *result=STN_INTERNAL_MINER_IDLE;
     return STN_DATA_OK;
 }
+
+
+stn_data_status stn_internal_miner_worker_step(
+    stn_internal_miner_worker *worker,
+    stn_internal_miner_result *result)
+{
+    uint8_t template_response[STN_MINING_PREFIX+STN_BLOCK_MAX_SIZE];
+    uint8_t share_id[STN_SHARE_ID_SIZE];
+    stn_share_evidence evidence={0};
+    stn_internal_miner_result found=STN_INTERNAL_MINER_IDLE;
+    size_t response_length=0u,block_length;
+    stn_rpc_code rpc;
+    stn_data_status status;
+
+    if(worker==NULL || result==NULL || worker->service==NULL ||
+       worker->service->chain==NULL)
+        return STN_DATA_ARGUMENT;
+    if(worker->miner.type!=STN_ADDRESS_IDENTITY)return STN_DATA_TYPE;
+    if(worker->duty_permille==0u ||
+       worker->duty_permille>STN_INTERNAL_MINER_MAX_DUTY_PERMILLE ||
+       worker->nonce_budget==0u)
+        return STN_DATA_CONTENT;
+
+    *result=STN_INTERNAL_MINER_IDLE;
+    rpc=stn_mining_template_local(worker->service,template_response,
+        sizeof(template_response),&response_length);
+    if(rpc!=STN_RPC_OK)return rpc==STN_RPC_UNAVAILABLE || rpc==STN_RPC_STALE ?
+        STN_DATA_UNRESOLVED : STN_DATA_CONTENT;
+    if(response_length<STN_MINING_PREFIX+STN_BLOCK_HEADER_SIZE)
+        return STN_DATA_CONTENT;
+    block_length=stn_wire_read(template_response+64u,4u);
+    if(block_length<STN_BLOCK_HEADER_SIZE || block_length>STN_BLOCK_MAX_SIZE ||
+       response_length!=STN_MINING_PREFIX+block_length)
+        return STN_DATA_CONTENT;
+
+    status=stn_internal_miner_search(template_response+STN_MINING_PREFIX,
+        template_response+32u,&worker->miner,&worker->next_nonce,
+        worker->nonce_budget,worker->duty_permille,
+        &worker->service->chain->hash_provider,&evidence,&found);
+    if(status!=STN_DATA_OK)return status;
+
+    if(found==STN_INTERNAL_MINER_SHARE){
+        rpc=stn_mining_submit_share_local(worker->service,&evidence,share_id);
+        if(rpc==STN_RPC_STALE){worker->next_nonce=0u;return STN_DATA_UNRESOLVED;}
+        if(rpc!=STN_RPC_OK)return STN_DATA_CONTENT;
+    }else if(found==STN_INTERNAL_MINER_BLOCK){
+        stn_block_header solved;
+        size_t written=0u;
+        uint8_t *block=template_response+STN_MINING_PREFIX;
+        if(stn_block_header_decode(block,STN_BLOCK_HEADER_SIZE,&solved)!=STN_DATA_OK)
+            return STN_DATA_CONTENT;
+        solved.reserved_work_nonce=evidence.nonce;
+        if(stn_block_header_encode(&solved,block,STN_BLOCK_HEADER_SIZE,&written)!=STN_DATA_OK ||
+           written!=STN_BLOCK_HEADER_SIZE)
+            return STN_DATA_CONTENT;
+        rpc=stn_mining_submit_work_local(worker->service,&worker->miner,
+            template_response,evidence.work_id,block,block_length);
+        if(rpc==STN_RPC_STALE){worker->next_nonce=0u;return STN_DATA_UNRESOLVED;}
+        if(rpc!=STN_RPC_OK)return STN_DATA_CONTENT;
+        worker->next_nonce=0u;
+    }else if(found==STN_INTERNAL_MINER_EXHAUSTED){
+        worker->next_nonce=0u;
+    }
+
+    *result=found;
+    return STN_DATA_OK;
+}
