@@ -37,22 +37,7 @@ static uint64_t test_timestamp_now(void *user)
     return *(const uint64_t *)user;
 }
 static int solve_block(uint8_t *p,size_t n,const stn_hash_provider *hash)
-{uint64_t nonce;uint8_t digest[32];for(nonce=UINT64_C(4294967296);nonce<UINT64_C(4295032832);++nonce){put64(p+152,nonce);if(stn_pow_verify(p,n,hash,digest)==STN_DATA_OK){return 1;}}{
-        uint8_t block[STN_BLOCK_HEADER_SIZE]={0};
-        uint8_t frame[STN_RPC_HEADER_SIZE+STN_BLOCK_HEADER_SIZE];
-        stn_rpc_message request={0},decoded={0};
-        size_t written=0;
-        block[0]=0;block[1]=3;
-        request.kind=1u;
-        request.method=STN_RPC_SUBMIT_BLOCK_EVIDENCE;
-        request.code=STN_RPC_OK;
-        request.request_id=91u;
-        request.payload=block;
-        request.length=sizeof(block);
-        CHECK(stn_rpc_encode(&request,frame,sizeof(frame),&written)==STN_RPC_INVALID);
-        CHECK(written==0u);
-    }
-    return 0;}
+{uint64_t nonce;uint8_t digest[32];for(nonce=UINT64_C(4294967296);nonce<UINT64_C(4295032832);++nonce){put64(p+152,nonce);if(stn_pow_verify(p,n,hash,digest)==STN_DATA_OK){return 1;}}return 0;}
 
 static void activated_difficulty(void)
 {
@@ -242,6 +227,19 @@ int test_mining(void)
     CHECK(stn_storage_encode(&c,history,1,store.bytes,sizeof(store.bytes),&store.n)==STN_STORAGE_OK);
     memcpy(changed,work,n);changed[68+159]=2;
     CHECK(rpc(&s,STN_RPC_SUBMIT_WORK,changed,n,out,&w)==STN_RPC_OK);
+    /* STNC block evidence is untrusted input. Chain validates and atomically
+     * extends only the current accepted tip; the caller gains no authority. */
+    CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,second_work,&second_n)==STN_RPC_OK);
+    CHECK(second_n==432u);
+    CHECK(solve_block(second_work+68u,364u,&c.hash_provider));
+    CHECK(rpc(&s,STN_RPC_SUBMIT_BLOCK_EVIDENCE,second_work+68u,364u,out,&w)==STN_RPC_OK &&
+        w==80u && stn_wire_read(out+32u,8u)==s.active.height);
+    CHECK(rpc(&s,STN_RPC_SUBMIT_BLOCK_EVIDENCE,second_work+68u,364u,out,&w)==STN_RPC_REJECTED &&
+        w==0u);
+    second_work[68u+40u]^=1u;
+    CHECK(rpc(&s,STN_RPC_SUBMIT_BLOCK_EVIDENCE,second_work+68u,364u,out,&w)==STN_RPC_REJECTED &&
+        w==0u);
+    second_work[68u+40u]^=1u;
     stn_storage_view_release(&view);stn_chain_state_release(&s.active);
     activated_difficulty();
     printf("Mining work: %u checks, %u failures.\n",checks,failures);return failures!=0;
