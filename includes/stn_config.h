@@ -7,8 +7,8 @@
 
 typedef struct stn_config {
     int internal_miner_enabled;
-    stn_address miner_identity;
-    int has_miner_identity;
+    stn_address miner_wallet;
+    int has_miner_wallet;
 } stn_config;
 
 /* Strict, bounded JSON configuration. Unknown keys, duplicate keys, malformed
