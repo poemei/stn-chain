@@ -333,7 +333,10 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         fork=stn_fork_evaluate_history(s->chain,accepted_view.blocks,accepted_view.count,
             candidate,prefix+count,&plan);
         if(fork.result==STN_FORK_CURRENT||fork.result==STN_FORK_TIE){
-            code=STN_RPC_REJECTED;goto suffix_done;
+            /* Valid evidence that does not displace accepted state is not a
+             * malformed or hostile peer condition. Report CURRENT distinctly
+             * so consumers can retain the peer without granting it authority. */
+            code=STN_RPC_CURRENT;goto suffix_done;
         }
         if(fork.result==STN_FORK_UNRESOLVED){code=STN_RPC_UNAVAILABLE;goto suffix_done;}
         if(fork.result!=STN_FORK_CANDIDATE){code=STN_RPC_REJECTED;goto suffix_done;}
