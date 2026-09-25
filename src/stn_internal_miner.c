@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_internal_miner.h"
+#include "stn_wire.h"
 #include <string.h>
 
 stn_data_status stn_internal_miner_search(
