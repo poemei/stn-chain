@@ -6,11 +6,11 @@ static unsigned checks,failures;
 #define CHECK(e) do{++checks;if(!(e)){++failures;fprintf(stderr,"config line %d: %s\n",__LINE__,#e);}}while(0)
 static void vectors(void){
  stn_config c={0};stn_address a={0};char id[STN_ADDRESS_TEXT_CAPACITY];size_t n=0;char json[512];
- a.type=STN_ADDRESS_IDENTITY;memset(a.identifier,0x11,32u);
+ a.type=STN_ADDRESS_WALLET;memset(a.identifier,0x11,32u);
  CHECK(stn_address_encode(&a,id,sizeof(id),&n)==STN_DATA_OK);
- snprintf(json,sizeof(json),"{\"internal_miner\":{\"enabled\":true,\"identity\":\"%s\"}}",id);
+ snprintf(json,sizeof(json),"{\"internal_miner\":{\"enabled\":true,\"wallet\":\"%s\"}}",id);
  CHECK(stn_config_decode((const uint8_t*)json,strlen(json),&c)==STN_DATA_OK);
- CHECK(c.internal_miner_enabled==1&&c.has_miner_identity==1&&c.miner_identity.type==STN_ADDRESS_IDENTITY);
+ CHECK(c.internal_miner_enabled==1&&c.has_miner_wallet==1&&c.miner_wallet.type==STN_ADDRESS_WALLET);
  CHECK(stn_config_decode((const uint8_t*)"{\"internal_miner\":{\"enabled\":false}}",36u,&c)==STN_DATA_OK);
  CHECK(stn_config_decode((const uint8_t*)"{\"bad\":true}",12u,&c)==STN_DATA_CONTENT);
  CHECK(stn_config_decode(NULL,0u,&c)==STN_DATA_ARGUMENT);
