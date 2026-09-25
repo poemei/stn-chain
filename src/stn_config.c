@@ -20,7 +20,8 @@ stn_data_status stn_config_decode(const uint8_t *bytes,size_t length,stn_config 
  for(;;){
   char key[64];size_t kn;if(!str(&q,key,sizeof(key),&kn)||!ch(&q,':'))return STN_DATA_CONTENT;
   if(kn==14u&&memcmp(key,"internal_miner",14u)==0){
-   if(seen_miner++)return STN_DATA_CONTENT;if(!ch(&q,'{'))return STN_DATA_CONTENT;
+   if(seen_miner++)return STN_DATA_CONTENT;
+   if(!ch(&q,'{'))return STN_DATA_CONTENT;
    for(;;){
     char mk[64],value[STN_ADDRESS_TEXT_CAPACITY];size_t mn,vn;
     if(!str(&q,mk,sizeof(mk),&mn)||!ch(&q,':'))return STN_DATA_CONTENT;
