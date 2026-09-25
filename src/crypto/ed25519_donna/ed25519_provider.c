@@ -4,6 +4,12 @@
 #define ED25519_TEST
 #define ED25519_FORCE_32BIT
 #include "ed25519.c"
+int stn_ed25519_publickey(const unsigned char sk[32],unsigned char pk[32])
+{
+    if(sk==NULL || pk==NULL)return -1;
+    ed25519_publickey_stn(sk,pk);
+    return 0;
+}
 int stn_ed25519_sign(const unsigned char *m,size_t n,const unsigned char pk[32],const unsigned char sk[32],unsigned char sig[64])
 {
     if(m==NULL || pk==NULL || sk==NULL || sig==NULL)return -1;
