@@ -244,6 +244,16 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
     }
 }
 
+static void suffix_stage_clear(stn_suffix_stage *stage)
+{
+    size_t i;
+    if(stage==NULL)return;
+    if(stage->owned!=NULL){
+        for(i=0u;i<(size_t)stage->received_count;i++)free(stage->owned[i]);
+    }
+    free(stage->owned);free(stage->blocks);memset(stage,0,sizeof(*stage));
+}
+
 stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t cap,size_t *written)
 {
     stn_mining_service *s=user;stn_storage_view v={0};stn_rpc_code code;size_t n=0,required=0;stn_chain_state accepted={0};
@@ -295,6 +305,50 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         query.intelligence=s->intelligence;
         code=stn_node_service_handle(&query,q,p,cap,written);
         goto done;
+    }
+
+    if(q->method==STN_RPC_SUFFIX_STAGE_ABORT){
+        suffix_stage_clear(&s->suffix_stage);code=STN_RPC_OK;goto done;
+    }
+
+    if(q->method==STN_RPC_SUFFIX_STAGE_BEGIN){
+        uint32_t prefix,total;
+        if(q->payload==NULL||q->length!=8u){code=STN_RPC_INVALID;goto done;}
+        prefix=(uint32_t)stn_wire_read(q->payload,4u);
+        total=(uint32_t)stn_wire_read(q->payload+4u,4u);
+        if(prefix==0u||total==0u||prefix>v.count){code=STN_RPC_REJECTED;goto done;}
+        suffix_stage_clear(&s->suffix_stage);
+        s->suffix_stage.blocks=(stn_block_span *)calloc((size_t)total,sizeof(*s->suffix_stage.blocks));
+        s->suffix_stage.owned=(uint8_t **)calloc((size_t)total,sizeof(*s->suffix_stage.owned));
+        if(s->suffix_stage.blocks==NULL||s->suffix_stage.owned==NULL){
+            suffix_stage_clear(&s->suffix_stage);code=STN_RPC_CAPACITY;goto done;
+        }
+        s->suffix_stage.prefix_count=prefix;s->suffix_stage.expected_count=total;
+        s->suffix_stage.active=1;code=STN_RPC_OK;goto done;
+    }
+
+    if(q->method==STN_RPC_SUFFIX_STAGE_APPEND){
+        size_t at=8u,i,count,length;uint32_t start;
+        if(!s->suffix_stage.active||q->payload==NULL||q->length<8u){code=STN_RPC_REJECTED;goto done;}
+        start=(uint32_t)stn_wire_read(q->payload,4u);
+        count=(size_t)stn_wire_read(q->payload+4u,4u);
+        if(start!=s->suffix_stage.received_count||count==0u||
+           count>(size_t)s->suffix_stage.expected_count-start){code=STN_RPC_REJECTED;goto done;}
+        for(i=0u;i<count;i++){
+            uint8_t *copy;
+            if(at>q->length||q->length-at<4u){code=STN_RPC_INVALID;goto done;}
+            length=(size_t)stn_wire_read(q->payload+at,4u);at+=4u;
+            if(length<STN_BLOCK_HEADER_SIZE||length>STN_BLOCK_MAX_SIZE||length>q->length-at){
+                code=STN_RPC_INVALID;goto done;
+            }
+            copy=(uint8_t *)malloc(length);if(copy==NULL){code=STN_RPC_CAPACITY;goto done;}
+            memcpy(copy,q->payload+at,length);at+=length;
+            s->suffix_stage.owned[start+(uint32_t)i]=copy;
+            s->suffix_stage.blocks[start+(uint32_t)i].bytes=copy;
+            s->suffix_stage.blocks[start+(uint32_t)i].length=length;
+        }
+        if(at!=q->length){code=STN_RPC_INVALID;goto done;}
+        s->suffix_stage.received_count+=(uint32_t)count;code=STN_RPC_OK;goto done;
     }
 
     if(q->method==STN_RPC_SUBMIT_SUFFIX_EVIDENCE){
