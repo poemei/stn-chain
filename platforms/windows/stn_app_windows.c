@@ -3,6 +3,8 @@
 #include "stn_windows_storage.h"
 #include "stn_windows_peer.h"
 #include "stn_mining.h"
+#include "stn_internal_miner.h"
+#include "stn_config.h"
 #include "stn_sha256.h"
 #include "../../src/stn_wire_internal.h"
 #ifndef _WIN32_WINNT
@@ -17,6 +19,9 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <time.h>
+#include <io.h>
+#include <fcntl.h>
+#include <stdint.h>
 #ifdef STN_PHASE9_TEST_RUNTIME
 #include "../../tests/stn_phase9_runtime.h"
 #endif
@@ -41,7 +46,18 @@ static int report_open(void)
     if(_snprintf_s(directory,sizeof(directory),_TRUNCATE,"%s\\STN Chain",program_data)<0){return 0;}
     if(!CreateDirectoryA(directory,NULL) && GetLastError()!=ERROR_ALREADY_EXISTS){return 0;}
     if(_snprintf_s(path,sizeof(path),_TRUNCATE,"%s\\stn-chain.log",directory)<0){return 0;}
-    return fopen_s(&report_log,path,"a")==0 && report_log!=NULL;
+    {
+        HANDLE handle=CreateFileA(path,FILE_APPEND_DATA,
+            FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,NULL);
+        int fd;
+        if(handle==INVALID_HANDLE_VALUE){return 0;}
+        fd=_open_osfhandle((intptr_t)handle,_O_APPEND|_O_TEXT);
+        if(fd<0){CloseHandle(handle);return 0;}
+        report_log=_fdopen(fd,"a");
+        if(report_log==NULL){_close(fd);return 0;}
+        return 1;
+    }
 }
 static void report_close(void)
 {
@@ -208,7 +224,12 @@ static int serve_once(stn_windows_peer *listener,const stn_rpc_service *service)
 typedef struct outbound_runtime {
     stn_peer_outbound manager;stn_windows_peer socket;stn_peer_workspace workspace;
     stn_mining_service *mining;CRITICAL_SECTION *lock;HANDLE thread;
+    int connected_reported;uint64_t reported_height;
 } outbound_runtime;
+
+typedef struct internal_miner_runtime {
+    stn_internal_miner_worker worker;CRITICAL_SECTION *lock;HANDLE thread;
+} internal_miner_runtime;
 static DWORD WINAPI outbound_thread(void *user)
 {
     outbound_runtime *runtime=user;
@@ -216,11 +237,55 @@ static DWORD WINAPI outbound_thread(void *user)
     while(InterlockedCompareExchange(&stopping,0,0)==0){
         EnterCriticalSection(runtime->lock);
         runtime->socket.operation_deadline_ms=GetTickCount64()+5000;
-        (void)stn_peer_outbound_step(&runtime->manager,GetTickCount64(),runtime->mining->chain,
-            runtime->mining->storage,&runtime->workspace,&runtime->mining->active);
+        {
+            stn_peer_status peer_status=stn_peer_outbound_step(&runtime->manager,GetTickCount64(),
+                runtime->mining->chain,runtime->mining->storage,&runtime->workspace,
+                &runtime->mining->active);
+            uint64_t height=runtime->mining->active.height;
+            if(!runtime->connected_reported && peer_status==STN_PEER_OK){
+                report_line("PEER","Connected to Chain peer.");
+                runtime->connected_reported=1;
+                runtime->reported_height=height;
+            }
+            if(runtime->connected_reported && height!=runtime->reported_height){
+                report_line("SYNC","Chain height %llu.",(unsigned long long)height);
+                runtime->reported_height=height;
+            }
+        }
         LeaveCriticalSection(runtime->lock);Sleep(100);
     }
     stn_peer_outbound_close(&runtime->manager);report_line("PEER","Outbound peer manager stopped.");return 0;
+}
+static DWORD WINAPI internal_miner_thread(void *user)
+{
+    internal_miner_runtime *runtime=user;
+    report_line("MINER","Internal miner started duty=2%% nonce_budget=%llu.",
+        (unsigned long long)runtime->worker.nonce_budget);
+    while(InterlockedCompareExchange(&stopping,0,0)==0){
+        stn_internal_miner_result mined=STN_INTERNAL_MINER_IDLE;
+        stn_data_status status;
+        ULONGLONG started=GetTickCount64(),elapsed,idle;
+        EnterCriticalSection(runtime->lock);
+        status=stn_internal_miner_worker_step(&runtime->worker,&mined);
+        LeaveCriticalSection(runtime->lock);
+        if(status!=STN_DATA_OK){
+            report_line("ERROR","Internal miner step failed status=%d.",(int)status);
+            Sleep(1000);continue;
+        }
+        if(mined==STN_INTERNAL_MINER_SHARE){report_line("MINER","Internal miner submitted share.");}
+        else if(mined==STN_INTERNAL_MINER_BLOCK){report_line("MINER","Internal miner submitted block.");}
+        elapsed=GetTickCount64()-started;
+        if(elapsed==0){Sleep(1);}
+        else{idle=elapsed*49u;if(idle>60000u)idle=60000u;Sleep((DWORD)idle);}
+    }
+    report_line("MINER","Internal miner stopped.");
+    return 0;
+}
+static int load_chain_config(const char *path,stn_config *config)
+{
+    uint8_t bytes[STN_CONFIG_MAX_BYTES];size_t length=0;
+    return read_file(path,bytes,sizeof(bytes),&length) &&
+        stn_config_decode(bytes,length,config)==STN_DATA_OK;
 }
 static int candidate_argument(const char *text,stn_peer_candidates *set)
 {
@@ -251,7 +316,7 @@ int stn_windows_app(int argc,char **argv)
 {
     InitializeCriticalSection(&report_lock);report_lock_ready=1;
     if(!report_open()){report_line("ERROR","Cannot open persistent log; terminal reporting remains active.");}
-    const char *data="stn-chain-dev.stns",*genesis_path=NULL,*transaction_path=NULL;
+    const char *data="stn-chain-dev.stns",*genesis_path=NULL,*transaction_path=NULL,*config_path="config\\chain_config.json";
     int dev=0,once=0,i,result=EXIT_FAILURE;unsigned long port=18473;char *end;
     wchar_t relative[260],absolute[260];DWORD path_length;
     uint8_t *genesis=NULL,*body=NULL;
@@ -261,12 +326,13 @@ int stn_windows_app(int argc,char **argv)
     stn_windows_peer listener={0};uint16_t bound;stn_storage_status status;
     stn_rpc_service service={&mining,stn_mining_handle};
     rpc_client *clients=NULL;CRITICAL_SECTION dispatch_lock;int lock_ready=0;
-    outbound_runtime outbound={0};stn_peer_candidates candidates={0};
+    outbound_runtime outbound={0};internal_miner_runtime internal_miner={0};stn_peer_candidates candidates={0};stn_config config={0};
     InterlockedExchange(&stopping,0);
     for(i=1;i<argc;++i){
         if(strcmp(argv[i],"--dev")==0){dev=1;}
         else if(strcmp(argv[i],"--peer")==0 && i+1<argc){if(!candidate_argument(argv[++i],&candidates)){goto usage;}}
         else if(strcmp(argv[i],"--once")==0){once=1;}
+        else if(strcmp(argv[i],"--config")==0 && i+1<argc){config_path=argv[++i];}
         else if(strcmp(argv[i],"--data")==0 && i+1<argc){data=argv[++i];}
         else if(strcmp(argv[i],"--genesis")==0 && i+1<argc){genesis_path=argv[++i];}
         else if(strcmp(argv[i],"--transaction")==0 && i+1<argc){transaction_path=argv[++i];}
@@ -320,6 +386,19 @@ int stn_windows_app(int argc,char **argv)
     if(stn_windows_peer_listen((uint16_t)port,&listener,&bound)!=STN_PEER_OK){fprintf(stderr,"Cannot bind loopback RPC port.\n");goto cleanup;}
     if(!SetConsoleCtrlHandler(stop,TRUE)){goto cleanup;}
     InitializeCriticalSection(&dispatch_lock);lock_ready=1;
+    if(!load_chain_config(config_path,&config)){
+        report_line("ERROR","Cannot read valid Chain configuration: %s",config_path);goto cleanup;
+    }
+    if(config.internal_miner_enabled){
+        internal_miner.worker.service=&mining;
+        internal_miner.worker.miner.type=STN_ADDRESS_IDENTITY;
+        memcpy(internal_miner.worker.miner.identifier,config.miner_wallet.identifier,STN_ADDRESS_ID_SIZE);
+        internal_miner.worker.nonce_budget=STN_INTERNAL_MINER_DEFAULT_NONCE_BUDGET;
+        internal_miner.worker.duty_permille=STN_INTERNAL_MINER_DEFAULT_DUTY_PERMILLE;
+        internal_miner.lock=&dispatch_lock;
+        internal_miner.thread=CreateThread(NULL,0,internal_miner_thread,&internal_miner,0,NULL);
+        if(internal_miner.thread==NULL){report_line("ERROR","Cannot start internal miner.");goto cleanup;}
+    }else{report_line("MINER","Internal miner disabled.");}
     report_line("START","RPC 127.0.0.1:%u height=%llu",(unsigned)bound,(unsigned long long)mining.active.height);
     if(dev){puts("DEVELOPMENT FIXTURE: repeated structural test transaction; no signed intelligence admission or coin.");}
     puts("RPC v1 binary STNC; concurrent loopback clients limited only by host resources; read + solved-work submission. Ctrl+C stops.");fflush(stdout);
@@ -363,6 +442,7 @@ shutdown:
      * accepts immediately while active client sessions are interrupted below. */
     stn_windows_peer_close(&listener);
     if(outbound.thread!=NULL){WaitForSingleObject(outbound.thread,INFINITE);CloseHandle(outbound.thread);}
+    if(internal_miner.thread!=NULL){WaitForSingleObject(internal_miner.thread,INFINITE);CloseHandle(internal_miner.thread);}
     stop_clients(&clients);(void)SetConsoleCtrlHandler(stop,FALSE);
 cleanup:
 #ifdef STN_PHASE9_TEST_RUNTIME
@@ -374,7 +454,7 @@ cleanup:
     report_line("STOP","STN Chain Windows stopped.");report_close();
     return result;
 usage:
-    puts("Usage: stn-chain [--data PATH] [--rpc-port PORT] [--peer HOST:PORT]\n"
+    puts("Usage: stn-chain [--data PATH] [--rpc-port PORT] [--peer HOST:PORT] [--config PATH]\n"
          "Resume saved history or initialize the built-in genesis if absent.\n"
          "Repeat --peer HOST:PORT for automatic outbound P2P. Host may be DNS or IPv4.\n"
          "Loopback RPC only. Ctrl+C stops.");
