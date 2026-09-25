@@ -355,6 +355,16 @@ int test_mining(void)
         CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_ABORT,NULL,0u,out,&w)==STN_RPC_OK &&
             w==0u && !s.suffix_stage.active);
 
+        /* Retained staged bytes are bounded independently of block count. */
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_BEGIN,begin,sizeof(begin),out,&w)==STN_RPC_OK);
+        s.suffix_stage.received_bytes=STN_SUFFIX_STAGE_MAX_BYTES;
+        stn_wire_write(append,4u,0u);
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_APPEND,append,at,out,&w)==STN_RPC_CAPACITY &&
+            w==0u && s.suffix_stage.active && s.suffix_stage.received_count==0u &&
+            s.suffix_stage.received_bytes==STN_SUFFIX_STAGE_MAX_BYTES);
+        CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_ABORT,NULL,0u,out,&w)==STN_RPC_OK &&
+            w==0u && !s.suffix_stage.active);
+
         /* A malformed later block in one APPEND rolls back every block copied
          * by that APPEND while preserving the active empty stage. */
         stn_wire_write(begin,4u,3u);stn_wire_write(begin+4u,4u,2u);
