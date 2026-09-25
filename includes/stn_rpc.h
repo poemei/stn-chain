@@ -43,6 +43,10 @@ typedef enum stn_rpc_method {
      * untrusted evidence. Chain validates it against the current accepted tip
      * before any atomic storage extension. Success returns tip/height/work. */
     STN_RPC_SUBMIT_BLOCK_EVIDENCE=0x1006,
+    /* Complete candidate history evidence. Payload is u32 count followed by
+     * repeated u32 block length + canonical block bytes. Chain alone validates
+     * fork preference and performs atomic adoption. */
+    STN_RPC_SUBMIT_HISTORY_EVIDENCE=0x1007,
     STN_RPC_MINING_CONTEXT=0x2000,STN_RPC_CHECK_WORK_BASE=0x2001,
     STN_RPC_MINING_TEMPLATE=0x2002,STN_RPC_SUBMIT_WORK=0x2003,STN_RPC_SUBMIT_SHARE=0x2004,
     STN_RPC_ADMIN_CONTROL=0x3000
