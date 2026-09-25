@@ -25,7 +25,7 @@ static uint32_t capability(uint16_t method)
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_BLOCK_HEIGHT:case STN_RPC_BLOCK_ID:case STN_RPC_GET_ACCEPTED_RECORD:
     case STN_RPC_CHECK_INTELLIGENCE:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_INTELLIGENCE_CURSOR:
     case STN_RPC_MINING_CONTEXT:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_MINING_TEMPLATE:return STN_RPC_READ;
-    case STN_RPC_SUBMIT_TRANSACTION:case STN_RPC_SUBMIT_INTELLIGENCE:case STN_RPC_SUBMIT_WORK:case STN_RPC_SUBMIT_SHARE:return STN_RPC_SUBMISSION;
+    case STN_RPC_SUBMIT_TRANSACTION:case STN_RPC_SUBMIT_BLOCK_EVIDENCE:case STN_RPC_SUBMIT_INTELLIGENCE:case STN_RPC_SUBMIT_WORK:case STN_RPC_SUBMIT_SHARE:return STN_RPC_SUBMISSION;
     case STN_RPC_ADMIN_CONTROL:return STN_RPC_ADMIN;
     default:return 0;
     }
@@ -56,6 +56,9 @@ static int shape(uint16_t method,const uint8_t *p,size_t n)
             address.type==STN_ADDRESS_CONTRACT;
     }
     case STN_RPC_SUBMIT_TRANSACTION:return n<=STN_TX_MAX_SIZE;
+    case STN_RPC_SUBMIT_BLOCK_EVIDENCE:
+        return n>=STN_BLOCK_HEADER_SIZE && n<=STN_BLOCK_MAX_SIZE &&
+            stn_block_validate_structure(p,n)==STN_DATA_OK;
     case STN_RPC_PENDING:case STN_RPC_INFO:case STN_RPC_MINING_CONTEXT:case STN_RPC_MINING_TEMPLATE:case STN_RPC_ADMIN_CONTROL:return n==0;
     case STN_RPC_BLOCK_HEIGHT:return n==8;
     case STN_RPC_BLOCK_ID:case STN_RPC_INTELLIGENCE_ID:case STN_RPC_CHECK_WORK_BASE:case STN_RPC_GET_ACCEPTED_RECORD:return n==32;
@@ -124,6 +127,9 @@ static int response_shape(uint16_t method,const uint8_t *p,size_t n)
             stn_wire_read(p+2,2)<=STN_CONTRACT_SERVICE_AGREEMENT &&
             stn_wire_read(p+20,2)<=STN_CONTRACT_MAX_PARTICIPANTS &&
             stn_wire_read(p+22,4)<=STN_CONTRACT_MAX_TERMS;
+
+    case STN_RPC_SUBMIT_BLOCK_EVIDENCE:
+        return n==80;
 
     case STN_RPC_SUBMIT_TRANSACTION:
         return n==36 &&
