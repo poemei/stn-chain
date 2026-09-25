@@ -52,6 +52,18 @@ typedef enum stn_rpc_method {
      * Chain verifies the accepted prefix under storage exclusion, reconstructs
      * the full candidate internally, and alone determines fork preference. */
     STN_RPC_SUBMIT_SUFFIX_EVIDENCE=0x1008,
+    /* Staged suffix recovery carries a divergent candidate across bounded
+     * STNC frames without transferring fork choice to the caller.
+     * BEGIN: u32 accepted-prefix count + u32 total suffix block count.
+     * APPEND: u32 start suffix offset + u32 block count + repeated
+     *         u32 block length + canonical block bytes.
+     * COMMIT/ABORT: empty payload.
+     * Staging is Chain-owned transient evidence; only COMMIT may evaluate
+     * and atomically alter accepted state. */
+    STN_RPC_SUFFIX_STAGE_BEGIN=0x1009,
+    STN_RPC_SUFFIX_STAGE_APPEND=0x100a,
+    STN_RPC_SUFFIX_STAGE_COMMIT=0x100b,
+    STN_RPC_SUFFIX_STAGE_ABORT=0x100c,
     STN_RPC_MINING_CONTEXT=0x2000,STN_RPC_CHECK_WORK_BASE=0x2001,
     STN_RPC_MINING_TEMPLATE=0x2002,STN_RPC_SUBMIT_WORK=0x2003,STN_RPC_SUBMIT_SHARE=0x2004,
     STN_RPC_ADMIN_CONTROL=0x3000
