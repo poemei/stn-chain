@@ -402,8 +402,19 @@ int test_mining(void)
             q.method=STN_RPC_SUFFIX_STAGE_ABORT;q.payload=NULL;q.length=0u;
             CHECK(stn_mining_session_handle(&b,&q,out,sizeof(out),&w)==STN_RPC_OK &&
                 a.suffix_stage.active && !b.suffix_stage.active && !s.suffix_stage.active);
-            stn_mining_session_release(&b);stn_mining_session_release(&a);
-            CHECK(!s.suffix_stage.active);
+            q.method=STN_RPC_SUFFIX_STAGE_APPEND;q.payload=append;q.length=at;
+            stn_wire_write(append,4u,0u);
+            CHECK(stn_mining_session_handle(&b,&q,out,sizeof(out),&w)==STN_RPC_REJECTED &&
+                a.suffix_stage.active && a.suffix_stage.received_count==0u &&
+                !b.suffix_stage.active && !s.suffix_stage.active);
+            q.method=STN_RPC_SUFFIX_STAGE_COMMIT;q.payload=NULL;q.length=0u;
+            CHECK(stn_mining_session_handle(&b,&q,out,sizeof(out),&w)==STN_RPC_REJECTED &&
+                a.suffix_stage.active && a.suffix_stage.received_count==0u &&
+                !b.suffix_stage.active && !s.suffix_stage.active);
+            stn_mining_session_release(&b);
+            CHECK(a.suffix_stage.active && !s.suffix_stage.active);
+            stn_mining_session_release(&a);
+            CHECK(!a.suffix_stage.active && !s.suffix_stage.active);
         }
     }
 
