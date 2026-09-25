@@ -27,6 +27,8 @@ typedef struct stn_mining_service {
     const stn_validation_context *intelligence;
     uint8_t *pending_body;size_t pending_body_capacity;
     int owns_buffers; /* Opt in only for malloc/realloc-owned scratch. */
+    uint64_t (*timestamp_now)(void *user);
+    void *timestamp_user;
 } stn_mining_service;
 #define STN_MINING_PREFIX 68u
 #define STN_MINING_IDENTITY_SIZE STN_RPC_MINER_IDENTITY_SIZE
