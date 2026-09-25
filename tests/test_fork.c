@@ -129,6 +129,22 @@ int test_fork(void)
     memset(p.candidate.cumulative_work.bytes,255,STN_WORK_SIZE);
     stn_reorg_plan_release(&p);r=stn_fork_evaluate(&c,as,3,bs,2,&p);
     CHECK(r.result==STN_FORK_CURRENT && p.candidate.cumulative_work.bytes[39]==4);
+    /* Accepted-prefix suffix evaluation derives the complete candidate from
+     * Chain-owned prefix evidence and an untrusted suffix. */
+    stn_reorg_plan_release(&p);
+    r=stn_fork_evaluate_suffix(&c,as,3,1,as+1,2,&p);
+    CHECK(r.result==STN_FORK_TIE && !p.actionable && p.ancestor_index==0 &&
+        p.detach_begin==1 && p.attach_begin==1 && p.attach_end==3);
+    stn_reorg_plan_release(&p);
+    before=p;
+    CHECK(stn_fork_evaluate_suffix(&c,as,3,0,as+1,2,&p).result==STN_FORK_ERROR &&
+        memcmp(&p,&before,sizeof(p))==0);
+    {
+        stn_block_span bad=as[1];bad.bytes=b[1];b[1][40]^=1u;
+        CHECK(stn_fork_evaluate_suffix(&c,as,3,1,&bad,1,&p).result==STN_FORK_INVALID_CANDIDATE &&
+            memcmp(&p,&before,sizeof(p))==0);
+        b[1][40]^=1u;
+    }
     /* Arithmetic qualification only: three easy blocks lose to one harder
      * block. These different-policy totals are NOT eligible competing chains. */
     CHECK(stn_work_at_height(policy.fixed_target,2,&easy)==STN_DATA_OK);
