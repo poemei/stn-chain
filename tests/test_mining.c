@@ -323,7 +323,6 @@ int test_mining(void)
         uint8_t begin[8u],append[8u+4u+364u];
         size_t at=0u;
 
-        memcpy(changed,changed,364u);
         stn_wire_write(begin,4u,3u);stn_wire_write(begin+4u,4u,1u);
         CHECK(rpc(&s,STN_RPC_SUFFIX_STAGE_BEGIN,begin,sizeof(begin),out,&w)==STN_RPC_OK &&
             w==0u && s.suffix_stage.active && s.suffix_stage.received_count==0u);
