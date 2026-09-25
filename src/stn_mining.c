@@ -198,6 +198,11 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
     memcpy(b.header.previous_hash,v->state.tip_id,32);
     b.header.height=v->state.height+1;
     b.header.timestamp=v->state.timestamp;
+    if(s->timestamp_now!=NULL){
+        uint64_t now=s->timestamp_now(s->timestamp_user);
+        if(now==0u){return STN_RPC_UNAVAILABLE;}
+        if(now>b.header.timestamp){b.header.timestamp=now;}
+    }
     memcpy(b.header.reserved_target,required_target,32);
     b.header.transaction_count=transaction_count;
     b.header.body_length=(uint32_t)body_length;
@@ -433,7 +438,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
            v.state.height==UINT64_MAX ||
            work_header.height!=v.state.height+1u ||
            memcmp(work_header.previous_hash,v.state.tip_id,32u)!=0 ||
-           work_header.timestamp!=v.state.timestamp){
+           work_header.timestamp<v.state.timestamp){
             code=STN_RPC_STALE;
             goto done;
         }
