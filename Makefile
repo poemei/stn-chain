@@ -498,6 +498,6 @@ $(BUILD_DIR)/test-internal-miner: tests/test_internal_miner.c $(INTERNAL_MINER_T
 test-config: $(BUILD_DIR)/test-config
 	$(BUILD_DIR)/test-config
 
-$(BUILD_DIR)/test-config: tests/test_config.c src/stn_config.c src/stn_address.c includes/stn_config.h
+$(BUILD_DIR)/test-config: tests/test_config.c src/stn_config.c src/stn_address.c platforms/linux/stn_sha256.c includes/stn_config.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_CONFIG_TEST_MAIN tests/test_config.c src/stn_config.c src/stn_address.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_CONFIG_TEST_MAIN tests/test_config.c src/stn_config.c src/stn_address.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
