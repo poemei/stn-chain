@@ -695,3 +695,51 @@ done:
     stn_storage_view_release(&v);
     return code;
 }
+
+stn_rpc_code stn_mining_template_local(stn_mining_service *service,
+    uint8_t *payload,size_t capacity,size_t *written)
+{
+    stn_rpc_message request={0};
+    request.kind=1u;request.method=STN_RPC_MINING_TEMPLATE;
+    return stn_mining_handle(service,&request,payload,capacity,written);
+}
+
+stn_rpc_code stn_mining_submit_share_local(stn_mining_service *service,
+    const stn_share_evidence *evidence,uint8_t share_id[STN_SHARE_ID_SIZE])
+{
+    stn_rpc_message request={0};
+    uint8_t payload[STN_RPC_SHARE_SUBMISSION_SIZE],response[32];
+    char identity[STN_ADDRESS_TEXT_CAPACITY];size_t identity_length=0,written=0;
+    stn_rpc_code code;
+    if(service==NULL || evidence==NULL || share_id==NULL)return STN_RPC_INVALID;
+    if(stn_address_encode(&evidence->miner,identity,sizeof(identity),&identity_length)!=STN_DATA_OK ||
+       identity_length!=STN_MINING_IDENTITY_SIZE)return STN_RPC_INVALID;
+    memcpy(payload,evidence->work_id,32u);
+    memcpy(payload+32u,identity,STN_MINING_IDENTITY_SIZE);
+    stn_wire_write(payload+101u,8u,evidence->nonce);
+    memcpy(payload+STN_RPC_SHARE_SUBMISSION_PREFIX,evidence->template_header,STN_BLOCK_HEADER_SIZE);
+    request.kind=1u;request.method=STN_RPC_SUBMIT_SHARE;request.payload=payload;request.length=sizeof(payload);
+    code=stn_mining_handle(service,&request,response,sizeof(response),&written);
+    if(code==STN_RPC_OK && written==32u)memcpy(share_id,response,32u);
+    return code;
+}
+
+stn_rpc_code stn_mining_submit_work_local(stn_mining_service *service,
+    const stn_address *miner,const uint8_t parent[32],const uint8_t work_id[32],
+    const uint8_t *block,size_t block_length)
+{
+    stn_rpc_message request={0};uint8_t *payload,*response;char identity[STN_ADDRESS_TEXT_CAPACITY];
+    size_t identity_length=0,written=0,total;stn_rpc_code code;
+    if(service==NULL || miner==NULL || parent==NULL || work_id==NULL || block==NULL ||
+       block_length<STN_BLOCK_HEADER_SIZE || block_length>STN_BLOCK_MAX_SIZE)return STN_RPC_INVALID;
+    if(stn_address_encode(miner,identity,sizeof(identity),&identity_length)!=STN_DATA_OK ||
+       identity_length!=STN_MINING_IDENTITY_SIZE)return STN_RPC_INVALID;
+    total=STN_MINING_SUBMISSION_PREFIX+block_length;
+    payload=(uint8_t*)malloc(total);response=(uint8_t*)malloc(80u);
+    if(payload==NULL || response==NULL){free(payload);free(response);return STN_RPC_CAPACITY;}
+    memcpy(payload,parent,32u);memcpy(payload+32u,work_id,32u);stn_wire_write(payload+64u,4u,block_length);
+    memcpy(payload+68u,identity,STN_MINING_IDENTITY_SIZE);memcpy(payload+STN_MINING_SUBMISSION_PREFIX,block,block_length);
+    request.kind=1u;request.method=STN_RPC_SUBMIT_WORK;request.payload=payload;request.length=total;
+    code=stn_mining_handle(service,&request,response,80u,&written);
+    free(payload);free(response);return code;
+}
