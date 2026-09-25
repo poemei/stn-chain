@@ -85,6 +85,24 @@ static void codecs(void)
     q.code=STN_RPC_REJECTED;CHECK(stn_rpc_encode(&q,request,sizeof(request),&n)==STN_RPC_INVALID);
     q.length=0;q.payload=NULL;CHECK(stn_rpc_encode(&q,request,sizeof(request),&n)==STN_RPC_OK && n==24);
     CHECK(stn_rpc_dispatch(independent,24,1,&service,response,23,&w)==STN_RPC_CAPACITY && w==0);
+    /* Evidence-adoption success responses share one canonical 80-byte
+     * accepted-state shape. Keep RPC dispatch from degrading valid Chain
+     * adoption into PROVIDER merely because the method is history-based. */
+    {
+        uint8_t accepted[80]={0};
+        stn_rpc_message success={2,STN_RPC_SUBMIT_BLOCK_EVIDENCE,STN_RPC_OK,UINT64_C(9),accepted,80},decoded={0};
+        CHECK(stn_rpc_encode(&success,response,sizeof(response),&w)==STN_RPC_OK &&
+            stn_rpc_decode(response,w,&decoded)==STN_RPC_OK && decoded.length==80u);
+        success.method=STN_RPC_SUBMIT_HISTORY_EVIDENCE;
+        CHECK(stn_rpc_encode(&success,response,sizeof(response),&w)==STN_RPC_OK &&
+            stn_rpc_decode(response,w,&decoded)==STN_RPC_OK && decoded.length==80u);
+        success.method=STN_RPC_SUBMIT_SUFFIX_EVIDENCE;
+        CHECK(stn_rpc_encode(&success,response,sizeof(response),&w)==STN_RPC_OK &&
+            stn_rpc_decode(response,w,&decoded)==STN_RPC_OK && decoded.length==80u);
+        success.length=79u;
+        CHECK(stn_rpc_encode(&success,response,sizeof(response),&w)==STN_RPC_INVALID && w==0u);
+    }
+
     /* Different object padding and pointer addresses cannot affect bytes. */
     { stn_rpc_message x,y;memset(&x,0x55,sizeof(x));memset(&y,0xaa,sizeof(y));
       x.kind=y.kind=1;x.method=y.method=STN_RPC_BLOCK_HEIGHT;x.code=y.code=STN_RPC_OK;
