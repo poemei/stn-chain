@@ -1100,11 +1100,6 @@ int stn_linux_app(int argc, char **argv)
     inbound_runtime inbound;
 
     stn_storage_status status;
-    stn_rpc_service service = {
-        &mining,
-        stn_mining_handle
-    };
-
     rpc_client *clients = NULL;
     pthread_mutex_t dispatch_lock;
 
@@ -1716,7 +1711,8 @@ int stn_linux_app(int argc, char **argv)
     if(once) {
         if(!serve_once(
             &listener,
-            &service)) {
+            &mining,
+            &dispatch_lock)) {
             result = EXIT_FAILURE;
         }
 
