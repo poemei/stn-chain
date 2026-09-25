@@ -81,9 +81,37 @@ static void vectors(void)
         &provider,&evidence,&result)==STN_DATA_ARGUMENT);
 }
 
+
+static void worker_validation(void)
+{
+    stn_internal_miner_worker worker={0};
+    stn_internal_miner_result result=STN_INTERNAL_MINER_EXHAUSTED;
+    stn_mining_service service={0};
+    stn_chain_context chain={0};
+
+    CHECK(stn_internal_miner_worker_step(NULL,&result)==STN_DATA_ARGUMENT);
+    CHECK(stn_internal_miner_worker_step(&worker,NULL)==STN_DATA_ARGUMENT);
+    CHECK(stn_internal_miner_worker_step(&worker,&result)==STN_DATA_ARGUMENT);
+
+    worker.service=&service;
+    service.chain=&chain;
+    worker.miner.type=STN_ADDRESS_WALLET;
+    worker.nonce_budget=STN_INTERNAL_MINER_DEFAULT_NONCE_BUDGET;
+    worker.duty_permille=STN_INTERNAL_MINER_DEFAULT_DUTY_PERMILLE;
+    CHECK(stn_internal_miner_worker_step(&worker,&result)==STN_DATA_TYPE);
+
+    worker.miner.type=STN_ADDRESS_IDENTITY;
+    worker.nonce_budget=0u;
+    CHECK(stn_internal_miner_worker_step(&worker,&result)==STN_DATA_CONTENT);
+    worker.nonce_budget=STN_INTERNAL_MINER_DEFAULT_NONCE_BUDGET;
+    worker.duty_permille=STN_INTERNAL_MINER_MAX_DUTY_PERMILLE+1u;
+    CHECK(stn_internal_miner_worker_step(&worker,&result)==STN_DATA_CONTENT);
+}
+
 int test_internal_miner(void)
 {
     vectors();
+    worker_validation();
     printf("Internal miner primitive: %u checks, %u failures.\n",checks,failures);
     return failures==0?0:1;
 }
