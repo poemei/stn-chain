@@ -3,6 +3,7 @@
 #define STN_INTERNAL_MINER_H
 
 #include "stn_share.h"
+#include "stn_mining.h"
 
 #define STN_INTERNAL_MINER_DEFAULT_DUTY_PERMILLE 20u
 #define STN_INTERNAL_MINER_MAX_DUTY_PERMILLE 20u
@@ -35,6 +36,25 @@ stn_data_status stn_internal_miner_search(
     unsigned duty_permille,
     const stn_hash_provider *provider,
     stn_share_evidence *evidence,
+    stn_internal_miner_result *result);
+
+
+#define STN_INTERNAL_MINER_DEFAULT_NONCE_BUDGET 256u
+
+typedef struct stn_internal_miner_worker {
+    stn_mining_service *service;
+    stn_address miner;
+    uint64_t next_nonce;
+    uint64_t nonce_budget;
+    unsigned duty_permille;
+} stn_internal_miner_worker;
+
+/* One bounded worker step. It fetches the current canonical template through
+ * the mining service, searches only the configured nonce budget, then submits
+ * any result through the same validated service path used by external miners.
+ * No clock, sleeping or thread policy lives here. */
+stn_data_status stn_internal_miner_worker_step(
+    stn_internal_miner_worker *worker,
     stn_internal_miner_result *result);
 
 #endif
