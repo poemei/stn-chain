@@ -78,6 +78,14 @@ static void report_event(stn_report_event event, const char *format, ...)
 }
 
 
+static uint64_t chain_timestamp_now(void *user)
+{
+    time_t now;
+    (void)user;
+    now=time(NULL);
+    return now==(time_t)-1 || now<=0 ? 0u : (uint64_t)now;
+}
+
 static uint64_t monotonic_ms(void)
 {
     struct timespec value;
@@ -1325,6 +1333,7 @@ int stn_linux_app(int argc, char **argv)
 
     mining.chain = &chain;
     mining.storage = &storage;
+    mining.timestamp_now = chain_timestamp_now;
     mining.body = body;
     mining.body_length = 4 + transaction_length;
     mining.transaction_count = 1;
