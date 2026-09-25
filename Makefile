@@ -147,10 +147,11 @@ install: $(TARGET_PATH)
 	install -m 0755 $(TARGET_PATH) $(DESTDIR)$(BINDIR)/$(TARGET)
 	install -d $(DESTDIR)$(DATADIR)
 	install -d $(DESTDIR)$(LOGDIR)
-	install -d $(DESTDIR)/etc/stn-chain
+	install -d -o stnchain -g stnchain $(DESTDIR)/etc/stn-chain
 	@if [ ! -e "$(DESTDIR)/etc/stn-chain/chain_config.json" ]; then \
-		install -m 0644 config/chain_config.json $(DESTDIR)/etc/stn-chain/chain_config.json; \
+		install -o stnchain -g stnchain -m 0644 config/chain_config.json $(DESTDIR)/etc/stn-chain/chain_config.json; \
 	else \
+		chown stnchain:stnchain $(DESTDIR)/etc/stn-chain/chain_config.json; \
 		echo "Preserving existing /etc/stn-chain/chain_config.json"; \
 	fi
 	install -d $(DESTDIR)/etc/systemd/system
