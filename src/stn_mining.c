@@ -297,6 +297,74 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         goto done;
     }
 
+    if(q->method==STN_RPC_SUBMIT_BLOCK_EVIDENCE){
+        stn_block_span evidence;
+        stn_storage_view inclusion={0};
+
+        if(q->payload==NULL ||
+           q->length<STN_BLOCK_HEADER_SIZE ||
+           q->length>STN_BLOCK_MAX_SIZE){
+            code=STN_RPC_INVALID;
+            goto done;
+        }
+
+        evidence.bytes=q->payload;
+        evidence.length=q->length;
+        inclusion.blocks=&evidence;
+        inclusion.count=1u;
+
+        if(s->pending!=NULL &&
+           stn_pending_inclusions(
+                s->pending,
+                &inclusion,
+                &s->chain->hash_provider,
+                remove)!=STN_DATA_OK){
+            code=STN_RPC_PROVIDER;
+            goto done;
+        }
+
+        if(!storage_bytes_required(&v,q->length,&required) ||
+           !ensure_storage_capacity(s,required)){
+            code=STN_RPC_CAPACITY;
+            goto done;
+        }
+
+        if(stn_chain_state_share(&v.state,&accepted)!=STN_DATA_OK){
+            code=STN_RPC_CAPACITY;
+            goto done;
+        }
+
+        code=storage_code(stn_storage_extend(
+            s->chain,
+            s->storage,
+            q->payload,
+            q->length,
+            &s->workspace,
+            &accepted));
+
+        if(code!=STN_RPC_OK){
+            goto done;
+        }
+
+        stn_chain_state_move(&s->active,&accepted);
+
+        if(s->pending!=NULL){
+            stn_pending_prune(s->pending,remove);
+        }
+
+        if(cap<80u){
+            code=STN_RPC_CAPACITY;
+            goto done;
+        }
+
+        memcpy(p,s->active.tip_id,32u);
+        stn_wire_write(p+32u,8u,s->active.height);
+        memcpy(p+40u,s->active.cumulative_work.bytes,STN_WORK_SIZE);
+        *written=80u;
+        code=STN_RPC_OK;
+        goto done;
+    }
+
     if(q->method==STN_RPC_SUBMIT_TRANSACTION){
         stn_validation_report report;
         stn_pending_result result;
