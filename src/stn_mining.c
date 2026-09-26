@@ -4,6 +4,7 @@
 #include "stn_wire_internal.h"
 #include "stn_address.h"
 #include "stn_share.h"
+#include "stn_block_reward.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -284,6 +285,7 @@ stn_rpc_code stn_mining_session_handle(void *user,const stn_rpc_message *q,
 stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,size_t cap,size_t *written)
 {
     stn_mining_service *s=user;stn_storage_view v={0};stn_rpc_code code;size_t n=0,required=0;stn_chain_state accepted={0};
+    stn_address submitted_miner={0};int has_submitted_miner=0;
     uint8_t id[32],remove[STN_PENDING_MAX_ENTRIES]={0};stn_node_service query={0};
 
     if(written!=NULL){*written=0;}
@@ -915,17 +917,18 @@ history_done:
          * canonical block header. Transaction body bytes are optional and
          * are governed by the block header itself.
          */
-        stn_address miner;
         if(q->payload==NULL ||
            q->length<STN_MINING_SUBMISSION_PREFIX+STN_BLOCK_HEADER_SIZE ||
            q->length>STN_MINING_SUBMISSION_PREFIX+STN_BLOCK_MAX_SIZE ||
            stn_wire_read(q->payload+64,4)!=q->length-STN_MINING_SUBMISSION_PREFIX ||
-           stn_address_decode((const char *)(q->payload+68),STN_MINING_IDENTITY_SIZE,&miner)!=STN_DATA_OK ||
-           miner.type!=STN_ADDRESS_IDENTITY){
+           stn_address_decode((const char *)(q->payload+68),STN_MINING_IDENTITY_SIZE,
+               &submitted_miner)!=STN_DATA_OK ||
+           submitted_miner.type!=STN_ADDRESS_IDENTITY){
             code=STN_RPC_INVALID;
             goto done;
         }
 
+        has_submitted_miner=1;
         if(memcmp(q->payload,v.state.tip_id,32)!=0){
             code=STN_RPC_STALE;
             goto done;
@@ -1049,6 +1052,78 @@ history_done:
 
     if(s->pending!=NULL){
         stn_pending_prune(s->pending,remove);
+    }
+
+    /*
+     * The solved block is durable accepted Chain state before reward creation.
+     * Reward construction uses the accepted explicit stn0_ -> stnw0_
+     * compensation relationship. SUBMIT_WORK itself never mints value.
+     */
+    if(s->pending!=NULL && has_submitted_miner){
+        stn_block_compensation_evidence reward_evidence;
+        stn_issuance_record reward_issuance;
+        uint8_t evidence_tx[STN_BLOCK_REWARD_EVIDENCE_TX_SIZE];
+        uint8_t issuance_tx[STN_BLOCK_REWARD_ISSUANCE_TX_SIZE];
+        uint8_t evidence_id[32],issuance_id[32];
+        size_t evidence_length=0u,issuance_length=0u;
+        stn_validation_report reward_report;
+        stn_pending_result evidence_result,issuance_result;
+        stn_storage_view reward_view={0};
+        stn_data_status reward_status;
+
+        reward_status=stn_block_reward_build(
+            s->active.tip_id,&submitted_miner,s->active.compensation,
+            &reward_evidence,&reward_issuance);
+        if(reward_status!=STN_DATA_OK){
+            code=reward_status==STN_DATA_UNRESOLVED ? STN_RPC_UNAVAILABLE :
+                reward_status==STN_DATA_CAPACITY || reward_status==STN_DATA_OVERFLOW ?
+                    STN_RPC_CAPACITY : STN_RPC_PROVIDER;
+            goto done;
+        }
+
+        reward_status=stn_block_reward_encode_transactions(
+            &reward_evidence,&reward_issuance,
+            evidence_tx,sizeof(evidence_tx),&evidence_length,
+            issuance_tx,sizeof(issuance_tx),&issuance_length);
+        if(reward_status!=STN_DATA_OK){
+            code=reward_status==STN_DATA_CAPACITY || reward_status==STN_DATA_OVERFLOW ?
+                STN_RPC_CAPACITY : STN_RPC_PROVIDER;
+            goto done;
+        }
+
+        code=storage_code(stn_storage_load(
+            s->chain,s->storage,s->workspace.current_bytes,
+            s->workspace.current_capacity,&reward_view));
+        if(code!=STN_RPC_OK)goto done;
+
+        evidence_result=stn_pending_admit_transaction(
+            s->pending,evidence_tx,evidence_length,s->intelligence,&reward_view,
+            &s->chain->hash_provider,&reward_report,evidence_id);
+        if(evidence_result!=STN_PENDING_ACCEPTED &&
+           evidence_result!=STN_PENDING_DUPLICATE){
+            stn_storage_view_release(&reward_view);
+            code=evidence_result==STN_PENDING_CAPACITY ? STN_RPC_CAPACITY :
+                evidence_result==STN_PENDING_UNAVAILABLE ? STN_RPC_UNAVAILABLE :
+                evidence_result==STN_PENDING_PROVIDER ? STN_RPC_PROVIDER :
+                    STN_RPC_REJECTED;
+            goto done;
+        }
+
+        issuance_result=stn_pending_admit_transaction(
+            s->pending,issuance_tx,issuance_length,s->intelligence,&reward_view,
+            &s->chain->hash_provider,&reward_report,issuance_id);
+        stn_storage_view_release(&reward_view);
+
+        if(issuance_result!=STN_PENDING_ACCEPTED &&
+           issuance_result!=STN_PENDING_DUPLICATE){
+            if(evidence_result==STN_PENDING_ACCEPTED)
+                (void)stn_pending_remove(s->pending,evidence_id);
+            code=issuance_result==STN_PENDING_CAPACITY ? STN_RPC_CAPACITY :
+                issuance_result==STN_PENDING_UNAVAILABLE ? STN_RPC_UNAVAILABLE :
+                issuance_result==STN_PENDING_PROVIDER ? STN_RPC_PROVIDER :
+                    STN_RPC_REJECTED;
+            goto done;
+        }
     }
 
     memcpy(p,s->active.tip_id,32);
