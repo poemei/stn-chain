@@ -1,7 +1,11 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_compensation.h"
+#include "stn_transaction.h"
 #include <stdio.h>
 #include <string.h>
+
+_Static_assert(STN_TX_MIN_SIZE==STN_TX_HEADER_SIZE+STN_TX_COMPENSATION_DESTINATION_SIZE,
+    "canonical compensation transaction must fit the minimum transaction size");
 
 static unsigned checks,failures;
 #define CHECK(e) do { ++checks; if(!(e)){++failures;fprintf(stderr,"compensation line %d: %s\n",__LINE__,#e);} } while(0)
@@ -11,6 +15,9 @@ static void destination_vectors(void)
     stn_compensation_destination in={0},out={0},saved;
     uint8_t canonical[STN_COMPENSATION_DESTINATION_SIZE],before[STN_COMPENSATION_DESTINATION_SIZE];
     size_t i;
+
+    CHECK(STN_TX_MIN_SIZE==77u);
+    CHECK(STN_TX_MIN_SIZE==STN_TX_HEADER_SIZE+STN_COMPENSATION_DESTINATION_SIZE);
 
     in.mining_identity.type=STN_ADDRESS_IDENTITY;
     in.wallet.type=STN_ADDRESS_WALLET;

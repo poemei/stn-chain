@@ -7,14 +7,14 @@
 #define STN_TX_AUTHORITY_GRANT_SIZE 194u
 #define STN_TX_AUTHORITY_REVOKE_SIZE 129u
 #define STN_TX_IDENTITY_ROTATE_SIZE 129u
-/* Share evidence is larger than the pre-existing authority-revoke minimum.
- * Keep the structural minimum at the smallest canonical transaction class. */
 #define STN_TX_SHARE_EVIDENCE_SIZE 273u
 #define STN_TX_COMPENSATION_DESTINATION_SIZE 65u
 #define STN_TX_ISSUANCE_SIZE 106u
 #define STN_TX_TRANSFER_SIZE 202u
 #define STN_TX_BLOCK_COMPENSATION_SIZE 65u
-#define STN_TX_MIN_SIZE (STN_TX_HEADER_SIZE + STN_TX_AUTHORITY_REVOKE_SIZE)
+/* The canonical compensation-destination transaction is the smallest
+ * transaction class: 12-byte transaction header plus 65-byte record. */
+#define STN_TX_MIN_SIZE (STN_TX_HEADER_SIZE + STN_TX_COMPENSATION_DESTINATION_SIZE)
 #define STN_TX_CONTRACT_ACTION_MAX_SIZE (116u + 66656u + 97u)
 #define STN_TX_MAX_SIZE (STN_TX_HEADER_SIZE + STN_TX_CONTRACT_ACTION_MAX_SIZE)
 #define STN_TX_PUBLICATION 1u
