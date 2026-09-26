@@ -9,6 +9,7 @@
 /* Build the canonical economic consequence of one accepted solved block.
  * The caller supplies the accepted block ID and submitting stn0_ identity.
  * The accepted compensation state supplies the exact stnw0_ destination.
+ * The canonical block compensation is 100 STNC (10000 centi-STNC units).
  * No state is mutated and no issuance is accepted by this primitive. */
 stn_data_status stn_block_reward_build(
     const uint8_t block_id[STN_BLOCK_COMPENSATION_BLOCK_ID_SIZE],
