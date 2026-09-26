@@ -5,6 +5,7 @@
 #include "stn_compensation.h"
 #include "stn_issuance.h"
 #include "stn_transfer_envelope.h"
+#include "stn_block_compensation.h"
 #include "stn_wire_internal.h"
 #include <string.h>
 
@@ -16,6 +17,8 @@ _Static_assert(STN_TX_ISSUANCE_SIZE==STN_ISSUANCE_CANONICAL_SIZE,
     "issuance transaction size must match canonical issuance record");
 _Static_assert(STN_TX_TRANSFER_SIZE==STN_TRANSFER_ENVELOPE_CANONICAL_SIZE,
     "transfer transaction size must match canonical transfer envelope");
+_Static_assert(STN_TX_BLOCK_COMPENSATION_SIZE==STN_BLOCK_COMPENSATION_CANONICAL_SIZE,
+    "block compensation transaction size must match canonical evidence");
 
 static const uint8_t magic[4] = {0x53, 0x54, 0x4e, 0x54};
 
@@ -31,116 +34,53 @@ static size_t lifecycle_size(uint16_t type)
 stn_data_status stn_transaction_decode(const uint8_t *bytes, size_t length,
     stn_transaction *out)
 {
-    stn_transaction t = {0};
-    stn_record record;
-    if (bytes == NULL || out == NULL) { return STN_DATA_ARGUMENT; }
-    if (length < STN_TX_HEADER_SIZE || length > STN_TX_MAX_SIZE) { return STN_DATA_LENGTH; }
-    if (memcmp(bytes, magic, 4) != 0) { return STN_DATA_MAGIC; }
-    t.version = (uint16_t)stn_wire_read(bytes + 4, 2);
-    t.type = (uint16_t)stn_wire_read(bytes + 6, 2);
-    if (t.version != 1) { return STN_DATA_VERSION; }
-    if (t.type < STN_TX_PUBLICATION || t.type > STN_TX_TRANSFER) { return STN_DATA_TYPE; }
-    t.record_length = (uint32_t)stn_wire_read(bytes + 8, 4);
-    if ((size_t)t.record_length != length - STN_TX_HEADER_SIZE) { return STN_DATA_LENGTH; }
-    t.record_bytes = bytes + STN_TX_HEADER_SIZE;
-    if (t.type == STN_TX_PUBLICATION) {
-        if (stn_record_decode(t.record_bytes, t.record_length, &record) != STN_RECORD_OK) { return STN_DATA_CONTENT; }
-    } else if (t.type == STN_TX_CONTRACT_ACTION) {
-        if (stn_contract_transaction_validate_structure(t.record_bytes, t.record_length) != STN_CONTRACT_OK) { return STN_DATA_CONTENT; }
-    } else if (t.type == STN_TX_SHARE_EVIDENCE) {
-        stn_share_evidence share;
-        /*
-         * Share evidence v1 (73 bytes) was accepted on Chain before the
-         * self-contained v2 record was activated. It remains structurally
-         * valid historical evidence; current admission emits v2 only.
-         */
-        if (t.record_length != 73u &&
-            stn_share_decode(t.record_bytes,t.record_length,&share) != STN_DATA_OK) {
-            return STN_DATA_CONTENT;
-        }
-    } else if (t.type == STN_TX_COMPENSATION_DESTINATION) {
-        stn_compensation_destination destination;
-        if (stn_compensation_destination_decode(t.record_bytes,t.record_length,&destination) != STN_DATA_OK) { return STN_DATA_CONTENT; }
-    } else if (t.type == STN_TX_ISSUANCE) {
-        stn_issuance_record issuance;
-        if (stn_issuance_decode(t.record_bytes,t.record_length,&issuance) != STN_DATA_OK) { return STN_DATA_CONTENT; }
-    } else if (t.type == STN_TX_TRANSFER) {
-        stn_transfer_envelope envelope;
-        if (stn_transfer_envelope_decode(t.record_bytes,t.record_length,&envelope) != STN_DATA_OK) { return STN_DATA_CONTENT; }
-    } else if ((size_t)t.record_length != lifecycle_size(t.type)) { return STN_DATA_LENGTH; }
-    *out = t;
-    return STN_DATA_OK;
+    stn_transaction t = {0}; stn_record record;
+    if(bytes==NULL||out==NULL)return STN_DATA_ARGUMENT;
+    if(length<STN_TX_HEADER_SIZE||length>STN_TX_MAX_SIZE)return STN_DATA_LENGTH;
+    if(memcmp(bytes,magic,4)!=0)return STN_DATA_MAGIC;
+    t.version=(uint16_t)stn_wire_read(bytes+4,2); t.type=(uint16_t)stn_wire_read(bytes+6,2);
+    if(t.version!=1)return STN_DATA_VERSION;
+    if(t.type<STN_TX_PUBLICATION||t.type>STN_TX_BLOCK_COMPENSATION_EVIDENCE)return STN_DATA_TYPE;
+    t.record_length=(uint32_t)stn_wire_read(bytes+8,4);
+    if((size_t)t.record_length!=length-STN_TX_HEADER_SIZE)return STN_DATA_LENGTH;
+    t.record_bytes=bytes+STN_TX_HEADER_SIZE;
+    if(t.type==STN_TX_PUBLICATION){if(stn_record_decode(t.record_bytes,t.record_length,&record)!=STN_RECORD_OK)return STN_DATA_CONTENT;}
+    else if(t.type==STN_TX_CONTRACT_ACTION){if(stn_contract_transaction_validate_structure(t.record_bytes,t.record_length)!=STN_CONTRACT_OK)return STN_DATA_CONTENT;}
+    else if(t.type==STN_TX_SHARE_EVIDENCE){stn_share_evidence x;if(t.record_length!=73u&&stn_share_decode(t.record_bytes,t.record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
+    else if(t.type==STN_TX_COMPENSATION_DESTINATION){stn_compensation_destination x;if(stn_compensation_destination_decode(t.record_bytes,t.record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
+    else if(t.type==STN_TX_ISSUANCE){stn_issuance_record x;if(stn_issuance_decode(t.record_bytes,t.record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
+    else if(t.type==STN_TX_TRANSFER){stn_transfer_envelope x;if(stn_transfer_envelope_decode(t.record_bytes,t.record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
+    else if(t.type==STN_TX_BLOCK_COMPENSATION_EVIDENCE){stn_block_compensation_evidence x;if(stn_block_compensation_decode(t.record_bytes,t.record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
+    else if((size_t)t.record_length!=lifecycle_size(t.type))return STN_DATA_LENGTH;
+    *out=t;return STN_DATA_OK;
 }
 
-stn_data_status stn_transaction_validate_structure(const uint8_t *bytes, size_t length)
+stn_data_status stn_transaction_validate_structure(const uint8_t *bytes,size_t length){stn_transaction t;return stn_transaction_decode(bytes,length,&t);}
+
+stn_data_status stn_transaction_encode(const stn_transaction *tx,uint8_t *output,size_t capacity,size_t *written)
 {
-    stn_transaction t;
-    return stn_transaction_decode(bytes, length, &t);
+    stn_record r;size_t total;if(written!=NULL)*written=0;
+    if(tx==NULL||output==NULL||written==NULL||tx->record_bytes==NULL)return STN_DATA_ARGUMENT;
+    if(tx->version!=1)return STN_DATA_VERSION;
+    if(tx->type<STN_TX_PUBLICATION||tx->type>STN_TX_BLOCK_COMPENSATION_EVIDENCE)return STN_DATA_TYPE;
+    if(tx->type==STN_TX_PUBLICATION&&(tx->record_length<STN_RECORD_OVERHEAD||tx->record_length>STN_RECORD_MAX_SIZE))return STN_DATA_LENGTH;
+    if(tx->type!=STN_TX_PUBLICATION&&tx->type!=STN_TX_CONTRACT_ACTION&&tx->type!=STN_TX_SHARE_EVIDENCE&&tx->type!=STN_TX_COMPENSATION_DESTINATION&&tx->type!=STN_TX_ISSUANCE&&tx->type!=STN_TX_TRANSFER&&tx->type!=STN_TX_BLOCK_COMPENSATION_EVIDENCE&&(size_t)tx->record_length!=lifecycle_size(tx->type))return STN_DATA_LENGTH;
+    if(tx->type==STN_TX_PUBLICATION){if(stn_record_decode(tx->record_bytes,tx->record_length,&r)!=STN_RECORD_OK)return STN_DATA_CONTENT;}
+    else if(tx->type==STN_TX_CONTRACT_ACTION){if(tx->record_length>STN_TX_CONTRACT_ACTION_MAX_SIZE||stn_contract_transaction_validate_structure(tx->record_bytes,tx->record_length)!=STN_CONTRACT_OK)return STN_DATA_CONTENT;}
+    else if(tx->type==STN_TX_SHARE_EVIDENCE){stn_share_evidence x;if(tx->record_length!=73u&&stn_share_decode(tx->record_bytes,tx->record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
+    else if(tx->type==STN_TX_COMPENSATION_DESTINATION){stn_compensation_destination x;if(stn_compensation_destination_decode(tx->record_bytes,tx->record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
+    else if(tx->type==STN_TX_ISSUANCE){stn_issuance_record x;if(stn_issuance_decode(tx->record_bytes,tx->record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
+    else if(tx->type==STN_TX_TRANSFER){stn_transfer_envelope x;if(stn_transfer_envelope_decode(tx->record_bytes,tx->record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
+    else if(tx->type==STN_TX_BLOCK_COMPENSATION_EVIDENCE){stn_block_compensation_evidence x;if(stn_block_compensation_decode(tx->record_bytes,tx->record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
+    else if((size_t)tx->record_length!=lifecycle_size(tx->type))return STN_DATA_LENGTH;
+    total=STN_TX_HEADER_SIZE+(size_t)tx->record_length;if(capacity<total)return STN_DATA_CAPACITY;
+    memcpy(output,magic,4);stn_wire_write(output+4,2,tx->version);stn_wire_write(output+6,2,tx->type);stn_wire_write(output+8,4,tx->record_length);memcpy(output+STN_TX_HEADER_SIZE,tx->record_bytes,tx->record_length);*written=total;return STN_DATA_OK;
 }
 
-stn_data_status stn_transaction_encode(const stn_transaction *tx,
-    uint8_t *output, size_t capacity, size_t *written)
+stn_data_status stn_transaction_id(const uint8_t *bytes,size_t length,const stn_hash_provider *provider,uint8_t digest[32])
 {
-    stn_record r;
-    size_t total;
-    if (written != NULL) { *written = 0; }
-    if (tx == NULL || output == NULL || written == NULL || tx->record_bytes == NULL) {
-        return STN_DATA_ARGUMENT;
-    }
-    if (tx->version != 1) { return STN_DATA_VERSION; }
-    if (tx->type < STN_TX_PUBLICATION || tx->type > STN_TX_TRANSFER) { return STN_DATA_TYPE; }
-    if (tx->type == STN_TX_PUBLICATION && (tx->record_length < STN_RECORD_OVERHEAD || tx->record_length > STN_RECORD_MAX_SIZE)) return STN_DATA_LENGTH;
-    if (tx->type != STN_TX_PUBLICATION &&
-        tx->type != STN_TX_CONTRACT_ACTION &&
-        tx->type != STN_TX_SHARE_EVIDENCE &&
-        tx->type != STN_TX_COMPENSATION_DESTINATION &&
-        tx->type != STN_TX_ISSUANCE &&
-        tx->type != STN_TX_TRANSFER &&
-        (size_t)tx->record_length != lifecycle_size(tx->type)) return STN_DATA_LENGTH;
-    if (tx->type == STN_TX_PUBLICATION) {
-        if (stn_record_decode(tx->record_bytes, tx->record_length, &r) != STN_RECORD_OK) { return STN_DATA_CONTENT; }
-    } else if (tx->type == STN_TX_CONTRACT_ACTION) {
-        if (tx->record_length > STN_TX_CONTRACT_ACTION_MAX_SIZE) { return STN_DATA_LENGTH; }
-        if (stn_contract_transaction_validate_structure(tx->record_bytes, tx->record_length) != STN_CONTRACT_OK) { return STN_DATA_CONTENT; }
-    } else if (tx->type == STN_TX_SHARE_EVIDENCE) {
-        stn_share_evidence share;
-        if (tx->record_length != 73u &&
-            stn_share_decode(tx->record_bytes,tx->record_length,&share) != STN_DATA_OK) {
-            return STN_DATA_CONTENT;
-        }
-    } else if (tx->type == STN_TX_COMPENSATION_DESTINATION) {
-        stn_compensation_destination destination;
-        if (stn_compensation_destination_decode(tx->record_bytes,tx->record_length,&destination) != STN_DATA_OK) { return STN_DATA_CONTENT; }
-    } else if (tx->type == STN_TX_ISSUANCE) {
-        stn_issuance_record issuance;
-        if (stn_issuance_decode(tx->record_bytes,tx->record_length,&issuance) != STN_DATA_OK) { return STN_DATA_CONTENT; }
-    } else if (tx->type == STN_TX_TRANSFER) {
-        stn_transfer_envelope envelope;
-        if (stn_transfer_envelope_decode(tx->record_bytes,tx->record_length,&envelope) != STN_DATA_OK) { return STN_DATA_CONTENT; }
-    } else if ((size_t)tx->record_length != lifecycle_size(tx->type)) { return STN_DATA_LENGTH; }
-    total = STN_TX_HEADER_SIZE + (size_t)tx->record_length;
-    if (capacity < total) { return STN_DATA_CAPACITY; }
-    memcpy(output, magic, 4);
-    stn_wire_write(output + 4, 2, tx->version);
-    stn_wire_write(output + 6, 2, tx->type);
-    stn_wire_write(output + 8, 4, tx->record_length);
-    memcpy(output + STN_TX_HEADER_SIZE, tx->record_bytes, tx->record_length);
-    *written = total;
-    return STN_DATA_OK;
-}
-
-stn_data_status stn_transaction_id(const uint8_t *bytes, size_t length,
-    const stn_hash_provider *provider, uint8_t digest[32])
-{
-    static const uint8_t domain[] = "STN-CHAIN:TX:ID:1";
-    uint8_t temporary[32] = {0};
-    stn_data_status status;
-    if (digest == NULL) { return STN_DATA_ARGUMENT; }
-    status = stn_transaction_validate_structure(bytes, length);
-    if (status != STN_DATA_OK) { return status; }
-    if (provider == NULL || provider->hash == NULL) { return STN_DATA_UNRESOLVED; }
-    status = provider->hash(provider->user, domain, sizeof(domain), bytes, length, temporary);
-    if (status == STN_DATA_OK) { memcpy(digest, temporary, 32); }
-    else if (status != STN_DATA_UNRESOLVED) { status = STN_DATA_PROVIDER_ERROR; }
-    return status;
+    static const uint8_t domain[]="STN-CHAIN:TX:ID:1";uint8_t temporary[32]={0};stn_data_status status;
+    if(digest==NULL)return STN_DATA_ARGUMENT;status=stn_transaction_validate_structure(bytes,length);if(status!=STN_DATA_OK)return status;
+    if(provider==NULL||provider->hash==NULL)return STN_DATA_UNRESOLVED;
+    status=provider->hash(provider->user,domain,sizeof(domain),bytes,length,temporary);if(status==STN_DATA_OK)memcpy(digest,temporary,32);else if(status!=STN_DATA_UNRESOLVED)status=STN_DATA_PROVIDER_ERROR;return status;
 }
