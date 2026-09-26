@@ -1,29 +1,6 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_issuance_binding.h"
-#include "stn_sha256.h"
 #include <string.h>
-
-static int zero32(const uint8_t value[32])
-{
-    size_t i;uint8_t any=0u;
-    for(i=0u;i<32u;++i)any|=value[i];
-    return any==0u;
-}
-
-static stn_data_status block_compensation_id_local(
-    const stn_block_compensation_evidence *evidence,
-    uint8_t id[STN_BLOCK_COMPENSATION_ID_SIZE])
-{
-    static const uint8_t domain[]="STN-CHAIN:BLOCK-COMPENSATION:ID:1";
-    uint8_t canonical[STN_BLOCK_COMPENSATION_CANONICAL_SIZE];
-    if(evidence==NULL || id==NULL)return STN_DATA_ARGUMENT;
-    if(evidence->miner.type!=STN_ADDRESS_IDENTITY)return STN_DATA_TYPE;
-    if(zero32(evidence->block_id) || zero32(evidence->miner.identifier))return STN_DATA_CONTENT;
-    canonical[0]=STN_BLOCK_COMPENSATION_VERSION;
-    memcpy(canonical+1u,evidence->block_id,32u);
-    memcpy(canonical+33u,evidence->miner.identifier,32u);
-    return stn_sha256(NULL,domain,sizeof(domain),canonical,sizeof(canonical),id);
-}
 
 stn_data_status stn_issuance_bind_share(
     const stn_issuance_record *issuance,
@@ -72,7 +49,7 @@ stn_data_status stn_issuance_bind_block(
     if(memcmp(issuance->destination.mining_identity.identifier,
               evidence->miner.identifier,STN_ADDRESS_ID_SIZE)!=0)return STN_DATA_CONTENT;
 
-    status=block_compensation_id_local(evidence,evidence_id);
+    status=stn_block_compensation_id(evidence,evidence_id);
     if(status!=STN_DATA_OK)return status;
     if(memcmp(issuance->evidence_id,evidence_id,sizeof(evidence_id))!=0)return STN_DATA_CONTENT;
 
