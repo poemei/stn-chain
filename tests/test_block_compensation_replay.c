@@ -9,7 +9,7 @@ static unsigned checks=0u,failures=0u;
 
 int main(void)
 {
-    stn_block_compensation_replay state;
+    stn_block_compensation_replay state,copy;
     stn_block_compensation_evidence evidence;
     uint8_t a[STN_BLOCK_COMPENSATION_ID_SIZE]={0};
     uint8_t b[STN_BLOCK_COMPENSATION_ID_SIZE]={0};
@@ -28,6 +28,17 @@ int main(void)
     CHECK(state.count==1u);
     CHECK(stn_block_compensation_replay_consume(&state,b)==STN_DATA_OK);
     CHECK(state.count==2u);
+
+    memset(&copy,0xa5,sizeof(copy));
+    CHECK(stn_block_compensation_replay_copy(NULL,&copy)==STN_DATA_ARGUMENT);
+    CHECK(stn_block_compensation_replay_copy(&state,NULL)==STN_DATA_ARGUMENT);
+    CHECK(stn_block_compensation_replay_copy(&state,&copy)==STN_DATA_OK);
+    CHECK(copy.count==state.count);
+    CHECK(memcmp(copy.ids,state.ids,sizeof(state.ids))==0);
+    state.ids[0][0]=0u;
+    CHECK(stn_block_compensation_replay_copy(&state,&copy)==STN_DATA_CONTENT);
+    CHECK(copy.count==2u);
+    state.ids[0][0]=1u;
 
     stn_block_compensation_replay_initialize(&state);
     memset(&evidence,0,sizeof(evidence));
