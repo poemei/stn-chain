@@ -14,6 +14,8 @@
 #define STN_RPC_SUBMISSION 2u
 #define STN_RPC_ADMIN 4u
 #define STN_RPC_ACCEPTED_RECORD_PREFIX 76u
+#define STN_RPC_CONTRACT_LIST_ENTRY_SIZE 90u
+#define STN_RPC_CONTRACT_LIST_MAX 16u
 typedef enum stn_rpc_code {
     STN_RPC_OK=0,STN_RPC_INVALID,STN_RPC_VERSION,STN_RPC_METHOD,
     STN_RPC_FORBIDDEN,STN_RPC_UNAVAILABLE,STN_RPC_NOT_FOUND,
@@ -26,40 +28,20 @@ typedef enum stn_rpc_method {
     STN_RPC_GET_ACCEPTED_RECORD=4,
     STN_RPC_GET_FIRST_ACCEPTED_RECORD=5,STN_RPC_GET_NEXT_ACCEPTED_RECORD=6,
     STN_RPC_GET_CURSOR_REORG_STATUS=7,STN_RPC_GET_CONSUMER_RECOVERY_PLAN=8,
-    /* DERIVE_ADDRESS request: u16 typed namespace, u32 source length, then
-     * exact canonical source bytes. Supported types are Identity, Contract,
-     * and Wallet. Success returns the full canonical typed address text. */
     STN_RPC_DERIVE_ADDRESS=9,
-    /* BALANCE request: exact 70-byte canonical stnw0_ address text.
-     * Success returns accepted balance as one big-endian u64. */
     STN_RPC_BALANCE=10,
-    /* CONTRACT_STATE request: exact 70-byte canonical stnc0_ address text.
-     * Success returns state/type/sequence/created_at/participant_count/terms_length. */
     STN_RPC_CONTRACT_STATE=11,
+    /* CONTRACT_LIST request: exact canonical 69-byte stn0_ identity address.
+     * Success: u16 count followed by count fixed 90-byte entries:
+     * stnc0_ text[70], state u16, type u16, sequence u64, created_at u64.
+     * Results are active/nonterminal first, newest first, bounded to 16. */
+    STN_RPC_CONTRACT_LIST=12,
     STN_RPC_CHECK_INTELLIGENCE=0x1000,STN_RPC_SUBMIT_INTELLIGENCE=0x1001,
     STN_RPC_INTELLIGENCE_ID=0x1002,STN_RPC_INTELLIGENCE_CURSOR=0x1003,
     STN_RPC_PENDING=0x1004,STN_RPC_SUBMIT_TRANSACTION=0x1005,
-    /* SUBMIT_BLOCK_EVIDENCE request: one exact canonical block retrieved as
-     * untrusted evidence. Chain validates it against the current accepted tip
-     * before any atomic storage extension. Success returns tip/height/work. */
     STN_RPC_SUBMIT_BLOCK_EVIDENCE=0x1006,
-    /* Complete candidate history evidence. Payload is u32 count followed by
-     * repeated u32 block length + canonical block bytes. Chain alone validates
-     * fork preference and performs atomic adoption. */
     STN_RPC_SUBMIT_HISTORY_EVIDENCE=0x1007,
-    /* Candidate suffix evidence. Payload: u32 common-prefix block count,
-     * u32 suffix count, then repeated u32 block length + canonical block.
-     * Chain verifies the accepted prefix under storage exclusion, reconstructs
-     * the full candidate internally, and alone determines fork preference. */
     STN_RPC_SUBMIT_SUFFIX_EVIDENCE=0x1008,
-    /* Staged suffix recovery carries a divergent candidate across bounded
-     * STNC frames without transferring fork choice to the caller.
-     * BEGIN: u32 accepted-prefix count + u32 total suffix block count.
-     * APPEND: u32 start suffix offset + u32 block count + repeated
-     *         u32 block length + canonical block bytes.
-     * COMMIT/ABORT: empty payload.
-     * Staging is Chain-owned transient evidence; only COMMIT may evaluate
-     * and atomically alter accepted state. */
     STN_RPC_SUFFIX_STAGE_BEGIN=0x1009,
     STN_RPC_SUFFIX_STAGE_APPEND=0x100a,
     STN_RPC_SUFFIX_STAGE_COMMIT=0x100b,
@@ -68,7 +50,6 @@ typedef enum stn_rpc_method {
     STN_RPC_MINING_TEMPLATE=0x2002,STN_RPC_SUBMIT_WORK=0x2003,STN_RPC_SUBMIT_SHARE=0x2004,
     STN_RPC_ADMIN_CONTROL=0x3000
 } stn_rpc_method;
-/* STNC submission-result v1 wire values; independent of internal enums. */
 typedef enum stn_rpc_submission_result {
     STN_RPC_ADMITTED=0, STN_RPC_DUPLICATE=1, STN_RPC_POOL_FULL=2,
     STN_RPC_BAD_SUBMISSION=3, STN_RPC_UNSUPPORTED_SUBMISSION=4,
@@ -76,38 +57,19 @@ typedef enum stn_rpc_submission_result {
     STN_RPC_ADMISSION_UNAVAILABLE=7, STN_RPC_ADMISSION_INTERNAL=8
 } stn_rpc_submission_result;
 typedef struct stn_rpc_message {
-    uint16_t kind; /* 1 request, 2 response */
+    uint16_t kind;
     uint16_t method;
     stn_rpc_code code;
     uint64_t request_id;
     const uint8_t *payload;
     size_t length;
 } stn_rpc_message;
-/* Fixed-header preflight for stream readers. It does not interpret magic,
- * version, kind or method, so dispatch retains their existing error semantics.
- * It only permits an exact 24-byte header and a declared payload within the
- * global bound before the caller reads that payload from an untrusted stream. */
 stn_rpc_code stn_rpc_payload_length(const uint8_t *bytes,size_t length,size_t *payload_length);
-/* STNC,u16 version=2,u16 kind,u16 method,u16 code,u64 ID,u32 length.
- * Big-endian; exact length; no implicit fields. Request code must be zero.
- * Decode checks method payload shape for known requests; unknown methods are
- * well-framed requests for dispatch to answer METHOD, never service calls.
- * Encode/decode output unchanged on failure except *written=0 for encode.
- * Objects/spans must be disjoint; decoded payload borrows immutable bytes. */
 stn_rpc_code stn_rpc_decode(const uint8_t *bytes,size_t length,stn_rpc_message *out);
 stn_rpc_code stn_rpc_encode(const stn_rpc_message *message,uint8_t *bytes,size_t capacity,size_t *written);
-/* Internal service boundary. Only validated, authorized, known requests reach
- * the handler. Handler is trusted to obey capacity/lifetime and capability
- * semantics; it must not mutate read-only snapshots. Operation-specific recovery statuses may carry their qualified bodies.
- * Error responses carry no
- * payload. No authentication is implied by a local allowed-capability mask. */
 typedef stn_rpc_code (*stn_rpc_handler)(void *user,const stn_rpc_message *request,
     uint8_t *payload,size_t capacity,size_t *written);
 typedef struct stn_rpc_service { void *user;stn_rpc_handler handle; } stn_rpc_service;
-/* Returns OK if a complete response was encoded (including protocol errors).
- * Invalid frames receive request_id=0/method=0; no unvalidated correlation is
- * echoed. Output is scratch until success; *written stays zero on failure.
- * No socket, persistence path, global state or allocation is involved. */
 stn_rpc_code stn_rpc_dispatch(const uint8_t *request,size_t length,uint32_t allowed,
     const stn_rpc_service *service,uint8_t *response,size_t capacity,size_t *written);
 #endif
