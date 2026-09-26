@@ -69,6 +69,50 @@ static int ensure_storage_capacity(stn_mining_service *s,size_t required)
         grow(&s->workspace.next_bytes,&s->workspace.next_capacity,required,s->owns_buffers);
 }
 
+static int template_time_matches(const stn_mining_service *s,
+    const stn_storage_view *v,const stn_block_header *header)
+{
+    if(s==NULL || v==NULL || header==NULL || !s->template_time_valid){return 0;}
+    return
+        s->template_time_height==header->height &&
+        s->template_time_transaction_count==header->transaction_count &&
+        s->template_time_body_length==header->body_length &&
+        memcmp(s->template_time_base,v->state.tip_id,32u)==0 &&
+        memcmp(s->template_time_target,header->reserved_target,32u)==0 &&
+        memcmp(s->template_time_commitment,header->transaction_commitment,32u)==0;
+}
+
+static stn_rpc_code template_time_select(stn_mining_service *s,
+    const stn_storage_view *v,stn_block_header *header)
+{
+    uint64_t selected;
+
+    if(s==NULL || v==NULL || header==NULL){return STN_RPC_PROVIDER;}
+
+    if(template_time_matches(s,v,header)){
+        header->timestamp=s->template_time_value;
+        return STN_RPC_OK;
+    }
+
+    selected=v->state.timestamp;
+    if(s->timestamp_now!=NULL){
+        uint64_t now=s->timestamp_now(s->timestamp_user);
+        if(now==0u){return STN_RPC_UNAVAILABLE;}
+        if(now>selected){selected=now;}
+    }
+
+    memcpy(s->template_time_base,v->state.tip_id,32u);
+    memcpy(s->template_time_target,header->reserved_target,32u);
+    memcpy(s->template_time_commitment,header->transaction_commitment,32u);
+    s->template_time_height=header->height;
+    s->template_time_transaction_count=header->transaction_count;
+    s->template_time_body_length=header->body_length;
+    s->template_time_value=selected;
+    s->template_time_valid=1;
+    header->timestamp=selected;
+    return STN_RPC_OK;
+}
+
 static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view *v,size_t *length,uint8_t id[32])
 {
     static const uint8_t domain[]="STN-CHAIN:WORK:ID:1";
@@ -200,11 +244,6 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
     memcpy(b.header.previous_hash,v->state.tip_id,32);
     b.header.height=v->state.height+1;
     b.header.timestamp=v->state.timestamp;
-    if(s->timestamp_now!=NULL){
-        uint64_t now=s->timestamp_now(s->timestamp_user);
-        if(now==0u){return STN_RPC_UNAVAILABLE;}
-        if(now>b.header.timestamp){b.header.timestamp=now;}
-    }
     memcpy(b.header.reserved_target,required_target,32);
     b.header.transaction_count=transaction_count;
     b.header.body_length=(uint32_t)body_length;
@@ -217,6 +256,11 @@ static stn_rpc_code template_build(stn_mining_service *s,const stn_storage_view 
             &s->chain->hash_provider,
             b.header.transaction_commitment)!=STN_DATA_OK){
         return STN_RPC_REJECTED;
+    }
+
+    {
+        stn_rpc_code time_code=template_time_select(s,v,&b.header);
+        if(time_code!=STN_RPC_OK){return time_code;}
     }
 
     if(s->template_capacity<STN_BLOCK_HEADER_SIZE+body_length){
@@ -289,7 +333,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
     stn_address submitted_miner={0};int has_submitted_miner=0;
     uint8_t id[32],remove[STN_PENDING_MAX_ENTRIES]={0};stn_node_service query={0};
 
-    if(written!=NULL){*written=0;}
+    if(written!=NULL)*written=0u;
 
     if(s==NULL || q==NULL || p==NULL || written==NULL || s->chain==NULL || s->storage==NULL ||
        s->storage->acquire==NULL || s->storage->release==NULL || s->storage->read==NULL || s->storage->replace==NULL ||
@@ -542,7 +586,7 @@ suffix_done:
         candidate=(stn_block_span *)calloc(count,sizeof(*candidate));
         if(candidate==NULL){code=STN_RPC_CAPACITY;goto done;}
 
-        for(i=0;i<count;i++){
+        for(i=0u;i<count;i++){
             if(at>q->length||q->length-at<4u){code=STN_RPC_INVALID;goto history_done;}
             length=(size_t)stn_wire_read(q->payload+at,4u);at+=4u;
             if(length<STN_BLOCK_HEADER_SIZE||length>STN_BLOCK_MAX_SIZE||length>q->length-at){
