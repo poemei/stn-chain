@@ -3,16 +3,25 @@
 #include "stn_sha256.h"
 #include <string.h>
 
+static int zero32(const uint8_t value[32])
+{
+    size_t i;uint8_t any=0u;
+    for(i=0u;i<32u;++i)any|=value[i];
+    return any==0u;
+}
+
 static stn_data_status block_compensation_id_local(
     const stn_block_compensation_evidence *evidence,
     uint8_t id[STN_BLOCK_COMPENSATION_ID_SIZE])
 {
     static const uint8_t domain[]="STN-CHAIN:BLOCK-COMPENSATION:ID:1";
     uint8_t canonical[STN_BLOCK_COMPENSATION_CANONICAL_SIZE];
-    stn_data_status status;
     if(evidence==NULL || id==NULL)return STN_DATA_ARGUMENT;
-    status=stn_block_compensation_encode(evidence,canonical);
-    if(status!=STN_DATA_OK)return status;
+    if(evidence->miner.type!=STN_ADDRESS_IDENTITY)return STN_DATA_TYPE;
+    if(zero32(evidence->block_id) || zero32(evidence->miner.identifier))return STN_DATA_CONTENT;
+    canonical[0]=STN_BLOCK_COMPENSATION_VERSION;
+    memcpy(canonical+1u,evidence->block_id,32u);
+    memcpy(canonical+33u,evidence->miner.identifier,32u);
     return stn_sha256(NULL,domain,sizeof(domain),canonical,sizeof(canonical),id);
 }
 
