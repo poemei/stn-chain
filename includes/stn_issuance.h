@@ -9,8 +9,8 @@
 #define STN_ISSUANCE_REASON_BLOCK 2u
 #define STN_ISSUANCE_EVIDENCE_ID_SIZE 32u
 #define STN_ISSUANCE_CANONICAL_SIZE 106u
-#define STN_ISSUANCE_SHARE_UNITS 1u
-#define STN_ISSUANCE_BLOCK_UNITS 100u
+#define STN_ISSUANCE_SHARE_UNITS 100u
+#define STN_ISSUANCE_BLOCK_UNITS 10000u
 
 typedef struct stn_issuance_record {
     uint8_t reason;
@@ -23,8 +23,8 @@ typedef struct stn_issuance_record {
  * version[1] || reason[1] || units[8] big-endian || evidence_id[32] ||
  * compensation_destination[64 identifiers only].
  *
- * reason determines the only valid amount:
- * SHARE -> 1 unit, BLOCK -> 100 units.
+ * One economic unit is one centi-STNC. reason determines the only valid amount:
+ * SHARE -> 100 units (1 STNC), BLOCK -> 10000 units (100 STNC).
  * The destination is explicitly stn0_ identity -> stnw0_ wallet.
  * This is a canonical economic record primitive only. It does not establish
  * wallet control, accept evidence, mutate balances, or activate issuance. */

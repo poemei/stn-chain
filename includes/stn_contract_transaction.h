@@ -29,6 +29,13 @@
  *
  * All integer fields are big-endian.
  *
+ * CREATE is the bootstrap action. It carries zero authority bytes because no
+ * accepted Contract exists yet from which a scoped Contract grant can derive.
+ * CREATE still carries actor and signature and remains subject to identity,
+ * signature, participant, initial-state and consensus validation.
+ *
+ * Every action after CREATE carries exactly STN_AUTHORITY_EVIDENCE_SIZE bytes.
+ *
  * This is a structural transport object only. Decode/encode do not establish
  * signature validity, scoped authority, lifecycle validity, accepted history,
  * duplicate approval state or consensus acceptance.
