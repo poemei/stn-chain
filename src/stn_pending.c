@@ -4,6 +4,9 @@
 #include "stn_sha256.h"
 #include "stn_wire_internal.h"
 #include "stn_share.h"
+#include "stn_compensation.h"
+#include "stn_issuance.h"
+#include "stn_issuance_binding.h"
 #include "stn_transfer_envelope.h"
 #include "stn_transfer_envelope_authorization.h"
 #include <stdlib.h>
@@ -26,6 +29,83 @@ static size_t find_id(const stn_pending *p,const uint8_t id[32])
     return at;
 }
 
+static stn_data_status pending_share_for_issuance(
+    const stn_pending *p,
+    const stn_issuance_record *issuance,
+    const stn_compensation_state *compensation,
+    int *found)
+{
+    size_t i;
+    if(p==NULL || issuance==NULL || compensation==NULL || found==NULL)
+        return STN_DATA_ARGUMENT;
+    *found=0;
+    for(i=0u;i<p->count;++i){
+        stn_transaction tx;
+        if(stn_transaction_decode(p->entries[i].transaction,p->entries[i].length,&tx)!=STN_DATA_OK)
+            return STN_DATA_CONTENT;
+        if(tx.type==STN_TX_SHARE_EVIDENCE){
+            stn_share_evidence share;
+            if(stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK)
+                return STN_DATA_CONTENT;
+            if(stn_issuance_bind_share(issuance,&share,compensation)==STN_DATA_OK){
+                *found=1;
+                return STN_DATA_OK;
+            }
+        }
+    }
+    return STN_DATA_OK;
+}
+
+static stn_data_status history_issuance_state(
+    const stn_storage_view *v,
+    const stn_issuance_record *issuance,
+    const stn_compensation_state *compensation,
+    int *share_found,
+    int *issuance_found)
+{
+    size_t i,j;
+    if(v==NULL || issuance==NULL || compensation==NULL ||
+       share_found==NULL || issuance_found==NULL ||
+       (v->count!=0u && v->blocks==NULL))return STN_DATA_ARGUMENT;
+
+    *share_found=0;
+    *issuance_found=0;
+    for(i=0u;i<v->count;++i){
+        stn_block block;
+        size_t offset=0u;
+        if(stn_block_decode(v->blocks[i].bytes,v->blocks[i].length,&block)!=STN_DATA_OK)
+            return STN_DATA_CONTENT;
+        for(j=0u;j<block.header.transaction_count;++j){
+            uint32_t n;
+            stn_transaction tx;
+            if(offset+4u>block.header.body_length)return STN_DATA_CONTENT;
+            n=(uint32_t)stn_wire_read(block.body+offset,4u);
+            offset+=4u;
+            if(n>block.header.body_length-offset ||
+               stn_transaction_decode(block.body+offset,n,&tx)!=STN_DATA_OK)
+                return STN_DATA_CONTENT;
+            if(tx.type==STN_TX_SHARE_EVIDENCE){
+                stn_share_evidence share;
+                if(stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK)
+                    return STN_DATA_CONTENT;
+                if(stn_issuance_bind_share(issuance,&share,compensation)==STN_DATA_OK)
+                    *share_found=1;
+            }else if(tx.type==STN_TX_ISSUANCE){
+                stn_issuance_record prior;
+                if(stn_issuance_decode(tx.record_bytes,tx.record_length,&prior)!=STN_DATA_OK)
+                    return STN_DATA_CONTENT;
+                if(prior.reason==issuance->reason &&
+                   memcmp(prior.evidence_id,issuance->evidence_id,
+                       STN_ISSUANCE_EVIDENCE_ID_SIZE)==0){
+                    *issuance_found=1;
+                }
+            }
+            offset+=n;
+        }
+    }
+    return STN_DATA_OK;
+}
+
 stn_pending_result stn_pending_insert(stn_pending *p,const uint8_t *bytes,
     size_t length,const stn_hash_provider *hash,uint8_t id[32])
 {
@@ -42,6 +122,18 @@ stn_pending_result stn_pending_insert(stn_pending *p,const uint8_t *bytes,
             size_t i;
             for(i=0;i<8u;++i){entry.nonce[24u+i]=(uint8_t)(share.nonce>>(56u-8u*i));}
         }
+    }
+    else if(tx.type==STN_TX_COMPENSATION_DESTINATION){
+        stn_compensation_destination destination;
+        if(stn_compensation_destination_decode(tx.record_bytes,tx.record_length,&destination)!=STN_DATA_OK)return STN_PENDING_INVALID;
+        memcpy(entry.signer,destination.mining_identity.identifier,32);
+        memcpy(entry.nonce,destination.wallet.identifier,32);
+    }
+    else if(tx.type==STN_TX_ISSUANCE){
+        stn_issuance_record issuance;
+        if(stn_issuance_decode(tx.record_bytes,tx.record_length,&issuance)!=STN_DATA_OK)return STN_PENDING_INVALID;
+        memcpy(entry.signer,issuance.destination.mining_identity.identifier,32);
+        memcpy(entry.nonce,issuance.evidence_id,32);
     }
     else if(tx.type==STN_TX_TRANSFER){
         stn_transfer_envelope envelope;
@@ -122,7 +214,7 @@ static stn_data_status scan(const stn_pending *p,const stn_storage_view *v,uint8
         for(j=0;j<b.header.transaction_count;++j){
             size_t n=(size_t)stn_wire_read(b.body+offset,4);
             if(stn_transaction_decode(b.body+offset+4,n,&tx)!=STN_DATA_OK){return STN_DATA_CONTENT;}
-            lifecycle=tx.type!=STN_TX_PUBLICATION && tx.type!=STN_TX_SHARE_EVIDENCE;
+            lifecycle=1;
             if(tx.type==STN_TX_SHARE_EVIDENCE){
                 stn_share_evidence share;
                 if(stn_share_decode(tx.record_bytes,tx.record_length,&share)!=STN_DATA_OK)return STN_DATA_CONTENT;
@@ -132,13 +224,31 @@ static stn_data_status scan(const stn_pending *p,const stn_storage_view *v,uint8
                     size_t z;
                     for(z=0;z<8u;++z){nonce[24u+z]=(uint8_t)(share.nonce>>(56u-8u*z));}
                 }
+                lifecycle=0;
+            }
+            else if(tx.type==STN_TX_COMPENSATION_DESTINATION){
+                stn_compensation_destination destination;
+                if(stn_compensation_destination_decode(tx.record_bytes,tx.record_length,&destination)!=STN_DATA_OK)return STN_DATA_CONTENT;
+                memcpy(signer,destination.mining_identity.identifier,32);
+                memcpy(nonce,destination.wallet.identifier,32);
+                lifecycle=0;
+            }
+            else if(tx.type==STN_TX_ISSUANCE){
+                stn_issuance_record issuance;
+                if(stn_issuance_decode(tx.record_bytes,tx.record_length,&issuance)!=STN_DATA_OK)return STN_DATA_CONTENT;
+                memcpy(signer,issuance.destination.mining_identity.identifier,32);
+                memcpy(nonce,issuance.evidence_id,32);
+                lifecycle=0;
             }
             else if(tx.type==STN_TX_TRANSFER){
                 stn_transfer_envelope envelope;
                 if(stn_transfer_envelope_decode(tx.record_bytes,tx.record_length,&envelope)!=STN_DATA_OK)return STN_DATA_CONTENT;
                 memcpy(signer,envelope.controller,32);memcpy(nonce,envelope.nonce,32);lifecycle=0;
             }
-            else if(!lifecycle){if(stn_record_decode(tx.record_bytes,tx.record_length,&r)!=STN_RECORD_OK)return STN_DATA_CONTENT;memcpy(signer,r.signer_public_key,32);memcpy(nonce,r.nonce,32);}
+            else if(tx.type==STN_TX_PUBLICATION){
+                if(stn_record_decode(tx.record_bytes,tx.record_length,&r)!=STN_RECORD_OK)return STN_DATA_CONTENT;
+                memcpy(signer,r.signer_public_key,32);memcpy(nonce,r.nonce,32);lifecycle=0;
+            }
             else {memcpy(signer,tx.record_bytes+1,32);if(hash!=NULL){if(tx.type==STN_TX_AUTHORITY_GRANT){if(stn_authority_grant_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_GRANT)return STN_DATA_CONTENT;}else if(tx.type==STN_TX_AUTHORITY_REVOKE){if(stn_authority_revocation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_REVOCATION)return STN_DATA_CONTENT;}else if(tx.type==STN_TX_IDENTITY_ROTATE){if(stn_identity_rotation_statement(tx.record_bytes+1,tx.record_bytes+33,statement,sizeof(statement),&written)!=STN_AUTHORITY_VALID_ROTATION)return STN_DATA_CONTENT;}else return STN_DATA_CONTENT;if(stn_lifecycle_replay_nonce(tx.type,statement,written,hash,nonce)!=STN_LIFECYCLE_OK)return STN_DATA_CONTENT;}}
             if(!replay && stn_transaction_id(b.body+offset+4,n,hash,id)!=STN_DATA_OK){return STN_DATA_PROVIDER_ERROR;}
             for(k=0;k<p->count;++k){if(replay ? (lifecycle ? (p->entries[k].length==n && memcmp(p->entries[k].transaction,b.body+offset,n)==0) : same_nonce(&p->entries[k],signer,nonce)) : memcmp(p->entries[k].id,id,32)==0){mask[k]=1;}}
@@ -276,10 +386,71 @@ stn_pending_result stn_pending_admit_transaction(stn_pending *p,const uint8_t *b
         return lifecycle_result;
     }
     if(tx.type==STN_TX_ISSUANCE){
-        /* No caller may place an issuance record into pending until Chain can
-         * bind its evidence ID and destination to accepted mining evidence. */
-        report->acceptance=STN_ACCEPTANCE_UNRESOLVED;
-        return STN_PENDING_UNAVAILABLE;
+        stn_issuance_record issuance;
+        stn_address wallet;
+        int accepted_share=0,accepted_issuance=0,pending_share=0;
+        if(p==NULL || active==NULL || hash==NULL || active->state.compensation==NULL){
+            report->acceptance=STN_ACCEPTANCE_UNRESOLVED;
+            return STN_PENDING_UNAVAILABLE;
+        }
+        if(stn_issuance_decode(tx.record_bytes,tx.record_length,&issuance)!=STN_DATA_OK){
+            report->structure=STN_STAGE_REJECT;
+            report->acceptance=STN_ACCEPTANCE_REJECTED;
+            return STN_PENDING_INVALID;
+        }
+        /* Block issuance is consensus-coupled to block-compensation evidence.
+         * The generic pending path admits only share issuance. */
+        if(issuance.reason!=STN_ISSUANCE_REASON_SHARE){
+            report->acceptance=STN_ACCEPTANCE_UNRESOLVED;
+            return STN_PENDING_UNAVAILABLE;
+        }
+        status=stn_compensation_state_lookup(active->state.compensation,
+            &issuance.destination.mining_identity,&wallet);
+        if(status==STN_DATA_UNRESOLVED){
+            report->acceptance=STN_ACCEPTANCE_UNRESOLVED;
+            return STN_PENDING_UNAVAILABLE;
+        }
+        if(status!=STN_DATA_OK){
+            report->acceptance=STN_ACCEPTANCE_ERROR;
+            return status==STN_DATA_CAPACITY ? STN_PENDING_CAPACITY : STN_PENDING_PROVIDER;
+        }
+        if(wallet.type!=STN_ADDRESS_WALLET ||
+           memcmp(wallet.identifier,issuance.destination.wallet.identifier,
+               STN_ADDRESS_ID_SIZE)!=0){
+            report->acceptance=STN_ACCEPTANCE_REJECTED;
+            return STN_PENDING_REPLAY;
+        }
+        status=history_issuance_state(active,&issuance,active->state.compensation,
+            &accepted_share,&accepted_issuance);
+        if(status!=STN_DATA_OK){
+            report->acceptance=STN_ACCEPTANCE_ERROR;
+            return STN_PENDING_PROVIDER;
+        }
+        if(accepted_issuance){
+            report->replay=STN_STAGE_REJECT;
+            report->acceptance=STN_ACCEPTANCE_REJECTED;
+            return STN_PENDING_REPLAY;
+        }
+        if(!accepted_share){
+            status=pending_share_for_issuance(p,&issuance,
+                active->state.compensation,&pending_share);
+            if(status!=STN_DATA_OK){
+                report->acceptance=STN_ACCEPTANCE_ERROR;
+                return STN_PENDING_PROVIDER;
+            }
+            if(!pending_share){
+                report->acceptance=STN_ACCEPTANCE_UNRESOLVED;
+                return STN_PENDING_UNAVAILABLE;
+            }
+        }
+        lifecycle_result=stn_pending_insert(p,bytes,length,hash,id);
+        if(lifecycle_result==STN_PENDING_ACCEPTED){
+            report->replay=STN_STAGE_PASS;
+            report->acceptance=STN_ACCEPTANCE_UNDER_CONTEXT;
+            return lifecycle_result;
+        }
+        report->acceptance=STN_ACCEPTANCE_REJECTED;
+        return lifecycle_result;
     }
     if(tx.type==STN_TX_COMPENSATION_DESTINATION){
         stn_compensation_destination destination;
@@ -459,6 +630,31 @@ stn_data_status stn_pending_assemble(const stn_pending *p,const stn_validation_c
                    memcmp(parent_id,work_header.previous_hash,32u)!=0){
                     continue;
                 }
+            }
+        }
+
+        /* Share issuance becomes candidate-eligible only after the exact share
+         * evidence has entered accepted history. This preserves the Chain
+         * validator's evidence-first rule and prevents issuance from racing its
+         * still-pending share into the same candidate. */
+        if(tx.type==STN_TX_ISSUANCE){
+            stn_issuance_record issuance;
+            int accepted_share=0,accepted_issuance=0;
+            stn_data_status state;
+            if(active==NULL || active->state.compensation==NULL ||
+               stn_issuance_decode(tx.record_bytes,tx.record_length,&issuance)!=STN_DATA_OK){
+                return STN_DATA_CONTENT;
+            }
+            if(issuance.reason!=STN_ISSUANCE_REASON_SHARE){
+                continue;
+            }
+            state=history_issuance_state(active,&issuance,active->state.compensation,
+                &accepted_share,&accepted_issuance);
+            if(state!=STN_DATA_OK){
+                return state==STN_DATA_PROVIDER_ERROR ? STN_DATA_PROVIDER_ERROR : STN_DATA_CONTENT;
+            }
+            if(accepted_issuance || !accepted_share){
+                continue;
             }
         }
 
