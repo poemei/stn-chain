@@ -32,3 +32,15 @@ stn_data_status stn_block_compensation_replay_consume(
     ++state->count;
     return STN_DATA_OK;
 }
+
+stn_data_status stn_block_compensation_replay_consume_evidence(
+    stn_block_compensation_replay *state,
+    const stn_block_compensation_evidence *evidence)
+{
+    uint8_t evidence_id[STN_BLOCK_COMPENSATION_ID_SIZE];
+    stn_data_status status;
+    if(state==NULL || evidence==NULL)return STN_DATA_ARGUMENT;
+    status=stn_block_compensation_id(evidence,evidence_id);
+    if(status!=STN_DATA_OK)return status;
+    return stn_block_compensation_replay_consume(state,evidence_id);
+}
