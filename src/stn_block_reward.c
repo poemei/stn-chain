@@ -43,3 +43,38 @@ stn_data_status stn_block_reward_build(
     *issuance=i;
     return STN_DATA_OK;
 }
+
+stn_data_status stn_block_reward_encode_transactions(
+    const stn_block_compensation_evidence *evidence,
+    const stn_issuance_record *issuance,
+    uint8_t *evidence_tx,size_t evidence_capacity,size_t *evidence_written,
+    uint8_t *issuance_tx,size_t issuance_capacity,size_t *issuance_written)
+{
+    uint8_t evidence_bytes[STN_BLOCK_COMPENSATION_CANONICAL_SIZE];
+    uint8_t issuance_bytes[STN_ISSUANCE_CANONICAL_SIZE];
+    stn_transaction tx;
+    stn_data_status status;
+    size_t written;
+
+    if(evidence_written!=NULL)*evidence_written=0u;
+    if(issuance_written!=NULL)*issuance_written=0u;
+    if(evidence==NULL || issuance==NULL || evidence_tx==NULL || issuance_tx==NULL ||
+       evidence_written==NULL || issuance_written==NULL)return STN_DATA_ARGUMENT;
+
+    status=stn_block_compensation_encode(evidence,evidence_bytes,sizeof(evidence_bytes),&written);
+    if(status!=STN_DATA_OK)return status;
+    if(written!=sizeof(evidence_bytes))return STN_DATA_CONTENT;
+    memset(&tx,0,sizeof(tx));
+    tx.version=1u;tx.type=STN_TX_BLOCK_COMPENSATION_EVIDENCE;
+    tx.record_bytes=evidence_bytes;tx.record_length=(uint32_t)sizeof(evidence_bytes);
+    status=stn_transaction_encode(&tx,evidence_tx,evidence_capacity,evidence_written);
+    if(status!=STN_DATA_OK)return status;
+
+    status=stn_issuance_encode(issuance,issuance_bytes,sizeof(issuance_bytes),&written);
+    if(status!=STN_DATA_OK){*evidence_written=0u;return status;}
+    if(written!=sizeof(issuance_bytes)){*evidence_written=0u;return STN_DATA_CONTENT;}
+    tx.type=STN_TX_ISSUANCE;tx.record_bytes=issuance_bytes;tx.record_length=(uint32_t)sizeof(issuance_bytes);
+    status=stn_transaction_encode(&tx,issuance_tx,issuance_capacity,issuance_written);
+    if(status!=STN_DATA_OK){*evidence_written=0u;*issuance_written=0u;return status;}
+    return STN_DATA_OK;
+}
