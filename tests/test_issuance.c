@@ -28,32 +28,32 @@ static void vectors(void)
     fill(&in,STN_ISSUANCE_REASON_SHARE,STN_ISSUANCE_SHARE_UNITS);
     CHECK(stn_issuance_encode(&in,canonical)==STN_DATA_OK);
     CHECK(canonical[0]==STN_ISSUANCE_VERSION && canonical[1]==STN_ISSUANCE_REASON_SHARE);
-    CHECK(canonical[9]==1u);
+    CHECK(canonical[8]==0u && canonical[9]==100u);
     CHECK(memcmp(canonical+10u,in.evidence_id,32u)==0);
     CHECK(memcmp(canonical+42u,in.destination.mining_identity.identifier,32u)==0);
     CHECK(memcmp(canonical+74u,in.destination.wallet.identifier,32u)==0);
     CHECK(stn_issuance_decode(canonical,sizeof(canonical),&out)==STN_DATA_OK);
-    CHECK(out.reason==STN_ISSUANCE_REASON_SHARE && out.units==1u);
+    CHECK(out.reason==STN_ISSUANCE_REASON_SHARE && out.units==STN_ISSUANCE_SHARE_UNITS);
     CHECK(memcmp(out.evidence_id,in.evidence_id,32u)==0);
     CHECK(memcmp(out.destination.mining_identity.identifier,in.destination.mining_identity.identifier,32u)==0);
     CHECK(memcmp(out.destination.wallet.identifier,in.destination.wallet.identifier,32u)==0);
 
     fill(&in,STN_ISSUANCE_REASON_BLOCK,STN_ISSUANCE_BLOCK_UNITS);
     CHECK(stn_issuance_encode(&in,canonical)==STN_DATA_OK);
-    CHECK(canonical[1]==STN_ISSUANCE_REASON_BLOCK && canonical[9]==100u);
+    CHECK(canonical[1]==STN_ISSUANCE_REASON_BLOCK && canonical[8]==0x27u && canonical[9]==0x10u);
     CHECK(stn_issuance_decode(canonical,sizeof(canonical),&out)==STN_DATA_OK);
-    CHECK(out.reason==STN_ISSUANCE_REASON_BLOCK && out.units==100u);
+    CHECK(out.reason==STN_ISSUANCE_REASON_BLOCK && out.units==STN_ISSUANCE_BLOCK_UNITS);
 
     memset(before,0xa5,sizeof(before));memcpy(canonical,before,sizeof(canonical));
-    fill(&in,STN_ISSUANCE_REASON_SHARE,2u);
+    fill(&in,STN_ISSUANCE_REASON_SHARE,STN_ISSUANCE_SHARE_UNITS-1u);
     CHECK(stn_issuance_encode(&in,canonical)==STN_DATA_CONTENT);
     CHECK(memcmp(canonical,before,sizeof(canonical))==0);
-    fill(&in,STN_ISSUANCE_REASON_BLOCK,99u);
+    fill(&in,STN_ISSUANCE_REASON_BLOCK,STN_ISSUANCE_BLOCK_UNITS-1u);
     CHECK(stn_issuance_encode(&in,canonical)==STN_DATA_CONTENT);
     CHECK(memcmp(canonical,before,sizeof(canonical))==0);
-    fill(&in,3u,1u);
+    fill(&in,3u,STN_ISSUANCE_SHARE_UNITS);
     CHECK(stn_issuance_encode(&in,canonical)==STN_DATA_CONTENT);
-    fill(&in,STN_ISSUANCE_REASON_SHARE,1u);
+    fill(&in,STN_ISSUANCE_REASON_SHARE,STN_ISSUANCE_SHARE_UNITS);
     in.destination.wallet.type=STN_ADDRESS_IDENTITY;
     CHECK(stn_issuance_encode(&in,canonical)==STN_DATA_TYPE);
     in.destination.wallet.type=STN_ADDRESS_WALLET;
@@ -62,7 +62,7 @@ static void vectors(void)
     CHECK(stn_issuance_encode(NULL,canonical)==STN_DATA_ARGUMENT);
     CHECK(stn_issuance_encode(&in,NULL)==STN_DATA_ARGUMENT);
 
-    fill(&in,STN_ISSUANCE_REASON_SHARE,1u);
+    fill(&in,STN_ISSUANCE_REASON_SHARE,STN_ISSUANCE_SHARE_UNITS);
     CHECK(stn_issuance_encode(&in,canonical)==STN_DATA_OK);
     saved=out;
     CHECK(stn_issuance_decode(canonical,sizeof(canonical)-1u,&out)==STN_DATA_LENGTH);
