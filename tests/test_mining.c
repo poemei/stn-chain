@@ -156,15 +156,30 @@ int test_mining(void)
     CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,work,&n)==STN_RPC_OK && n==432);
     {
         uint64_t supplied_time=UINT64_C(1700000000);
+        size_t timed_n;
+
         s.timestamp_now=test_timestamp_now;s.timestamp_user=&supplied_time;
+        s.template_time_valid=0;
         CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,again,&w)==STN_RPC_OK &&
             stn_wire_read(again+68+80,8)==supplied_time);
-        supplied_time=0;
+        timed_n=w;memcpy(changed,again,w);
+
+        supplied_time+=30u;
+        CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,again,&w)==STN_RPC_OK &&
+            w==timed_n && memcmp(again,changed,w)==0 &&
+            stn_wire_read(again+68+80,8)==UINT64_C(1700000000));
+
+        supplied_time=0u;
+        CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,again,&w)==STN_RPC_OK &&
+            w==timed_n && memcmp(again,changed,w)==0);
+
+        s.template_time_valid=0;
         CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,again,&w)==STN_RPC_UNAVAILABLE && w==0);
+
         supplied_time=before.timestamp>0 ? before.timestamp-1u : 1u;
         CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,again,&w)==STN_RPC_OK &&
             stn_wire_read(again+68+80,8)>=before.timestamp);
-        s.timestamp_now=NULL;s.timestamp_user=NULL;
+        s.timestamp_now=NULL;s.timestamp_user=NULL;s.template_time_valid=0;
     }
     CHECK(rpc(&s,STN_RPC_MINING_TEMPLATE,NULL,0,again,&w)==STN_RPC_OK && n==w && memcmp(work,again,n)==0);
     CHECK(memcmp(work,before.tip_id,32)==0 && memcmp(work+32,expected,32)==0);
