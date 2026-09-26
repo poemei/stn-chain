@@ -10,6 +10,7 @@ static unsigned checks=0u,failures=0u;
 int main(void)
 {
     stn_block_compensation_replay state;
+    stn_block_compensation_evidence evidence;
     uint8_t a[STN_BLOCK_COMPENSATION_ID_SIZE]={0};
     uint8_t b[STN_BLOCK_COMPENSATION_ID_SIZE]={0};
     size_t i;
@@ -27,6 +28,22 @@ int main(void)
     CHECK(state.count==1u);
     CHECK(stn_block_compensation_replay_consume(&state,b)==STN_DATA_OK);
     CHECK(state.count==2u);
+
+    stn_block_compensation_replay_initialize(&state);
+    memset(&evidence,0,sizeof(evidence));
+    evidence.version=STN_BLOCK_COMPENSATION_VERSION;
+    evidence.block_id[0]=1u;
+    evidence.miner.type=STN_ADDRESS_IDENTITY;
+    evidence.miner.identifier[0]=2u;
+    CHECK(stn_block_compensation_replay_consume_evidence(NULL,&evidence)==STN_DATA_ARGUMENT);
+    CHECK(stn_block_compensation_replay_consume_evidence(&state,NULL)==STN_DATA_ARGUMENT);
+    CHECK(stn_block_compensation_replay_consume_evidence(&state,&evidence)==STN_DATA_OK);
+    CHECK(state.count==1u);
+    CHECK(stn_block_compensation_replay_consume_evidence(&state,&evidence)==STN_DATA_DUPLICATE);
+    CHECK(state.count==1u);
+    evidence.miner.type=STN_ADDRESS_WALLET;
+    CHECK(stn_block_compensation_replay_consume_evidence(&state,&evidence)==STN_DATA_TYPE);
+    CHECK(state.count==1u);
 
     stn_block_compensation_replay_initialize(&state);
     for(i=0u;i<STN_BLOCK_COMPENSATION_REPLAY_CAPACITY;++i){
