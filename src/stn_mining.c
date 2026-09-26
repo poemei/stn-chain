@@ -952,8 +952,10 @@ history_done:
 
             /*
              * Accepted share evidence is not itself value. Build the canonical
-             * SHARE issuance against the explicit accepted compensation
-             * relationship, then admit it for normal candidate validation.
+             * SHARE issuance against the explicit compensation relationship.
+             * A matching pending destination may resolve where eventual value
+             * belongs, but candidate assembly still defers issuance until both
+             * that mapping and the share evidence are accepted Chain history.
              */
             {
                 stn_issuance_record issuance;
@@ -966,8 +968,8 @@ history_done:
                 size_t issuance_transaction_length=0u;
                 stn_pending_result issuance_result;
 
-                verified=stn_compensation_state_lookup(
-                    v.state.compensation,&evidence.miner,&wallet);
+                verified=stn_pending_compensation_lookup(
+                    s->pending,v.state.compensation,&evidence.miner,&wallet);
                 if(verified!=STN_DATA_OK || wallet.type!=STN_ADDRESS_WALLET){
                     (void)stn_pending_remove(s->pending,transaction_id);
                     code=verified==STN_DATA_UNRESOLVED ? STN_RPC_UNAVAILABLE :
