@@ -12,7 +12,10 @@
  * Requests originate from validated RPC dispatch, or identical well-formed
  * internal messages. Work submission defensively checks its nested shape.
  * Production SHA-256 is required. Active state changes only after persistence.
- * A snapshot is freshly loaded for each call; no process-local work cache. */
+ * A snapshot is freshly loaded for each call. No authoritative work/template
+ * bytes are cached. A non-authoritative timestamp lease is retained only while
+ * the exact semantic mining candidate remains unchanged, so repeated reads of
+ * the same candidate produce the same immutable Work ID. */
 typedef struct stn_suffix_stage {
     uint32_t prefix_count;
     uint32_t expected_count;
@@ -44,6 +47,14 @@ typedef struct stn_mining_service {
     int owns_buffers; /* Opt in only for malloc/realloc-owned scratch. */
     uint64_t (*timestamp_now)(void *user);
     void *timestamp_user;
+    uint8_t template_time_base[32];
+    uint8_t template_time_target[32];
+    uint8_t template_time_commitment[32];
+    uint64_t template_time_height;
+    uint32_t template_time_transaction_count;
+    uint32_t template_time_body_length;
+    uint64_t template_time_value;
+    int template_time_valid;
     stn_suffix_stage suffix_stage;
 } stn_mining_service;
 #define STN_MINING_PREFIX 68u
