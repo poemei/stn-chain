@@ -854,12 +854,12 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
                     break;
                 }
 
-                if(next_offset+4u>b.body_length){
+                if(next_offset+4u>b.header.body_length){
                     failure=STN_DATA_CONTENT;break;
                 }
                 next_n=(uint32_t)stn_wire_read(b.body+next_offset,4);
                 next_offset+=4u;
-                if(next_n>b.body_length-next_offset ||
+                if(next_n>b.header.body_length-next_offset ||
                    stn_transaction_decode(b.body+next_offset,next_n,
                        &issuance_tx)!=STN_DATA_OK ||
                    issuance_tx.type!=STN_TX_ISSUANCE){
@@ -884,7 +884,11 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
                 if(stn_compensation_state_lookup(has_compensation?&candidate_compensation->state:prior->compensation,&issuance.destination.mining_identity,&mapped)!=STN_DATA_OK || memcmp(mapped.identifier,issuance.destination.wallet.identifier,32u)!=0){failure=STN_DATA_CONTENT;break;}
                 if(history==NULL){failure=STN_DATA_UNRESOLVED;break;}
                 for(hi=0;hi<history_count && !found;++hi){stn_block hb;size_t ho=0;if(stn_block_decode(history[hi].bytes,history[hi].length,&hb)!=STN_DATA_OK){failure=STN_DATA_CONTENT;break;}for(hj=0;hj<hb.header.transaction_count;++hj){uint32_t hn=(uint32_t)stn_wire_read(hb.body+ho,4);stn_transaction htx;ho+=4;if(stn_transaction_decode(hb.body+ho,hn,&htx)!=STN_DATA_OK){failure=STN_DATA_CONTENT;break;}if(htx.type==STN_TX_SHARE_EVIDENCE){stn_share_evidence share;if(stn_share_decode(htx.record_bytes,htx.record_length,&share)==STN_DATA_OK && stn_issuance_bind_share(&issuance,&share,has_compensation?&candidate_compensation->state:prior->compensation)==STN_DATA_OK){found=1;break;}}ho+=hn;}}
-                if(failure!=STN_DATA_OK)break;if(!found){failure=STN_DATA_CONTENT;break;}failure=stn_economic_state_apply(&candidate_economy->state,&issuance);if(failure!=STN_DATA_OK)break;continue;
+                if(failure!=STN_DATA_OK)break;
+                if(!found){failure=STN_DATA_CONTENT;break;}
+                failure=stn_economic_state_apply(&candidate_economy->state,&issuance);
+                if(failure!=STN_DATA_OK)break;
+                continue;
             }
             if(tx.type==STN_TX_TRANSFER){
                 stn_transfer_envelope envelope;
