@@ -5,6 +5,7 @@
 #include "stn_address.h"
 #include "stn_share.h"
 #include "stn_block_reward.h"
+#include "stn_issuance.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -903,6 +904,80 @@ history_done:
                 stn_pending_remove(s->pending,transaction_id);
                 code=STN_RPC_PROVIDER;
                 goto done;
+            }
+
+            /*
+             * Accepted share evidence is not itself value. Build the canonical
+             * SHARE issuance against the explicit accepted compensation
+             * relationship, then admit it for normal candidate validation.
+             */
+            {
+                stn_issuance_record issuance;
+                stn_transaction issuance_envelope={0};
+                stn_address wallet;
+                uint8_t issuance_canonical[STN_ISSUANCE_CANONICAL_SIZE];
+                uint8_t issuance_transaction[
+                    STN_TX_HEADER_SIZE+STN_ISSUANCE_CANONICAL_SIZE];
+                uint8_t issuance_transaction_id[32];
+                size_t issuance_transaction_length=0u;
+                stn_pending_result issuance_result;
+
+                verified=stn_compensation_state_lookup(
+                    v.state.compensation,&evidence.miner,&wallet);
+                if(verified!=STN_DATA_OK || wallet.type!=STN_ADDRESS_WALLET){
+                    (void)stn_pending_remove(s->pending,transaction_id);
+                    code=verified==STN_DATA_UNRESOLVED ? STN_RPC_UNAVAILABLE :
+                        verified==STN_DATA_CAPACITY || verified==STN_DATA_OVERFLOW ?
+                            STN_RPC_CAPACITY : STN_RPC_REJECTED;
+                    goto done;
+                }
+
+                memset(&issuance,0,sizeof(issuance));
+                issuance.reason=STN_ISSUANCE_REASON_SHARE;
+                issuance.units=STN_ISSUANCE_SHARE_UNITS;
+                memcpy(issuance.evidence_id,p,STN_SHARE_ID_SIZE);
+                issuance.destination.mining_identity=evidence.miner;
+                issuance.destination.wallet=wallet;
+
+                if(stn_issuance_encode(&issuance,issuance_canonical)!=STN_DATA_OK){
+                    (void)stn_pending_remove(s->pending,transaction_id);
+                    code=STN_RPC_PROVIDER;
+                    goto done;
+                }
+
+                issuance_envelope.version=1u;
+                issuance_envelope.type=STN_TX_ISSUANCE;
+                issuance_envelope.record_bytes=issuance_canonical;
+                issuance_envelope.record_length=STN_ISSUANCE_CANONICAL_SIZE;
+
+                if(stn_transaction_encode(
+                        &issuance_envelope,
+                        issuance_transaction,
+                        sizeof(issuance_transaction),
+                        &issuance_transaction_length)!=STN_DATA_OK){
+                    (void)stn_pending_remove(s->pending,transaction_id);
+                    code=STN_RPC_PROVIDER;
+                    goto done;
+                }
+
+                issuance_result=stn_pending_admit_transaction(
+                    s->pending,
+                    issuance_transaction,
+                    issuance_transaction_length,
+                    s->intelligence,
+                    &v,
+                    &s->chain->hash_provider,
+                    &report,
+                    issuance_transaction_id);
+
+                if(issuance_result!=STN_PENDING_ACCEPTED){
+                    (void)stn_pending_remove(s->pending,transaction_id);
+                    code=issuance_result==STN_PENDING_CAPACITY ? STN_RPC_CAPACITY :
+                        issuance_result==STN_PENDING_UNAVAILABLE ? STN_RPC_UNAVAILABLE :
+                        issuance_result==STN_PENDING_PROVIDER ? STN_RPC_PROVIDER :
+                            STN_RPC_REJECTED;
+                    goto done;
+                }
             }
         }
 
