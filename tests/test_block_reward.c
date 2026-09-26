@@ -30,6 +30,7 @@ int main(void)
     CHECK(memcmp(evidence.miner.identifier,miner.identifier,32u)==0);
     CHECK(issuance.reason==STN_ISSUANCE_REASON_BLOCK);
     CHECK(issuance.units==STN_ISSUANCE_BLOCK_UNITS);
+    CHECK(issuance.units==10000u);
     CHECK(issuance.destination.mining_identity.type==STN_ADDRESS_IDENTITY);
     CHECK(issuance.destination.wallet.type==STN_ADDRESS_WALLET);
     CHECK(memcmp(issuance.destination.wallet.identifier,wallet.identifier,32u)==0);
