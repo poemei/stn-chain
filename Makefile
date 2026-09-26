@@ -52,6 +52,8 @@ CORE_SOURCES := \
 	src/stn_block.c \
 	src/stn_block_compensation.c \
 	src/stn_block_compensation_replay.c \
+	src/stn_block_compensation_acceptance.c \
+	src/stn_block_compensation_candidate.c \
 	src/stn_chain.c \
 	src/stn_economy.c \
 	src/stn_compensation.c \
