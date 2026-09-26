@@ -12,6 +12,10 @@ typedef struct stn_block_compensation_replay {
 } stn_block_compensation_replay;
 
 void stn_block_compensation_replay_initialize(stn_block_compensation_replay *state);
+/* Copy only a structurally valid replay state. Output is unchanged on failure. */
+stn_data_status stn_block_compensation_replay_copy(
+    const stn_block_compensation_replay *source,
+    stn_block_compensation_replay *out);
 stn_data_status stn_block_compensation_replay_consume(
     stn_block_compensation_replay *state,
     const uint8_t evidence_id[STN_BLOCK_COMPENSATION_ID_SIZE]);
