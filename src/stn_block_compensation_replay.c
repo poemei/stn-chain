@@ -16,14 +16,32 @@ void stn_block_compensation_replay_initialize(stn_block_compensation_replay *sta
     memset(state,0,sizeof(*state));
 }
 
+stn_data_status stn_block_compensation_replay_copy(
+    const stn_block_compensation_replay *source,
+    stn_block_compensation_replay *out)
+{
+    stn_block_compensation_replay copy;
+    size_t i;
+    if(source==NULL || out==NULL)return STN_DATA_ARGUMENT;
+    if(source->count>STN_BLOCK_COMPENSATION_REPLAY_CAPACITY)return STN_DATA_CONTENT;
+    for(i=0u;i<source->count;++i){
+        if(zero_id(source->ids[i]))return STN_DATA_CONTENT;
+    }
+    copy=*source;
+    *out=copy;
+    return STN_DATA_OK;
+}
+
 stn_data_status stn_block_compensation_replay_consume(
     stn_block_compensation_replay *state,
     const uint8_t evidence_id[STN_BLOCK_COMPENSATION_ID_SIZE])
 {
     size_t i;
     if(state==NULL || evidence_id==NULL)return STN_DATA_ARGUMENT;
+    if(state->count>STN_BLOCK_COMPENSATION_REPLAY_CAPACITY)return STN_DATA_CONTENT;
     if(zero_id(evidence_id))return STN_DATA_CONTENT;
     for(i=0u;i<state->count;++i){
+        if(zero_id(state->ids[i]))return STN_DATA_CONTENT;
         if(memcmp(state->ids[i],evidence_id,STN_BLOCK_COMPENSATION_ID_SIZE)==0)
             return STN_DATA_DUPLICATE;
     }
