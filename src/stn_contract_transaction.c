@@ -10,6 +10,12 @@ static int action_valid(uint16_t action)
            action <= STN_CONTRACT_ACTION_CLOSE;
 }
 
+static int authority_length_valid(uint16_t action,uint32_t length)
+{
+    if(action==STN_CONTRACT_ACTION_CREATE)return length==0u;
+    return length==STN_AUTHORITY_EVIDENCE_SIZE;
+}
+
 stn_contract_status stn_contract_transaction_decode(
     const uint8_t *input,
     size_t input_length,
@@ -47,7 +53,7 @@ stn_contract_status stn_contract_transaction_decode(
         contract_length > STN_CONTRACT_MAX_SIZE) {
         return STN_CONTRACT_LENGTH;
     }
-    if (authority_length != STN_AUTHORITY_EVIDENCE_SIZE) {
+    if (!authority_length_valid(decoded.action,authority_length)) {
         return STN_CONTRACT_AUTHORITY_ERROR;
     }
 
@@ -62,7 +68,7 @@ stn_contract_status stn_contract_transaction_decode(
 
     decoded.canonical_contract = input + STN_CONTRACT_TX_HEADER_SIZE;
     decoded.canonical_contract_length = contract_length;
-    decoded.authority_evidence =
+    decoded.authority_evidence = authority_length == 0u ? NULL :
         decoded.canonical_contract + contract_length;
     decoded.authority_evidence_length = authority_length;
 
@@ -72,7 +78,8 @@ stn_contract_status stn_contract_transaction_decode(
         return STN_CONTRACT_LENGTH;
     }
 
-    if (stn_authority_evidence_validate(
+    if (decoded.action != STN_CONTRACT_ACTION_CREATE &&
+        stn_authority_evidence_validate(
             decoded.authority_evidence,
             decoded.authority_evidence_length) != STN_AUTHORITY_AUTHORIZED) {
         return STN_CONTRACT_AUTHORITY_ERROR;
@@ -96,8 +103,7 @@ stn_contract_status stn_contract_transaction_encode(
     }
 
     if (transaction == NULL || output == NULL || written == NULL ||
-        transaction->canonical_contract == NULL ||
-        transaction->authority_evidence == NULL) {
+        transaction->canonical_contract == NULL) {
         return STN_CONTRACT_ARGUMENT;
     }
 
@@ -111,9 +117,13 @@ stn_contract_status stn_contract_transaction_encode(
         transaction->canonical_contract_length > STN_CONTRACT_MAX_SIZE) {
         return STN_CONTRACT_LENGTH;
     }
-    if (transaction->authority_evidence_length !=
-        STN_AUTHORITY_EVIDENCE_SIZE) {
+    if (!authority_length_valid(transaction->action,
+                                transaction->authority_evidence_length)) {
         return STN_CONTRACT_AUTHORITY_ERROR;
+    }
+    if (transaction->authority_evidence_length != 0u &&
+        transaction->authority_evidence == NULL) {
+        return STN_CONTRACT_ARGUMENT;
     }
 
     if (stn_contract_validate_structure(
@@ -122,7 +132,8 @@ stn_contract_status stn_contract_transaction_encode(
         return STN_CONTRACT_LENGTH;
     }
 
-    if (stn_authority_evidence_validate(
+    if (transaction->action != STN_CONTRACT_ACTION_CREATE &&
+        stn_authority_evidence_validate(
             transaction->authority_evidence,
             transaction->authority_evidence_length) !=
         STN_AUTHORITY_AUTHORIZED) {
@@ -156,11 +167,13 @@ stn_contract_status stn_contract_transaction_encode(
         temporary + STN_CONTRACT_TX_HEADER_SIZE,
         transaction->canonical_contract,
         transaction->canonical_contract_length);
-    memcpy(
-        temporary + STN_CONTRACT_TX_HEADER_SIZE +
-            transaction->canonical_contract_length,
-        transaction->authority_evidence,
-        transaction->authority_evidence_length);
+    if(transaction->authority_evidence_length!=0u){
+        memcpy(
+            temporary + STN_CONTRACT_TX_HEADER_SIZE +
+                transaction->canonical_contract_length,
+            transaction->authority_evidence,
+            transaction->authority_evidence_length);
+    }
 
     memcpy(output, temporary, total);
     *written = total;
