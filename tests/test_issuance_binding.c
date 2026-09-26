@@ -55,8 +55,9 @@ static void vectors(void)
     stn_compensation_destination map,store[1];
     stn_compensation_state state={0};
     stn_share_evidence share={0};
+    stn_block_compensation_evidence block={0};
     stn_issuance_record issuance={0},changed;
-    uint8_t share_id[32];
+    uint8_t share_id[32],block_id[32];
 
     memset(&map,0,sizeof(map));
     map.mining_identity.type=STN_ADDRESS_IDENTITY;
@@ -78,23 +79,48 @@ static void vectors(void)
 
     changed=issuance;changed.evidence_id[0]^=1u;
     CHECK(stn_issuance_bind_share(&changed,&share,&state)==STN_DATA_CONTENT);
-
     changed=issuance;changed.destination.mining_identity.identifier[0]^=1u;
     CHECK(stn_issuance_bind_share(&changed,&share,&state)==STN_DATA_CONTENT);
-
     changed=issuance;changed.destination.wallet.identifier[0]^=1u;
     CHECK(stn_issuance_bind_share(&changed,&share,&state)==STN_DATA_CONTENT);
-
     CHECK(stn_issuance_bind_share(NULL,&share,&state)==STN_DATA_ARGUMENT);
     CHECK(stn_issuance_bind_share(&issuance,NULL,&state)==STN_DATA_ARGUMENT);
     CHECK(stn_issuance_bind_share(&issuance,&share,NULL)==STN_DATA_ARGUMENT);
-
     changed=issuance;changed.reason=STN_ISSUANCE_REASON_BLOCK;
     CHECK(stn_issuance_bind_share(&changed,&share,&state)==STN_DATA_CONTENT);
     changed=issuance;changed.units=2u;
     CHECK(stn_issuance_bind_share(&changed,&share,&state)==STN_DATA_CONTENT);
     changed=issuance;changed.destination.wallet.type=STN_ADDRESS_IDENTITY;
     CHECK(stn_issuance_bind_share(&changed,&share,&state)==STN_DATA_TYPE);
+
+    memset(&block,0,sizeof(block));
+    block.version=STN_BLOCK_COMPENSATION_VERSION;
+    memset(block.block_id,0x33,sizeof(block.block_id));
+    block.miner=map.mining_identity;
+    CHECK(stn_block_compensation_id(&block,block_id)==STN_DATA_OK);
+    memset(&issuance,0,sizeof(issuance));
+    issuance.reason=STN_ISSUANCE_REASON_BLOCK;
+    issuance.units=STN_ISSUANCE_BLOCK_UNITS;
+    memcpy(issuance.evidence_id,block_id,sizeof(block_id));
+    issuance.destination=map;
+    CHECK(stn_issuance_bind_block(&issuance,&block,&state)==STN_DATA_OK);
+    CHECK(issuance.units==10000u);
+
+    changed=issuance;changed.evidence_id[0]^=1u;
+    CHECK(stn_issuance_bind_block(&changed,&block,&state)==STN_DATA_CONTENT);
+    changed=issuance;changed.reason=STN_ISSUANCE_REASON_SHARE;
+    CHECK(stn_issuance_bind_block(&changed,&block,&state)==STN_DATA_CONTENT);
+    changed=issuance;changed.units=STN_ISSUANCE_SHARE_UNITS;
+    CHECK(stn_issuance_bind_block(&changed,&block,&state)==STN_DATA_CONTENT);
+    changed=issuance;changed.destination.mining_identity.identifier[0]^=1u;
+    CHECK(stn_issuance_bind_block(&changed,&block,&state)==STN_DATA_CONTENT);
+    changed=issuance;changed.destination.wallet.identifier[0]^=1u;
+    CHECK(stn_issuance_bind_block(&changed,&block,&state)==STN_DATA_CONTENT);
+    changed=issuance;changed.destination.wallet.type=STN_ADDRESS_IDENTITY;
+    CHECK(stn_issuance_bind_block(&changed,&block,&state)==STN_DATA_TYPE);
+    CHECK(stn_issuance_bind_block(NULL,&block,&state)==STN_DATA_ARGUMENT);
+    CHECK(stn_issuance_bind_block(&issuance,NULL,&state)==STN_DATA_ARGUMENT);
+    CHECK(stn_issuance_bind_block(&issuance,&block,NULL)==STN_DATA_ARGUMENT);
 }
 
 int test_issuance_binding(void);
