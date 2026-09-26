@@ -51,6 +51,7 @@ CORE_SOURCES := \
 	src/stn_authority.c \
 	src/stn_block.c \
 	src/stn_block_compensation.c \
+	src/stn_block_compensation_replay.c \
 	src/stn_chain.c \
 	src/stn_economy.c \
 	src/stn_compensation.c \
@@ -310,9 +311,9 @@ $(BUILD_DIR)/test-compensation-state: tests/test_compensation_state.c src/stn_co
 test-issuance-binding: $(BUILD_DIR)/test-issuance-binding
 	$(BUILD_DIR)/test-issuance-binding
 
-$(BUILD_DIR)/test-issuance-binding: tests/test_issuance_binding.c src/stn_issuance_binding.c src/stn_issuance.c src/stn_compensation_state.c src/stn_compensation.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_issuance_binding.h src/stn_share_replay.c
+$(BUILD_DIR)/test-issuance-binding: tests/test_issuance_binding.c src/stn_issuance_binding.c src/stn_issuance.c src/stn_compensation_state.c src/stn_compensation.c src/stn_share.c src/stn_block_compensation.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_issuance_binding.h src/stn_share_replay.c
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_ISSUANCE_BINDING_TEST_MAIN tests/test_issuance_binding.c src/stn_issuance_binding.c src/stn_issuance.c src/stn_compensation_state.c src/stn_compensation.c src/stn_share.c src/stn_share_replay.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_ISSUANCE_BINDING_TEST_MAIN tests/test_issuance_binding.c src/stn_issuance_binding.c src/stn_issuance.c src/stn_compensation_state.c src/stn_compensation.c src/stn_share.c src/stn_block_compensation.c src/stn_share_replay.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
 
 
 # Phase 19 deterministic wallet balance qualification.
