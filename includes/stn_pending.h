@@ -53,6 +53,12 @@ stn_pending_result stn_pending_admit(stn_pending *pool,const uint8_t *record,siz
  * require a validated active view and matching immutable validation snapshot.
  * Missing hooks/context fail closed. INVALID includes malformed envelope or
  * payload; UNSUPPORTED covers reserved transaction/record versions and types.
+ * Share issuance is admitted only when it binds deterministically to the
+ * explicit accepted compensation destination and to either matching accepted
+ * share evidence or matching share evidence already held in this pending pool.
+ * Candidate assembly still defers that issuance until its share evidence exists
+ * in accepted history. Block issuance remains coupled to block-compensation
+ * evidence and is not admitted through the generic pending path.
  * The report describes record validation, not subsequent store/replay results.
  * No ownership transfers on rejection. Use these entry points for submissions;
  * insert alone is only the structural store primitive. */
@@ -66,7 +72,9 @@ stn_data_status stn_pending_inclusions(const stn_pending *pool,const stn_storage
     const stn_hash_provider *hash,uint8_t remove[STN_PENDING_MAX_ENTRIES]);
 void stn_pending_prune(stn_pending *pool,const uint8_t remove[STN_PENDING_MAX_ENTRIES]);
 /* Revalidate eligibility; select ascending unsigned transaction-ID bytes.
- * Skip ineligible entries without eviction. Stop at count/body/caller capacity.
+ * Skip ineligible entries without eviction. Share issuance remains pending until
+ * matching share evidence is accepted, preserving evidence-before-issuance
+ * consensus ordering. Stop at count/body/caller capacity.
  * Provider error fails the assembly; no empty-block consensus exception. */
 stn_data_status stn_pending_assemble(const stn_pending *pool,const stn_validation_context *context,const stn_storage_view *active,
     uint8_t *body,size_t capacity,size_t *written,uint32_t *count);
