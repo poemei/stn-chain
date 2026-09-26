@@ -19,6 +19,8 @@ _Static_assert(STN_TX_TRANSFER_SIZE==STN_TRANSFER_ENVELOPE_CANONICAL_SIZE,
     "transfer transaction size must match canonical transfer envelope");
 _Static_assert(STN_TX_BLOCK_COMPENSATION_SIZE==STN_BLOCK_COMPENSATION_CANONICAL_SIZE,
     "block compensation transaction size must match canonical evidence");
+_Static_assert(STN_TX_MIN_SIZE==STN_TX_HEADER_SIZE+STN_TX_COMPENSATION_DESTINATION_SIZE,
+    "minimum transaction size must admit canonical compensation destinations");
 
 static const uint8_t magic[4] = {0x53,0x54,0x4e,0x54};
 
