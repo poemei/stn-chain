@@ -50,6 +50,7 @@ CORE_SOURCES := \
 	src/stn_config.c \
 	src/stn_authority.c \
 	src/stn_block.c \
+	src/stn_block_compensation.c \
 	src/stn_chain.c \
 	src/stn_economy.c \
 	src/stn_compensation.c \
@@ -261,71 +262,70 @@ test-share: $(BUILD_DIR)/test-share
 
 $(BUILD_DIR)/test-share: tests/test_share.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_compensation_state.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_share.h src/stn_share_replay.c
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_SHARE_TEST_MAIN tests/test_share.c src/stn_share_replay.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_compensation_state.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_SHARE_TEST_MAIN tests/test_share.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_compensation_state.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
 
 
-# Phase 19 deterministic accepted-share replay qualification.
+# Phase 19 share replay protection qualification.
 .PHONY: test-share-replay
 test-share-replay: $(BUILD_DIR)/test-share-replay
 	$(BUILD_DIR)/test-share-replay
 
-$(BUILD_DIR)/test-share-replay: tests/test_share_replay.c src/stn_share_replay.c includes/stn_share_replay.h includes/stn_share.h
+$(BUILD_DIR)/test-share-replay: tests/test_share_replay.c src/stn_share_replay.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_compensation_state.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_share_replay.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_SHARE_REPLAY_TEST_MAIN tests/test_share_replay.c src/stn_share_replay.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_SHARE_REPLAY_TEST_MAIN tests/test_share_replay.c src/stn_share_replay.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_compensation_state.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
 
 
-# Phase 19 canonical mining issuance record qualification.
+# Phase 19 deterministic issuance qualification.
 .PHONY: test-issuance
 test-issuance: $(BUILD_DIR)/test-issuance
 	$(BUILD_DIR)/test-issuance
 
-$(BUILD_DIR)/test-issuance: tests/test_issuance.c src/stn_issuance.c src/stn_compensation.c includes/stn_issuance.h includes/stn_compensation.h includes/stn_address.h
+$(BUILD_DIR)/test-issuance: tests/test_issuance.c src/stn_issuance.c src/stn_compensation.c includes/stn_issuance.h includes/stn_compensation.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_ISSUANCE_TEST_MAIN tests/test_issuance.c src/stn_issuance.c src/stn_compensation.c -o $@ $(LDLIBS)
 
 
-# Phase 19 deterministic accepted economic state qualification.
+# Phase 19 accepted economic state qualification.
 .PHONY: test-economic-state
 test-economic-state: $(BUILD_DIR)/test-economic-state
 	$(BUILD_DIR)/test-economic-state
 
-$(BUILD_DIR)/test-economic-state: tests/test_economic_state.c src/stn_economic_state.c src/stn_transfer.c includes/stn_economic_state.h includes/stn_issuance.h includes/stn_transfer.h
+$(BUILD_DIR)/test-economic-state: tests/test_economic_state.c src/stn_economic_state.c src/stn_issuance.c src/stn_compensation.c includes/stn_economic_state.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_ECONOMIC_STATE_TEST_MAIN tests/test_economic_state.c src/stn_economic_state.c src/stn_transfer.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_ECONOMIC_STATE_TEST_MAIN tests/test_economic_state.c src/stn_economic_state.c src/stn_issuance.c src/stn_compensation.c -o $@ $(LDLIBS)
 
 
-# Phase 19 deterministic accepted compensation mapping state qualification.
+# Phase 19 accepted compensation destination state qualification.
 .PHONY: test-compensation-state
 test-compensation-state: $(BUILD_DIR)/test-compensation-state
 	$(BUILD_DIR)/test-compensation-state
 
-$(BUILD_DIR)/test-compensation-state: tests/test_compensation_state.c src/stn_compensation_state.c includes/stn_compensation_state.h includes/stn_compensation.h
+$(BUILD_DIR)/test-compensation-state: tests/test_compensation_state.c src/stn_compensation_state.c src/stn_compensation.c includes/stn_compensation_state.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_COMPENSATION_STATE_TEST_MAIN tests/test_compensation_state.c src/stn_compensation_state.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_COMPENSATION_STATE_TEST_MAIN tests/test_compensation_state.c src/stn_compensation_state.c src/stn_compensation.c -o $@ $(LDLIBS)
 
 
+# Phase 19 issuance-to-share binding qualification.
 .PHONY: test-issuance-binding
 test-issuance-binding: $(BUILD_DIR)/test-issuance-binding
 	$(BUILD_DIR)/test-issuance-binding
 
-ISSUANCE_BINDING_SOURCES := $(filter-out src/main.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) platforms/linux/stn_sha256.c
-
-$(BUILD_DIR)/test-issuance-binding: tests/test_issuance_binding.c $(ISSUANCE_BINDING_SOURCES)
+$(BUILD_DIR)/test-issuance-binding: tests/test_issuance_binding.c src/stn_issuance_binding.c src/stn_issuance.c src/stn_compensation_state.c src/stn_compensation.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_issuance_binding.h src/stn_share_replay.c
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_ISSUANCE_BINDING_TEST_MAIN tests/test_issuance_binding.c $(ISSUANCE_BINDING_SOURCES) -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_ISSUANCE_BINDING_TEST_MAIN tests/test_issuance_binding.c src/stn_issuance_binding.c src/stn_issuance.c src/stn_compensation_state.c src/stn_compensation.c src/stn_share.c src/stn_share_replay.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
 
 
-# Phase 19 deterministic wallet primitive qualification.
+# Phase 19 deterministic wallet balance qualification.
 .PHONY: test-wallet
 test-wallet: $(BUILD_DIR)/test-wallet
 	$(BUILD_DIR)/test-wallet
 
-$(BUILD_DIR)/test-wallet: tests/test_wallet.c src/stn_wallet.c src/stn_address.c platforms/linux/stn_sha256.c includes/stn_wallet.h includes/stn_address.h
+$(BUILD_DIR)/test-wallet: tests/test_wallet.c src/stn_wallet.c src/stn_economic_state.c src/stn_issuance.c src/stn_compensation.c includes/stn_wallet.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_WALLET_TEST_MAIN tests/test_wallet.c src/stn_wallet.c src/stn_address.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_WALLET_TEST_MAIN tests/test_wallet.c src/stn_wallet.c src/stn_economic_state.c src/stn_issuance.c src/stn_compensation.c -o $@ $(LDLIBS)
 
 
-# Phase 19 deterministic transfer primitive qualification.
+# Phase 19 canonical transfer qualification.
 .PHONY: test-transfer
 test-transfer: $(BUILD_DIR)/test-transfer
 	$(BUILD_DIR)/test-transfer
@@ -335,178 +335,127 @@ $(BUILD_DIR)/test-transfer: tests/test_transfer.c src/stn_transfer.c includes/st
 	$(CC) $(CFLAGS) -DSTN_TRANSFER_TEST_MAIN tests/test_transfer.c src/stn_transfer.c -o $@ $(LDLIBS)
 
 
-# Phase 19 deterministic accepted-transfer replay qualification.
+# Phase 19 transfer replay protection qualification.
 .PHONY: test-transfer-replay
 test-transfer-replay: $(BUILD_DIR)/test-transfer-replay
 	$(BUILD_DIR)/test-transfer-replay
 
-$(BUILD_DIR)/test-transfer-replay: tests/test_transfer_replay.c src/stn_transfer_replay.c src/stn_transfer.c includes/stn_transfer_replay.h includes/stn_transfer.h
+$(BUILD_DIR)/test-transfer-replay: tests/test_transfer_replay.c src/stn_transfer_replay.c src/stn_transfer.c includes/stn_transfer_replay.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_TRANSFER_REPLAY_TEST_MAIN tests/test_transfer_replay.c src/stn_transfer_replay.c src/stn_transfer.c -o $@ $(LDLIBS)
 
 
-# Phase 19 accepted transfer replay/economic-state binding qualification.
+# Phase 19 transfer binding qualification.
 .PHONY: test-transfer-binding
 test-transfer-binding: $(BUILD_DIR)/test-transfer-binding
 	$(BUILD_DIR)/test-transfer-binding
 
-$(BUILD_DIR)/test-transfer-binding: tests/test_transfer_binding.c src/stn_transfer_binding.c src/stn_transfer_replay.c src/stn_transfer.c src/stn_economic_state.c includes/stn_transfer_binding.h includes/stn_transfer_replay.h includes/stn_transfer.h includes/stn_economic_state.h
+$(BUILD_DIR)/test-transfer-binding: tests/test_transfer_binding.c src/stn_transfer_binding.c src/stn_transfer.c src/stn_wallet.c src/stn_economic_state.c src/stn_issuance.c src/stn_compensation.c includes/stn_transfer_binding.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_TRANSFER_BINDING_TEST_MAIN tests/test_transfer_binding.c src/stn_transfer_binding.c src/stn_transfer_replay.c src/stn_transfer.c src/stn_economic_state.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_BINDING_TEST_MAIN tests/test_transfer_binding.c src/stn_transfer_binding.c src/stn_transfer.c src/stn_wallet.c src/stn_economic_state.c src/stn_issuance.c src/stn_compensation.c -o $@ $(LDLIBS)
 
 
-# Phase 19 deterministic source-wallet transfer authorization qualification.
+# Phase 19 transfer authorization qualification.
 .PHONY: test-transfer-authorization
 test-transfer-authorization: $(BUILD_DIR)/test-transfer-authorization
 	$(BUILD_DIR)/test-transfer-authorization
 
-$(BUILD_DIR)/test-transfer-authorization: tests/test_transfer_authorization.c src/stn_transfer_authorization.c src/stn_transfer.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_transfer_authorization.h
+$(BUILD_DIR)/test-transfer-authorization: tests/test_transfer_authorization.c src/stn_transfer_authorization.c src/stn_transfer.c src/crypto/ed25519_donna/ed25519_provider.c includes/stn_transfer_authorization.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_TRANSFER_AUTHORIZATION_TEST_MAIN tests/test_transfer_authorization.c src/stn_transfer_authorization.c src/stn_transfer.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_AUTHORIZATION_TEST_MAIN tests/test_transfer_authorization.c src/stn_transfer_authorization.c src/stn_transfer.c src/crypto/ed25519_donna/ed25519_provider.c -o $@ $(LDLIBS)
 
 
-# Phase 19 authorized accepted-transfer qualification.
+# Phase 19 accepted transfer qualification.
 .PHONY: test-transfer-acceptance
 test-transfer-acceptance: $(BUILD_DIR)/test-transfer-acceptance
 	$(BUILD_DIR)/test-transfer-acceptance
 
-TRANSFER_ACCEPTANCE_SOURCES := src/stn_transfer_acceptance.c src/stn_transfer_authorization.c src/stn_transfer_binding.c src/stn_transfer_replay.c src/stn_transfer.c src/stn_economic_state.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c
-
-$(BUILD_DIR)/test-transfer-acceptance: tests/test_transfer_acceptance.c $(TRANSFER_ACCEPTANCE_SOURCES) includes/stn_transfer_acceptance.h
+$(BUILD_DIR)/test-transfer-acceptance: tests/test_transfer_acceptance.c src/stn_transfer_acceptance.c src/stn_transfer_authorization.c src/stn_transfer_binding.c src/stn_transfer_replay.c src/stn_transfer.c src/stn_wallet.c src/stn_economic_state.c src/stn_issuance.c src/stn_compensation.c src/crypto/ed25519_donna/ed25519_provider.c includes/stn_transfer_acceptance.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_TRANSFER_ACCEPTANCE_TEST_MAIN tests/test_transfer_acceptance.c $(TRANSFER_ACCEPTANCE_SOURCES) -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_ACCEPTANCE_TEST_MAIN tests/test_transfer_acceptance.c src/stn_transfer_acceptance.c src/stn_transfer_authorization.c src/stn_transfer_binding.c src/stn_transfer_replay.c src/stn_transfer.c src/stn_wallet.c src/stn_economic_state.c src/stn_issuance.c src/stn_compensation.c src/crypto/ed25519_donna/ed25519_provider.c -o $@ $(LDLIBS)
 
 
-# Phase 19 canonical transfer envelope qualification.
+# Phase 19 signed transfer envelope qualification.
 .PHONY: test-transfer-envelope
 test-transfer-envelope: $(BUILD_DIR)/test-transfer-envelope
 	$(BUILD_DIR)/test-transfer-envelope
 
-$(BUILD_DIR)/test-transfer-envelope: tests/test_transfer_envelope.c src/stn_transfer_envelope.c src/stn_transfer.c includes/stn_transfer_envelope.h includes/stn_transfer.h
+$(BUILD_DIR)/test-transfer-envelope: tests/test_transfer_envelope.c src/stn_transfer_envelope.c src/stn_transfer.c includes/stn_transfer_envelope.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_TEST_MAIN tests/test_transfer_envelope.c src/stn_transfer_envelope.c src/stn_transfer.c -o $@ $(LDLIBS)
 
 
-# Phase 19 nonce-aware transfer replay qualification.
+# Phase 19 signed transfer envelope replay qualification.
 .PHONY: test-transfer-envelope-replay
 test-transfer-envelope-replay: $(BUILD_DIR)/test-transfer-envelope-replay
 	$(BUILD_DIR)/test-transfer-envelope-replay
 
-$(BUILD_DIR)/test-transfer-envelope-replay: tests/test_transfer_envelope_replay.c src/stn_transfer_envelope_replay.c src/stn_replay.c src/stn_record.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c includes/stn_transfer_envelope_replay.h
+$(BUILD_DIR)/test-transfer-envelope-replay: tests/test_transfer_envelope_replay.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope.c src/stn_transfer.c includes/stn_transfer_envelope_replay.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_REPLAY_TEST_MAIN tests/test_transfer_envelope_replay.c src/stn_transfer_envelope_replay.c src/stn_replay.c src/stn_record.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_REPLAY_TEST_MAIN tests/test_transfer_envelope_replay.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope.c src/stn_transfer.c -o $@ $(LDLIBS)
 
 
-# Phase 19 nonce-bound transfer authorization qualification.
+# Phase 19 signed transfer envelope authorization qualification.
 .PHONY: test-transfer-envelope-authorization
 test-transfer-envelope-authorization: $(BUILD_DIR)/test-transfer-envelope-authorization
 	$(BUILD_DIR)/test-transfer-envelope-authorization
 
-$(BUILD_DIR)/test-transfer-envelope-authorization: tests/test_transfer_envelope_authorization.c src/stn_transfer_envelope_authorization.c src/stn_transfer.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_transfer_envelope_authorization.h
+$(BUILD_DIR)/test-transfer-envelope-authorization: tests/test_transfer_envelope_authorization.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope.c src/stn_transfer.c src/crypto/ed25519_donna/ed25519_provider.c includes/stn_transfer_envelope_authorization.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_AUTHORIZATION_TEST_MAIN tests/test_transfer_envelope_authorization.c src/stn_transfer_envelope_authorization.c src/stn_transfer.c src/stn_wallet.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_AUTHORIZATION_TEST_MAIN tests/test_transfer_envelope_authorization.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope.c src/stn_transfer.c src/crypto/ed25519_donna/ed25519_provider.c -o $@ $(LDLIBS)
 
 
-# Phase 19 nonce-aware authorized transfer acceptance qualification.
+# Phase 19 signed transfer envelope accepted-state qualification.
 .PHONY: test-transfer-envelope-acceptance
 test-transfer-envelope-acceptance: $(BUILD_DIR)/test-transfer-envelope-acceptance
 	$(BUILD_DIR)/test-transfer-envelope-acceptance
 
-TRANSFER_ENVELOPE_ACCEPTANCE_SOURCES := src/stn_transfer_envelope_acceptance.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_replay.c src/stn_transfer.c src/stn_economic_state.c src/stn_wallet.c src/stn_address.c src/stn_replay.c src/stn_record.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c
-
-$(BUILD_DIR)/test-transfer-envelope-acceptance: tests/test_transfer_envelope_acceptance.c $(TRANSFER_ENVELOPE_ACCEPTANCE_SOURCES) includes/stn_transfer_envelope_acceptance.h
+$(BUILD_DIR)/test-transfer-envelope-acceptance: tests/test_transfer_envelope_acceptance.c src/stn_transfer_envelope_acceptance.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope.c src/stn_transfer.c src/stn_wallet.c src/stn_economic_state.c src/stn_issuance.c src/stn_compensation.c src/crypto/ed25519_donna/ed25519_provider.c includes/stn_transfer_envelope_acceptance.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_ACCEPTANCE_TEST_MAIN tests/test_transfer_envelope_acceptance.c $(TRANSFER_ENVELOPE_ACCEPTANCE_SOURCES) -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_ENVELOPE_ACCEPTANCE_TEST_MAIN tests/test_transfer_envelope_acceptance.c src/stn_transfer_envelope_acceptance.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope.c src/stn_transfer.c src/stn_wallet.c src/stn_economic_state.c src/stn_issuance.c src/stn_compensation.c src/crypto/ed25519_donna/ed25519_provider.c -o $@ $(LDLIBS)
 
 
-# Phase 19 canonical transfer transaction qualification.
+# Phase 19 signed transfer transaction qualification.
 .PHONY: test-transfer-transaction
 test-transfer-transaction: $(BUILD_DIR)/test-transfer-transaction
 	$(BUILD_DIR)/test-transfer-transaction
 
-TRANSFER_TRANSACTION_SOURCES := src/stn_transaction.c src/stn_transfer_envelope.c src/stn_transfer.c src/stn_record.c src/stn_contract_transaction.c src/stn_authority.c src/stn_address.c src/stn_block.c src/stn_economy.c src/stn_pow.c tests/stn_pow_block_id_stub.c src/stn_contract.c src/stn_contract_lineage.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_share.c src/stn_compensation.c src/stn_issuance.c src/stn_sentinel_intelligence.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c
-
-$(BUILD_DIR)/test-transfer-transaction: tests/test_transfer_transaction.c $(TRANSFER_TRANSACTION_SOURCES) includes/stn_transaction.h
+$(BUILD_DIR)/test-transfer-transaction: tests/test_transfer_transaction.c src/stn_transaction.c src/stn_transfer_envelope.c src/stn_transfer.c src/stn_record.c src/stn_contract_transaction.c src/stn_compensation.c src/stn_issuance.c includes/stn_transaction.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_TRANSFER_TRANSACTION_TEST_MAIN tests/test_transfer_transaction.c $(TRANSFER_TRANSACTION_SOURCES) -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_TRANSFER_TRANSACTION_TEST_MAIN tests/test_transfer_transaction.c src/stn_transaction.c src/stn_transfer_envelope.c src/stn_transfer.c src/stn_record.c src/stn_contract_transaction.c src/stn_compensation.c src/stn_issuance.c -o $@ $(LDLIBS)
 
-# Existing Chain accepted-state qualification, including Phase 19 transfer integration.
-.PHONY: test-chain
-test-chain: $(BUILD_DIR)/test-chain
-	$(BUILD_DIR)/test-chain
 
-CHAIN_TEST_SOURCES := src/stn_chain.c src/stn_transaction.c src/stn_block.c src/stn_pow.c src/stn_economy.c src/stn_record.c src/stn_validation.c src/stn_lifecycle.c src/stn_authority.c src/stn_contract.c src/stn_contract_lineage.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_snapshot.c src/stn_contract_transaction.c src/stn_share.c src/stn_share_replay.c src/stn_compensation.c src/stn_compensation_state.c src/stn_issuance.c src/stn_issuance_binding.c src/stn_economic_state.c src/stn_transfer.c src/stn_transfer_envelope.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope_acceptance.c src/stn_wallet.c src/stn_address.c src/stn_replay.c src/stn_identity.c src/stn_sentinel_intelligence.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c
+# Phase 19 Chain accepted economic state qualification.
+.PHONY: test-chain-economic
+test-chain-economic: $(BUILD_DIR)/test-chain-economic
+	$(BUILD_DIR)/test-chain-economic
 
-$(BUILD_DIR)/test-chain: tests/test_chain.c $(CHAIN_TEST_SOURCES) includes/stn_chain.h
+$(BUILD_DIR)/test-chain-economic: tests/test_chain_economic.c src/stn_chain.c src/stn_compensation_state.c src/stn_compensation.c src/stn_issuance.c src/stn_economic_state.c src/stn_issuance_binding.c src/stn_economy.c src/stn_transfer.c src/stn_wallet.c src/stn_transfer_envelope.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_acceptance.c src/stn_block.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_pow.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c src/stn_share.c src/stn_share_replay.c
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_LIFECYCLE_TEST -DSTN_CHAIN_TEST_MAIN tests/test_chain.c $(CHAIN_TEST_SOURCES) -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_CHAIN_ECONOMIC_TEST_MAIN tests/test_chain_economic.c src/stn_chain.c src/stn_compensation_state.c src/stn_compensation.c src/stn_issuance.c src/stn_economic_state.c src/stn_issuance_binding.c src/stn_economy.c src/stn_transfer.c src/stn_wallet.c src/stn_transfer_envelope.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_acceptance.c src/stn_block.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_pow.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c src/stn_share.c src/stn_share_replay.c -o $@ $(LDLIBS)
 
 
-# Phase 19 deterministic economic persistence qualification.
-.PHONY: test-economic-persistence
-test-economic-persistence: $(BUILD_DIR)/test-economic-persistence
-	$(BUILD_DIR)/test-economic-persistence
+# Phase 19 accepted transfer Chain qualification.
+.PHONY: test-chain-transfer
+test-chain-transfer: $(BUILD_DIR)/test-chain-transfer
+	$(BUILD_DIR)/test-chain-transfer
 
-$(BUILD_DIR)/test-economic-persistence: tests/test_economic_persistence.c src/stn_economic_persistence.c src/stn_economic_state.c src/stn_transfer.c
+$(BUILD_DIR)/test-chain-transfer: tests/test_chain_transfer.c src/stn_chain.c src/stn_compensation_state.c src/stn_compensation.c src/stn_issuance.c src/stn_economic_state.c src/stn_issuance_binding.c src/stn_economy.c src/stn_transfer.c src/stn_wallet.c src/stn_transfer_envelope.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_acceptance.c src/stn_block.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_pow.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c src/stn_share.c src/stn_share_replay.c
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_ECONOMIC_PERSISTENCE_TEST_MAIN tests/test_economic_persistence.c src/stn_economic_persistence.c src/stn_economic_state.c src/stn_transfer.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_CHAIN_TRANSFER_TEST_MAIN tests/test_chain_transfer.c src/stn_chain.c src/stn_compensation_state.c src/stn_compensation.c src/stn_issuance.c src/stn_economic_state.c src/stn_issuance_binding.c src/stn_economy.c src/stn_transfer.c src/stn_wallet.c src/stn_transfer_envelope.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_acceptance.c src/stn_block.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_pow.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c src/stn_share.c src/stn_share_replay.c -o $@ $(LDLIBS)
 
 
-# Existing P2P synchronization/recovery qualification, including Phase 19 history reconstruction.
-.PHONY: test-peer
-test-peer: $(BUILD_DIR)/test-peer
-	$(BUILD_DIR)/test-peer
-
-$(BUILD_DIR)/test-peer: tests/test_peer.c $(filter-out src/main.c platforms/linux/stn_app_linux.c,$(SOURCES))
-	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(PLATFORM_CFLAGS) -DSTN_LIFECYCLE_TEST -DSTN_PEER_TEST_MAIN tests/test_peer.c $(filter-out src/main.c platforms/linux/stn_app_linux.c,$(SOURCES)) -o $@ $(LDLIBS)
-
-
-# Existing fork/reorg qualification using authoritative full-history reconstruction.
-.PHONY: test-fork
-test-fork: $(BUILD_DIR)/test-fork
-	$(BUILD_DIR)/test-fork
-
-$(BUILD_DIR)/test-fork: tests/test_fork.c $(CHAIN_TEST_SOURCES) src/stn_fork.c
-	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_LIFECYCLE_TEST -DSTN_FORK_TEST_MAIN tests/test_fork.c src/stn_fork.c $(CHAIN_TEST_SOURCES) -o $@ $(LDLIBS)
-
-
-
-# STNC RPC/node interface qualification, including accepted wallet balance
-# and Contract state reads. Uses the production Linux storage backend.
-.PHONY: test-rpc
-test-rpc: $(BUILD_DIR)/test-rpc
-	$(BUILD_DIR)/test-rpc
-
-RPC_TEST_SOURCES := $(filter-out src/main.c src/stn_internal_miner.c src/stn_peer.c src/stn_report.c src/stn_config.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) platforms/linux/stn_sha256.c platforms/linux/stn_linux_storage.c
-
-$(BUILD_DIR)/test-rpc: tests/test_rpc.c $(RPC_TEST_SOURCES)
-	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(PLATFORM_CFLAGS) -DSTN_LIFECYCLE_TEST -DSTN_RPC_TEST_MAIN tests/test_rpc.c $(RPC_TEST_SOURCES) -o $@ $(LDLIBS)
-
-# Operational reporting qualification.
-test-report: $(BUILD_DIR)/test-report
-	$(BUILD_DIR)/test-report
-
-$(BUILD_DIR)/test-report: tests/test_report.c src/stn_report.c includes/stn_report.h
-	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) tests/test_report.c src/stn_report.c -o $@
-
-
-# Bounded platform-neutral internal Chain miner primitive qualification.
+# Phase 19 internal miner primitive qualification.
 .PHONY: test-internal-miner
 test-internal-miner: $(BUILD_DIR)/test-internal-miner
 	$(BUILD_DIR)/test-internal-miner
 
-INTERNAL_MINER_TEST_SOURCES := $(filter-out src/main.c src/stn_peer.c src/stn_report.c src/stn_rpc.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) platforms/linux/stn_sha256.c
-
-$(BUILD_DIR)/test-internal-miner: tests/test_internal_miner.c $(INTERNAL_MINER_TEST_SOURCES) includes/stn_internal_miner.h
+$(BUILD_DIR)/test-internal-miner: tests/test_internal_miner.c src/stn_internal_miner.c src/stn_address.c platforms/linux/stn_sha256.c includes/stn_internal_miner.h includes/stn_address.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_INTERNAL_MINER_TEST_MAIN tests/test_internal_miner.c $(INTERNAL_MINER_TEST_SOURCES) -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_INTERNAL_MINER_TEST_MAIN tests/test_internal_miner.c src/stn_internal_miner.c src/stn_address.c platforms/linux/stn_sha256.c src/stn_mining.c src/stn_share.c src/stn_economy.c src/stn_pow.c src/stn_block.c src/stn_chain.c src/stn_compensation_state.c src/stn_compensation.c src/stn_issuance.c src/stn_economic_state.c src/stn_issuance_binding.c src/stn_wallet.c src/stn_transfer.c src/stn_transfer_replay.c src/stn_transfer_binding.c src/stn_transfer_authorization.c src/stn_transfer_acceptance.c src/stn_transfer_envelope.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_acceptance.c src/stn_pending.c src/stn_storage.c src/stn_transaction.c src/stn_record.c src/stn_validation.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_replay.c src/stn_contract_transaction.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_authority.c src/stn_identity.c src/stn_share_replay.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c platforms/linux/stn_linux_storage.c -o $@ $(LDLIBS)
 
 
-# Strict bounded JSON runtime configuration qualification.
+# Chain JSON configuration qualification.
 .PHONY: test-config
 test-config: $(BUILD_DIR)/test-config
 	$(BUILD_DIR)/test-config
@@ -514,3 +463,13 @@ test-config: $(BUILD_DIR)/test-config
 $(BUILD_DIR)/test-config: tests/test_config.c src/stn_config.c src/stn_address.c platforms/linux/stn_sha256.c includes/stn_config.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_CONFIG_TEST_MAIN tests/test_config.c src/stn_config.c src/stn_address.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+
+
+# Solved-block compensation evidence qualification.
+.PHONY: test-block-compensation
+test-block-compensation: $(BUILD_DIR)/test-block-compensation
+	$(BUILD_DIR)/test-block-compensation
+
+$(BUILD_DIR)/test-block-compensation: tests/test_block_compensation.c src/stn_block_compensation.c platforms/linux/stn_sha256.c includes/stn_block_compensation.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DSTN_BLOCK_COMPENSATION_TEST_MAIN tests/test_block_compensation.c src/stn_block_compensation.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
