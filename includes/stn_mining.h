@@ -6,13 +6,14 @@
 #include "stn_pending.h"
 #include "stn_pending_cleanup.h"
 #include "stn_block_compensation_candidate.h"
-/* Mining is the producer of canonical block-compensation evidence and BLOCK
- * issuance. Route its pending admission and candidate assembly through the
- * pairing layer so consensus-required adjacency is preserved without changing
- * generic pending semantics for unrelated callers. Solved-work cleanup uses
- * transaction IDs from the committed candidate and never reinterprets payload
- * classes after the Work ID has committed the candidate. */
-#define stn_pending_admit_transaction stn_block_compensation_pending_admit
+#include "stn_share_pending.h"
+/* Mining is the producer of canonical compensation evidence and issuance.
+ * Route admission through the share-pair guard, which preserves the existing
+ * block-compensation-aware path for all other transaction classes. Candidate
+ * assembly keeps consensus-required block-compensation adjacency. Solved-work
+ * cleanup uses transaction IDs from the committed candidate and never
+ * reinterprets payload classes after the Work ID has committed the candidate. */
+#define stn_pending_admit_transaction stn_share_pending_admit
 #define stn_pending_assemble stn_block_compensation_pending_assemble
 #define stn_pending_inclusions stn_pending_committed_inclusions
 /* Explicit operator-selected canonical body, not a mempool/selection policy.
