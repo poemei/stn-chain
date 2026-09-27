@@ -194,6 +194,19 @@ static stn_data_status append_transaction(uint8_t *body,size_t capacity,
     *written=at+4u+entry->length;++*count;return STN_DATA_OK;
 }
 
+static int pair_fits(size_t written,uint32_t count,size_t capacity,
+    const stn_pending_entry *evidence,const stn_pending_entry *issuance)
+{
+    size_t first,second;
+    if(evidence==NULL || issuance==NULL)return 0;
+    if(evidence->length>UINT32_MAX || issuance->length>UINT32_MAX)return 0;
+    if(count>STN_BLOCK_MAX_TRANSACTIONS-2u)return 0;
+    if(evidence->length>SIZE_MAX-4u || issuance->length>SIZE_MAX-4u)return 0;
+    first=evidence->length+4u;second=issuance->length+4u;
+    if(first>capacity-written)return 0;
+    return second<=capacity-written-first;
+}
+
 stn_data_status stn_block_compensation_pending_assemble(
     const stn_pending *pool,const stn_validation_context *context,
     const stn_storage_view *active,uint8_t *body,size_t capacity,
@@ -218,9 +231,9 @@ stn_data_status stn_block_compensation_pending_assemble(
     status=stn_pending_assemble(&generic,context,active,body,capacity,written,count);
     if(status!=STN_DATA_OK)return status;
 
-    /* BLOCK compensation is consensus-atomic: append each eligible evidence
-     * immediately followed by its bound BLOCK issuance. Pending ID ordering is
-     * used only to choose the evidence order; it never separates the pair. */
+    /* BLOCK compensation is consensus-atomic. Append an eligible evidence and
+     * its bound issuance only when the complete pair fits. A full candidate is
+     * not an RPC failure: the untouched pair remains pending for a later block. */
     for(i=0u;i<pool->count;++i){
         stn_transaction evidence_tx;stn_block_compensation_evidence evidence;
         const stn_pending_entry *issuance_entry=NULL;
@@ -246,6 +259,8 @@ stn_data_status stn_block_compensation_pending_assemble(
             }
         }
         if(issuance_entry==NULL)continue;
+        if(!pair_fits(*written,*count,capacity,&pool->entries[i],issuance_entry))
+            continue;
         status=append_transaction(body,capacity,written,count,&pool->entries[i]);
         if(status!=STN_DATA_OK)return status;
         status=append_transaction(body,capacity,written,count,issuance_entry);
