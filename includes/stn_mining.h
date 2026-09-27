@@ -4,13 +4,17 @@
 #include "stn_node_service.h"
 #include "stn_storage.h"
 #include "stn_pending.h"
+#include "stn_pending_cleanup.h"
 #include "stn_block_compensation_candidate.h"
 /* Mining is the producer of canonical block-compensation evidence and BLOCK
  * issuance. Route its pending admission and candidate assembly through the
  * pairing layer so consensus-required adjacency is preserved without changing
- * generic pending semantics for unrelated callers. */
+ * generic pending semantics for unrelated callers. Solved-work cleanup uses
+ * transaction IDs from the committed candidate and never reinterprets payload
+ * classes after the Work ID has committed the candidate. */
 #define stn_pending_admit_transaction stn_block_compensation_pending_admit
 #define stn_pending_assemble stn_block_compensation_pending_assemble
+#define stn_pending_inclusions stn_pending_committed_inclusions
 /* Explicit operator-selected canonical body, not a mempool/selection policy.
  * Caller serializes calls and keeps inputs immutable. All buffers and inputs
  * must be disjoint. Default scratch remains caller-owned and never reallocates.
@@ -51,7 +55,7 @@ typedef struct stn_mining_service {
     stn_pending *pending;
     const stn_validation_context *intelligence;
     uint8_t *pending_body;size_t pending_body_capacity;
-    int owns_buffers; /* Opt in only for malloc/realloc-owned scratch. */
+    int owns_buffers;
     uint64_t (*timestamp_now)(void *user);
     void *timestamp_user;
     uint8_t template_time_base[32];
@@ -69,35 +73,16 @@ typedef struct stn_mining_service {
 #define STN_MINING_SUBMISSION_PREFIX STN_RPC_MINING_SUBMISSION_PREFIX
 #define STN_MINING_NONCE_OFFSET 152u
 #define STN_MINING_NONCE_SIZE 8u
-/* Transient staged recovery is deliberately bounded independently of the
- * accepted Chain length. Long recovery may be retried in bounded windows. */
 #define STN_SUFFIX_STAGE_MAX_BLOCKS 4096u
 #define STN_SUFFIX_STAGE_MAX_BYTES (64u * 1024u * 1024u)
-/* Template response remains 68-byte prefix + block. Solved submission is
- * parent[32] + work ID[32] + block length[4] + canonical stn0_ identity[69]
- * + block. Only block bytes 152..159 may change: unsigned big-endian nonce. */
 stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *request,
     uint8_t *payload,size_t capacity,size_t *written);
-/* Bind one instance to one long-lived STNC connection. Staged suffix evidence
- * is connection-owned; accepted Chain state remains shared in service. Caller
- * serializes all session handlers against service mutations. */
 void stn_mining_session_init(stn_mining_session *session,stn_mining_service *service);
 void stn_mining_session_release(stn_mining_session *session);
 stn_rpc_code stn_mining_session_handle(void *user,const stn_rpc_message *request,
     uint8_t *payload,size_t capacity,size_t *written);
-
-/* Resolve the exact wallet destination for a mining identity from canonical
- * compensation-destination transactions already held in the local pending pool.
- * This helper does not make pending state authoritative. It exists only so a
- * verified qualifying share can retain its deterministic future issuance while
- * the explicit stn0_ -> stnw0_ relationship is waiting to enter accepted
- * history. Conflicting pending destinations fail closed. */
 stn_data_status stn_mining_pending_compensation_lookup(const stn_pending *pending,
     const stn_address *mining_identity,stn_address *wallet);
-
-/* In-process callers use the exact same validated mining service path as STNC.
- * These helpers do not bypass storage, pending admission, target validation or
- * consensus. Caller serializes access to the service. */
 stn_rpc_code stn_mining_template_local(stn_mining_service *service,
     uint8_t *payload,size_t capacity,size_t *written);
 stn_rpc_code stn_mining_submit_share_local(stn_mining_service *service,
