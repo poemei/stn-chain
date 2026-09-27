@@ -23,7 +23,9 @@ stn_data_status stn_block_compensation_candidate_apply(
  * transaction ID, which cannot preserve the consensus-required adjacent
  * evidence -> issuance pair. These wrappers preserve the generic path for all
  * other transactions while admitting and assembling BLOCK compensation as one
- * deterministic pair. */
+ * deterministic pair. Candidate capacity is also atomic: if the complete pair
+ * cannot fit, neither transaction is emitted and the pair remains pending for
+ * a later candidate rather than making mining-template construction fail. */
 stn_pending_result stn_block_compensation_pending_admit(
     stn_pending *pool,const uint8_t *transaction,size_t length,
     const stn_validation_context *context,const stn_storage_view *active,
