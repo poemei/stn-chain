@@ -28,6 +28,7 @@ int main(void)
     uint8_t issuance_tx[STN_BLOCK_REWARD_ISSUANCE_TX_SIZE],id[32],body[2048];
     size_t evidence_length=0,issuance_length=0,written=0;uint32_t count=0;
     stn_transaction first,second;size_t offset=0;uint32_t n;
+    size_t pair_length,limited_written;uint32_t limited_count;
 
     genesis(block);span.bytes=block;span.length=sizeof(block);active.blocks=&span;active.count=1;
     CHECK(stn_chain_block_id(block,sizeof(block),&hash,block_id)==STN_DATA_OK);
@@ -46,6 +47,7 @@ int main(void)
     CHECK(pool.count==2u);
     CHECK(stn_block_compensation_pending_assemble(&pool,NULL,&active,body,sizeof(body),&written,&count)==STN_DATA_OK);
     CHECK(count==2u&&written>0u);
+    pair_length=written;
 
     n=((uint32_t)body[offset]<<24)|((uint32_t)body[offset+1]<<16)|((uint32_t)body[offset+2]<<8)|body[offset+3];offset+=4u;
     CHECK(stn_transaction_decode(body+offset,n,&first)==STN_DATA_OK);offset+=n;
@@ -54,6 +56,15 @@ int main(void)
     CHECK(first.type==STN_TX_BLOCK_COMPENSATION_EVIDENCE&&second.type==STN_TX_ISSUANCE);
     CHECK(stn_block_compensation_candidate_apply(&first,&second,&replay,&compensation,
         &(stn_economic_state){0},NULL)!=STN_DATA_TYPE);
+
+    /* Candidate capacity is not a template failure. If the complete atomic pair
+     * cannot fit, emit neither half and leave both entries pending. */
+    CHECK(pair_length>0u);
+    limited_written=99u;limited_count=99u;
+    CHECK(stn_block_compensation_pending_assemble(&pool,NULL,&active,body,
+        pair_length-1u,&limited_written,&limited_count)==STN_DATA_OK);
+    CHECK(limited_written==0u&&limited_count==0u);
+    CHECK(pool.count==2u);
 
     stn_pending_clear(&pool);
     puts("Block compensation pending pairing tests passed.");
