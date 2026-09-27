@@ -4,6 +4,13 @@
 #include "stn_node_service.h"
 #include "stn_storage.h"
 #include "stn_pending.h"
+#include "stn_block_compensation_candidate.h"
+/* Mining is the producer of canonical block-compensation evidence and BLOCK
+ * issuance. Route its pending admission and candidate assembly through the
+ * pairing layer so consensus-required adjacency is preserved without changing
+ * generic pending semantics for unrelated callers. */
+#define stn_pending_admit_transaction stn_block_compensation_pending_admit
+#define stn_pending_assemble stn_block_compensation_pending_assemble
 /* Explicit operator-selected canonical body, not a mempool/selection policy.
  * Caller serializes calls and keeps inputs immutable. All buffers and inputs
  * must be disjoint. Default scratch remains caller-owned and never reallocates.
