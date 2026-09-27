@@ -79,6 +79,15 @@ void stn_mining_session_release(stn_mining_session *session);
 stn_rpc_code stn_mining_session_handle(void *user,const stn_rpc_message *request,
     uint8_t *payload,size_t capacity,size_t *written);
 
+/* Resolve the exact wallet destination for a mining identity from canonical
+ * compensation-destination transactions already held in the local pending pool.
+ * This helper does not make pending state authoritative. It exists only so a
+ * verified qualifying share can retain its deterministic future issuance while
+ * the explicit stn0_ -> stnw0_ relationship is waiting to enter accepted
+ * history. Conflicting pending destinations fail closed. */
+stn_data_status stn_mining_pending_compensation_lookup(const stn_pending *pending,
+    const stn_address *mining_identity,stn_address *wallet);
+
 /* In-process callers use the exact same validated mining service path as STNC.
  * These helpers do not bypass storage, pending admission, target validation or
  * consensus. Caller serializes access to the service. */
