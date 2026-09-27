@@ -1,5 +1,5 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
-#include "stn_pending.h"
+#include "stn_pending_cleanup.h"
 #include "stn_block_compensation.h"
 #include "stn_transaction.h"
 #include "stn_sha256.h"
@@ -49,10 +49,10 @@ int main(void)
 
     span.bytes=block_bytes;span.length=block_length;
     view.blocks=&span;view.count=1u;
-    if(stn_pending_inclusions(&pool,&view,&hash,remove)!=STN_DATA_OK)return 1;
+    if(stn_pending_committed_inclusions(&pool,&view,&hash,remove)!=STN_DATA_OK)return 1;
     if(remove[0]!=1u)return 1;
     stn_pending_prune(&pool,remove);
     if(pool.count!=0u)return 1;
-    puts("Pending block-compensation inclusion cleanup: PASS");
+    puts("Committed pending cleanup recognizes block-compensation evidence: PASS");
     return 0;
 }
