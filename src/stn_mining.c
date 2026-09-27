@@ -5,6 +5,7 @@
 #include "stn_address.h"
 #include "stn_share.h"
 #include "stn_block_reward.h"
+#include "stn_compensation.h"
 #include "stn_issuance.h"
 #include <string.h>
 #include <stdlib.h>
@@ -67,6 +68,56 @@ static int ensure_storage_capacity(stn_mining_service *s,size_t required)
     return
         grow(&s->workspace.current_bytes,&s->workspace.current_capacity,required,s->owns_buffers) &&
         grow(&s->workspace.next_bytes,&s->workspace.next_capacity,required,s->owns_buffers);
+}
+
+stn_data_status stn_mining_pending_compensation_lookup(const stn_pending *pending,
+    const stn_address *mining_identity,stn_address *wallet)
+{
+    stn_address selected={0};
+    size_t i;
+    int found=0;
+
+    if(pending==NULL || mining_identity==NULL || wallet==NULL){return STN_DATA_ARGUMENT;}
+    if(mining_identity->type!=STN_ADDRESS_IDENTITY){return STN_DATA_TYPE;}
+
+    for(i=0u;i<pending->count;++i){
+        stn_transaction tx;
+        stn_compensation_destination destination;
+
+        if(stn_transaction_decode(
+                pending->entries[i].transaction,
+                pending->entries[i].length,
+                &tx)!=STN_DATA_OK){
+            return STN_DATA_CONTENT;
+        }
+        if(tx.type!=STN_TX_COMPENSATION_DESTINATION){continue;}
+        if(stn_compensation_destination_decode(
+                tx.record_bytes,
+                tx.record_length,
+                &destination)!=STN_DATA_OK){
+            return STN_DATA_CONTENT;
+        }
+        if(memcmp(destination.mining_identity.identifier,
+                mining_identity->identifier,
+                STN_ADDRESS_ID_SIZE)!=0){
+            continue;
+        }
+        if(destination.mining_identity.type!=STN_ADDRESS_IDENTITY ||
+           destination.wallet.type!=STN_ADDRESS_WALLET){
+            return STN_DATA_CONTENT;
+        }
+        if(found &&
+           memcmp(selected.identifier,destination.wallet.identifier,
+               STN_ADDRESS_ID_SIZE)!=0){
+            return STN_DATA_DUPLICATE;
+        }
+        selected=destination.wallet;
+        found=1;
+    }
+
+    if(!found){return STN_DATA_UNRESOLVED;}
+    *wallet=selected;
+    return STN_DATA_OK;
 }
 
 static int template_time_matches(const stn_mining_service *s,
@@ -952,8 +1003,13 @@ history_done:
 
             /*
              * Accepted share evidence is not itself value. Build the canonical
-             * SHARE issuance against the explicit accepted compensation
-             * relationship, then admit it for normal candidate validation.
+             * SHARE issuance against the miner's explicit compensation
+             * relationship. A relationship already accepted by Chain uses the
+             * normal semantic admission path. A canonical relationship waiting
+             * in pending may supply only the future destination: the internally
+             * constructed issuance is retained structurally but remains
+             * candidate-ineligible until both that relationship and this share
+             * evidence exist in accepted history.
              */
             {
                 stn_issuance_record issuance;
@@ -965,9 +1021,15 @@ history_done:
                 uint8_t issuance_transaction_id[32];
                 size_t issuance_transaction_length=0u;
                 stn_pending_result issuance_result;
+                int compensation_pending=0;
 
                 verified=stn_compensation_state_lookup(
                     v.state.compensation,&evidence.miner,&wallet);
+                if(verified==STN_DATA_UNRESOLVED){
+                    verified=stn_mining_pending_compensation_lookup(
+                        s->pending,&evidence.miner,&wallet);
+                    if(verified==STN_DATA_OK){compensation_pending=1;}
+                }
                 if(verified!=STN_DATA_OK || wallet.type!=STN_ADDRESS_WALLET){
                     (void)stn_pending_remove(s->pending,transaction_id);
                     code=verified==STN_DATA_UNRESOLVED ? STN_RPC_UNAVAILABLE :
@@ -1004,17 +1066,33 @@ history_done:
                     goto done;
                 }
 
-                issuance_result=stn_pending_admit_transaction(
-                    s->pending,
-                    issuance_transaction,
-                    issuance_transaction_length,
-                    s->intelligence,
-                    &v,
-                    &s->chain->hash_provider,
-                    &report,
-                    issuance_transaction_id);
+                if(compensation_pending){
+                    /* The destination came from a canonical compensation record
+                     * already admitted to this pending pool. This structural
+                     * insertion does not make that mapping authoritative. The
+                     * existing issuance candidate gate still requires accepted
+                     * compensation state and accepted share evidence before this
+                     * issuance may enter a block. */
+                    issuance_result=stn_pending_insert(
+                        s->pending,
+                        issuance_transaction,
+                        issuance_transaction_length,
+                        &s->chain->hash_provider,
+                        issuance_transaction_id);
+                }else{
+                    issuance_result=stn_pending_admit_transaction(
+                        s->pending,
+                        issuance_transaction,
+                        issuance_transaction_length,
+                        s->intelligence,
+                        &v,
+                        &s->chain->hash_provider,
+                        &report,
+                        issuance_transaction_id);
+                }
 
-                if(issuance_result!=STN_PENDING_ACCEPTED){
+                if(issuance_result!=STN_PENDING_ACCEPTED &&
+                   issuance_result!=STN_PENDING_DUPLICATE){
                     (void)stn_pending_remove(s->pending,transaction_id);
                     code=issuance_result==STN_PENDING_CAPACITY ? STN_RPC_CAPACITY :
                         issuance_result==STN_PENDING_UNAVAILABLE ? STN_RPC_UNAVAILABLE :
