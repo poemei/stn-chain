@@ -150,6 +150,32 @@ typedef struct stn_chain_economic_owned {
     uint8_t *replay_bytes;
     stn_economic_balance balances[];
 } stn_chain_economic_owned;
+/* [AI:GPT-6 | 2026-09-28 01:09:15 UTC] */
+stn_data_status stn_chain_transfer_replay_check(
+    const stn_chain_state *state,const stn_transfer_envelope *envelope)
+{
+    const stn_chain_economic_owned *owned;
+    stn_transfer_envelope_replay_state replay;
+    stn_transfer_envelope_replay_result result;
+    if(state==NULL || envelope==NULL)return STN_DATA_ARGUMENT;
+    if(state->economy==NULL)return STN_DATA_UNRESOLVED;
+    /* Snapshot must originate from Chain initialization/validation.
+     * Never reinterpret a standalone economic-state allocation. */
+    owned=(const stn_chain_economic_owned *)state->economy;
+    if(owned->references==0u ||
+       owned->replay_count>owned->replay_capacity ||
+       owned->replay_capacity>SIZE_MAX/STN_TRANSFER_ENVELOPE_REPLAY_KEY_SIZE ||
+       (owned->replay_capacity!=0u && owned->replay_bytes==NULL))
+        return STN_DATA_CONTENT;
+    replay.consumed=owned->replay_bytes;
+    replay.consumed_count=owned->replay_count;
+    replay.consumed_capacity=owned->replay_capacity;
+    result=stn_transfer_envelope_replay_check(&replay,envelope);
+    if(result==STN_TRANSFER_ENVELOPE_REPLAY_FRESH)return STN_DATA_OK;
+    if(result==STN_TRANSFER_ENVELOPE_REPLAY_DUPLICATE)return STN_DATA_DUPLICATE;
+    return STN_DATA_ARGUMENT;
+}
+/* [End AI:GPT-6] */
 static stn_chain_economic_owned *economic_new(void){stn_chain_economic_owned *o=(stn_chain_economic_owned *)calloc(1,sizeof(*o));if(o==NULL)return NULL;o->references=1;stn_economic_state_initialize(&o->state,NULL,0u);return o;}
 static stn_chain_economic_owned *economic_clone(const stn_chain_state *s){
     stn_chain_economic_owned *source,*o;size_t capacity,balance_bytes,replay_capacity,replay_bytes,total;
