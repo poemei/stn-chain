@@ -32,8 +32,17 @@ CRYPTO_SOURCES := src/crypto/ed25519_donna/ed25519_provider.c
 PLATFORM_SOURCES := platforms/linux/stn_sha256.c platforms/linux/stn_linux_storage.c platforms/linux/stn_linux_peer.c platforms/linux/stn_app_linux.c
 SOURCES := $(CORE_SOURCES) $(CRYPTO_SOURCES) $(PLATFORM_SOURCES)
 OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SOURCES))
-.PHONY: all configure clean install install-service uninstall info test-contract-query test-transaction-status
+.PHONY: all configure clean install install-service uninstall info test-contract-query test-transaction-status test-linux-info
 all: configure $(TARGET_PATH)
+
+# [AI:GPT-6 | 2026-09-28 14:52:23 UTC]
+# The test includes stn_app_linux.c to exercise its private INFO helpers.
+test-linux-info: $(BUILD_DIR)/test-linux-info
+	$(BUILD_DIR)/test-linux-info
+$(BUILD_DIR)/test-linux-info: tests/test_linux_info.c $(filter-out src/main.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) $(PLATFORM_SOURCES)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(PLATFORM_CFLAGS) tests/test_linux_info.c $(filter-out src/main.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) $(filter-out platforms/linux/stn_app_linux.c,$(PLATFORM_SOURCES)) -o $@ $(LDLIBS)
+# [End AI:GPT-6]
 configure:
 	@echo "Configuring STN Chain for $(HOST_OS)/$(HOST_ARCH)..."
 	@echo "Compiler: $(CC)"

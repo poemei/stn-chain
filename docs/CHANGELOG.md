@@ -5,6 +5,29 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Linux STNC INFO availability - 2026-09-28
+
+- Linux INFO now copies a separately synchronized 184-byte snapshot of local
+  accepted state instead of waiting for the outbound P2P dispatch lock and
+  reconstructing stored history for every INFO request. The snapshot is seeded
+  after validated startup and published after outbound synchronization and RPC
+  dispatch, including same-height reorganizations. While an operation is in
+  progress, INFO reports the last completed publication.
+- Preserved STNC v2 framing, correlation IDs, response fields and error handling.
+  Other stateful RPC methods retain their existing serialization and validation.
+  Peer evidence still passes the existing independent validation/adoption path.
+  Internal miner implementation, startup, configuration and mining sources are
+  unchanged; no new production implementation unit was introduced.
+- Added a C regression, Windows helper-test runner, Linux make test target and
+  an isolated VPS socket regression for stalled outbound P2P, concurrent and
+  persistent INFO sessions, fragmented requests, malformed INFO and --once.
+- Validation: MSVC C17 /W4 /WX helper/codec build passed; 40,039 checks, zero
+  failures. Windows uses extracted production helpers with native SRW locks;
+  it does not qualify Linux pthreads/sockets. Network-test Python syntax passed.
+  Full Windows build hit 12 pre-existing unresolved symbols from omitted build
+  inputs. Linux build and VPS process tests remain unrun on this Windows host.
+  No deployment, commit or release. No guarantee is added for non-INFO latency.
+
 ### Pending source compiler cleanup - 2026-09-27
 
 - Expanded compressed statements in stn_pending.c to remove misleading indentation; verified identical non-whitespace content and unchanged logic.

@@ -328,6 +328,103 @@ static stn_peer_status rpc_transfer(
     return status;
 }
 
+/* [AI:GPT-6 | 2026-09-28 14:52:23 UTC] */
+#define APP_INFO_PAYLOAD_SIZE 184u
+
+/* Only the bounded wire payload is shared, never borrowed Chain pointers.
+ * Writers hold dispatch_lock (or run before worker startup), then info_lock.
+ * Readers take only info_lock; neither disk nor network I/O holds info_lock.
+ * During validation/synchronization INFO describes the last published local
+ * accepted state, not a peer's advertised height or an unvalidated candidate.
+ */
+static pthread_mutex_t info_lock = PTHREAD_MUTEX_INITIALIZER;
+static uint8_t info_payload[APP_INFO_PAYLOAD_SIZE];
+static stn_rpc_code info_status = STN_RPC_UNAVAILABLE;
+
+static void publish_info(const stn_chain_state *accepted)
+{
+    uint8_t payload[APP_INFO_PAYLOAD_SIZE] = {0};
+    stn_rpc_code status = STN_RPC_UNAVAILABLE;
+
+    if(accepted->has_tip) {
+        /* Accepted persisted history starts at height zero. The existing
+         * STNC v2 count field is u32 and includes that genesis block. */
+        if(accepted->height >= UINT32_MAX) {
+            status = STN_RPC_CAPACITY;
+        } else {
+            memcpy(payload, accepted->network_id, 32u);
+            memcpy(payload + 32u, accepted->genesis_id, 32u);
+            stn_wire_write(payload + 64u, 8u, accepted->height);
+            memcpy(payload + 72u, accepted->tip_id, 32u);
+            memcpy(payload + 104u, accepted->cumulative_work.bytes, STN_WORK_SIZE);
+            memcpy(payload + 144u, accepted->current_target, 32u);
+            stn_wire_write(payload + 176u, 4u, 1u);
+            stn_wire_write(payload + 180u, 4u, accepted->height + 1u);
+            status = STN_RPC_OK;
+        }
+    }
+
+    pthread_mutex_lock(&info_lock);
+    memcpy(info_payload, payload, sizeof(info_payload));
+    info_status = status;
+    pthread_mutex_unlock(&info_lock);
+}
+
+static stn_rpc_code cached_info_handle(
+    void *user, const stn_rpc_message *request,
+    uint8_t *payload, size_t capacity, size_t *written)
+{
+    stn_rpc_code status;
+    (void)user;
+    *written = 0u;
+    if(request->method != STN_RPC_INFO) {
+        return STN_RPC_METHOD;
+    }
+    if(capacity < APP_INFO_PAYLOAD_SIZE) {
+        return STN_RPC_CAPACITY;
+    }
+
+    pthread_mutex_lock(&info_lock);
+    status = info_status;
+    if(status == STN_RPC_OK) {
+        memcpy(payload, info_payload, APP_INFO_PAYLOAD_SIZE);
+        *written = APP_INFO_PAYLOAD_SIZE;
+    }
+    pthread_mutex_unlock(&info_lock);
+    return status;
+}
+
+static stn_rpc_code dispatch_request(
+    const uint8_t *request, size_t length, const stn_rpc_service *service,
+    stn_mining_service *mining, pthread_mutex_t *dispatch_lock,
+    uint8_t *response, size_t capacity, size_t *written)
+{
+    stn_rpc_message decoded;
+    stn_rpc_code result;
+    stn_rpc_service cached = {NULL, cached_info_handle};
+
+    /* Keep codec validation, permissions, error framing and request IDs in
+     * the existing dispatcher. Invalid frames need no mutable Chain state. */
+    result = stn_rpc_decode(request, length, &decoded);
+    if(result != STN_RPC_OK || decoded.kind != 1u ||
+       decoded.method == STN_RPC_INFO) {
+        return stn_rpc_dispatch(request, length,
+            STN_RPC_READ | STN_RPC_SUBMISSION, &cached,
+            response, capacity, written);
+    }
+
+    pthread_mutex_lock(dispatch_lock);
+    result = stn_rpc_dispatch(request, length,
+        STN_RPC_READ | STN_RPC_SUBMISSION, service,
+        response, capacity, written);
+    /* A failed request may follow a committed state change. Publish the
+     * actual accepted state, never infer adoption from an RPC result code. */
+    publish_info(&mining->active);
+    pthread_mutex_unlock(dispatch_lock);
+    return result;
+}
+/* [End AI:GPT-6] */
+
 typedef struct rpc_client {
     pthread_t thread;
     stn_linux_peer peer;
@@ -407,18 +504,17 @@ static void *rpc_client_thread(void *user)
                 break;
             }
 
-            pthread_mutex_lock(client->dispatch_lock);
-
-            dispatch = stn_rpc_dispatch(
+            /* [AI:GPT-6 | 2026-09-28 14:52:23 UTC] */
+            dispatch = dispatch_request(
                 request,
                 24 + payload_length,
-                STN_RPC_READ | STN_RPC_SUBMISSION,
                 &client->service,
+                client->mining_session.service,
+                client->dispatch_lock,
                 response,
                 STN_RPC_MAX_FRAME,
                 &response_length);
-
-            pthread_mutex_unlock(client->dispatch_lock);
+            /* [End AI:GPT-6] */
 
             if(dispatch != STN_RPC_OK ||
                rpc_transfer(
@@ -558,16 +654,17 @@ static int serve_once(
 
             {
                 stn_rpc_code dispatch;
-                pthread_mutex_lock(dispatch_lock);
-                dispatch = stn_rpc_dispatch(
+                /* [AI:GPT-6 | 2026-09-28 14:52:23 UTC] */
+                dispatch = dispatch_request(
                     request,
                     24 + payload_length,
-                    STN_RPC_READ | STN_RPC_SUBMISSION,
                     &service,
+                    mining,
+                    dispatch_lock,
                     response,
                     STN_RPC_MAX_FRAME,
                     &response_length);
-                pthread_mutex_unlock(dispatch_lock);
+                /* [End AI:GPT-6] */
                 if(dispatch != STN_RPC_OK ||
                    rpc_transfer(&peer,&transport,response,response_length,1,0) != STN_PEER_OK) {
                     break;
@@ -842,7 +939,9 @@ static void *outbound_thread(void *user)
             int step_due = !runtime->manager.started ||
                 now >= runtime->manager.last_step + STN_PEER_OUTBOUND_INTERVAL_MS;
             size_t selected_index = runtime->manager.next;
-            uint64_t before_height = runtime->mining->active.height;
+            /* [AI:GPT-6 | 2026-09-28 14:52:23 UTC] */
+            uint64_t before_height;
+            /* [End AI:GPT-6] */
             stn_peer_status peer_status;
 
             if(step_due && !was_connected &&
@@ -862,6 +961,10 @@ static void *outbound_thread(void *user)
 
             pthread_mutex_lock(runtime->lock);
 
+            /* [AI:GPT-6 | 2026-09-28 14:52:23 UTC] */
+            before_height = runtime->mining->active.height;
+            /* [End AI:GPT-6] */
+
             runtime->socket.operation_deadline_ms = now + 5000u;
 
             peer_status = stn_peer_outbound_step(
@@ -871,6 +974,10 @@ static void *outbound_thread(void *user)
                 runtime->mining->storage,
                 &runtime->workspace,
                 &runtime->mining->active);
+
+            /* [AI:GPT-6 | 2026-09-28 14:52:23 UTC] */
+            publish_info(&runtime->mining->active);
+            /* [End AI:GPT-6] */
 
             if(!was_connected && runtime->manager.connected) {
                 report_event(STN_REPORT_PEER, "Connected");
@@ -1581,6 +1688,12 @@ int stn_linux_app(int argc, char **argv)
     }
 
     lock_ready = 1;
+
+    /* [AI:GPT-6 | 2026-09-28 14:52:23 UTC] */
+    /* Startup storage creation/load has independently validated this state.
+     * Seed INFO before any worker can accept a request or start peer I/O. */
+    publish_info(&mining.active);
+    /* [End AI:GPT-6] */
 
     if(!load_chain_config(config_path, &config)) {
         fprintf(stderr, "Cannot read valid Chain configuration: %s\n", config_path);
