@@ -34,11 +34,19 @@
  * CREATE still carries actor and signature and remains subject to identity,
  * signature, participant, initial-state and consensus validation.
  *
+ * [AI-MODIFIED] 2026-09-27
+ * A CREATE payload must also describe a DRAFT whose immutable participant set
+ * can initialize Phase 18 approval consensus. At least one unique APPROVER is
+ * therefore required. This prevents a consensus-impossible CREATE from being
+ * represented as admissible pending work.
+ * [HUMAN-REVIEW-REQUIRED]
+ *
  * Every action after CREATE carries exactly STN_AUTHORITY_EVIDENCE_SIZE bytes.
  *
- * This is a structural transport object only. Decode/encode do not establish
- * signature validity, scoped authority, lifecycle validity, accepted history,
- * duplicate approval state or consensus acceptance.
+ * This transport layer does not establish signature validity, scoped authority,
+ * accepted history, duplicate approval state or consensus acceptance. CREATE's
+ * deterministic approval-set viability is checked because it is immutable and
+ * already knowable before pending admission.
  */
 typedef struct stn_contract_transaction {
     uint16_t version;

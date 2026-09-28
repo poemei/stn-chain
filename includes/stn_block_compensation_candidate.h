@@ -3,6 +3,7 @@
 #define STN_BLOCK_COMPENSATION_CANDIDATE_H
 
 #include "stn_block_compensation_acceptance.h"
+#include "stn_pending.h"
 #include "stn_transaction.h"
 
 /* Validate and apply the adjacent canonical block-compensation evidence and
@@ -16,5 +17,23 @@ stn_data_status stn_block_compensation_candidate_apply(
     const stn_compensation_state *compensation,
     stn_economic_state *economy,
     stn_block_compensation_evidence *accepted_evidence);
+
+/* Mining-side pending integration for block compensation. Generic pending
+ * admission predates BLOCK issuance and generic candidate assembly sorts by
+ * transaction ID, which cannot preserve the consensus-required adjacent
+ * evidence -> issuance pair. These wrappers preserve the generic path for all
+ * other transactions while admitting and assembling BLOCK compensation as one
+ * deterministic pair. Candidate capacity is also atomic: if the complete pair
+ * cannot fit, neither transaction is emitted and the pair remains pending for
+ * a later candidate rather than making mining-template construction fail. */
+stn_pending_result stn_block_compensation_pending_admit(
+    stn_pending *pool,const uint8_t *transaction,size_t length,
+    const stn_validation_context *context,const stn_storage_view *active,
+    const stn_hash_provider *hash,stn_validation_report *report,uint8_t id[32]);
+
+stn_data_status stn_block_compensation_pending_assemble(
+    const stn_pending *pool,const stn_validation_context *context,
+    const stn_storage_view *active,uint8_t *body,size_t capacity,
+    size_t *written,uint32_t *count);
 
 #endif

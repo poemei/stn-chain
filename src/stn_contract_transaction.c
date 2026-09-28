@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_contract_transaction.h"
+#include "stn_contract_consensus.h"
 #include "stn_wire_internal.h"
 
 #include <string.h>
@@ -16,12 +17,38 @@ static int authority_length_valid(uint16_t action,uint32_t length)
     return length==STN_AUTHORITY_EVIDENCE_SIZE;
 }
 
+static stn_contract_status create_admission_valid(
+    uint16_t action,
+    const uint8_t *canonical_contract,
+    size_t canonical_contract_length)
+{
+    stn_contract_vote_state votes;
+
+    if(action!=STN_CONTRACT_ACTION_CREATE)return STN_CONTRACT_OK;
+
+    /*
+     * [AI-MODIFIED] 2026-09-27
+     * CREATE is admitted only when its immutable DRAFT can initialize the
+     * Phase 18 approval set. This rejects a structurally valid agreement with
+     * zero unique APPROVER participants before pending admission can report
+     * success for a contract consensus can never advance.
+     * [HUMAN-REVIEW-REQUIRED]
+     */
+    return stn_contract_vote_state_initialize(
+        &votes,
+        canonical_contract,
+        canonical_contract_length,
+        NULL,
+        0u);
+}
+
 stn_contract_status stn_contract_transaction_decode(
     const uint8_t *input,
     size_t input_length,
     stn_contract_transaction *transaction)
 {
     stn_contract_transaction decoded;
+    stn_contract_status status;
     uint32_t contract_length;
     uint32_t authority_length;
     size_t expected_length;
@@ -78,6 +105,12 @@ stn_contract_status stn_contract_transaction_decode(
         return STN_CONTRACT_LENGTH;
     }
 
+    status=create_admission_valid(
+        decoded.action,
+        decoded.canonical_contract,
+        decoded.canonical_contract_length);
+    if(status!=STN_CONTRACT_OK)return status;
+
     if (decoded.action != STN_CONTRACT_ACTION_CREATE &&
         stn_authority_evidence_validate(
             decoded.authority_evidence,
@@ -96,6 +129,7 @@ stn_contract_status stn_contract_transaction_encode(
     size_t *written)
 {
     uint8_t temporary[STN_CONTRACT_TX_MAX_SIZE];
+    stn_contract_status status;
     size_t total;
 
     if (written != NULL) {
@@ -131,6 +165,12 @@ stn_contract_status stn_contract_transaction_encode(
             transaction->canonical_contract_length) != STN_CONTRACT_OK) {
         return STN_CONTRACT_LENGTH;
     }
+
+    status=create_admission_valid(
+        transaction->action,
+        transaction->canonical_contract,
+        transaction->canonical_contract_length);
+    if(status!=STN_CONTRACT_OK)return status;
 
     if (transaction->action != STN_CONTRACT_ACTION_CREATE &&
         stn_authority_evidence_validate(
