@@ -626,8 +626,6 @@ static void *inbound_client_thread(void *user)
     response = (uint8_t *)malloc(STN_PEER_MAX_FRAME);
 
     if(snapshot != NULL && request != NULL && response != NULL) {
-        pthread_mutex_lock(client->lock);
-
         storage_status = client->mining->storage->acquire(
             client->mining->storage->user);
 
@@ -660,8 +658,6 @@ static void *inbound_client_thread(void *user)
                 storage_status = STN_STORAGE_CAPACITY;
             }
         }
-
-        pthread_mutex_unlock(client->lock);
 
         if(storage_status != STN_STORAGE_OK) {
             report_event(
