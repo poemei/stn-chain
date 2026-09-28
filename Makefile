@@ -32,7 +32,7 @@ CRYPTO_SOURCES := src/crypto/ed25519_donna/ed25519_provider.c
 PLATFORM_SOURCES := platforms/linux/stn_sha256.c platforms/linux/stn_linux_storage.c platforms/linux/stn_linux_peer.c platforms/linux/stn_app_linux.c
 SOURCES := $(CORE_SOURCES) $(CRYPTO_SOURCES) $(PLATFORM_SOURCES)
 OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SOURCES))
-.PHONY: all configure clean install install-service uninstall info test-contract-query test-transaction-status test-linux-info
+.PHONY: all configure clean install install-service uninstall info test-contract-query test-transaction-status test-linux-info test-mining-capacity
 all: configure $(TARGET_PATH)
 
 # [AI:GPT-6 | 2026-09-28 14:52:23 UTC]
@@ -69,7 +69,7 @@ $(BUILD_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 install: $(TARGET_PATH)
 	install -d $(DESTDIR)$(BINDIR)
-	install -m 0755 $(TARGET_PATH) $(DESTDIR)$(BINDIR)/$(TARGET)
+	install -m 0755 $(TARGET_PATH) $(DESTDIR)$(BINDIR)
 	install -d $(DESTDIR)$(DATADIR)
 	install -d $(DESTDIR)$(LOGDIR)
 	install -d -o stnchain -g stnchain $(DESTDIR)/etc/stn-chain
@@ -83,8 +83,8 @@ install: $(TARGET_PATH)
 	@echo "  Application: $(BINDIR)/$(TARGET)"
 	@echo "  Service:     /etc/systemd/system/stn-chain.service"
 	@echo "  Config:      /etc/stn-chain/chain_config.json"
-	@echo "  Data:        $(DATADIR)"
-	@echo "  Logs:        $(LOGDIR)"
+	@echo "  Data:         $(DATADIR)"
+	@echo "  Logs:         $(LOGDIR)"
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(TARGET)
 	@echo "Removed $(BINDIR)/$(TARGET)"
@@ -107,3 +107,9 @@ test-transaction-status: $(BUILD_DIR)/test-transaction-status
 $(BUILD_DIR)/test-transaction-status: tests/test_transaction_status.c src/stn_transaction_status.c $(filter-out src/main.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) $(PLATFORM_SOURCES)
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(PLATFORM_CFLAGS) -DSTN_TRANSACTION_STATUS_TEST_MAIN tests/test_transaction_status.c $(filter-out src/main.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) $(PLATFORM_SOURCES) -o $@ $(LDLIBS)
+
+test-mining-capacity: $(BUILD_DIR)/test-mining-capacity
+	$(BUILD_DIR)/test-mining-capacity
+$(BUILD_DIR)/test-mining-capacity: tests/test_mining_capacity.c includes/stn_block.h includes/stn_economy.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) tests/test_mining_capacity.c -o $@
