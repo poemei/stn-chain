@@ -16,6 +16,7 @@
 #define STN_RPC_ACCEPTED_RECORD_PREFIX 76u
 #define STN_RPC_CONTRACT_LIST_ENTRY_SIZE 90u
 #define STN_RPC_CONTRACT_LIST_MAX 16u
+#define STN_RPC_TRANSACTION_STATUS_SIZE 44u
 typedef enum stn_rpc_code {
     STN_RPC_OK=0,STN_RPC_INVALID,STN_RPC_VERSION,STN_RPC_METHOD,
     STN_RPC_FORBIDDEN,STN_RPC_UNAVAILABLE,STN_RPC_NOT_FOUND,
@@ -36,6 +37,11 @@ typedef enum stn_rpc_method {
      * stnc0_ text[70], state u16, type u16, sequence u64, created_at u64.
      * Results are active/nonterminal first, newest first, bounded to 16. */
     STN_RPC_CONTRACT_LIST=12,
+    /* Exact canonical 32-byte transaction identifier. OK returns height u64,
+     * accepted block id[32], transaction position u32. NOT_FOUND means absent
+     * from the current accepted history; it does not mean rejected or absent
+     * from pending state. */
+    STN_RPC_TRANSACTION_STATUS=13,
     STN_RPC_CHECK_INTELLIGENCE=0x1000,STN_RPC_SUBMIT_INTELLIGENCE=0x1001,
     STN_RPC_INTELLIGENCE_ID=0x1002,STN_RPC_INTELLIGENCE_CURSOR=0x1003,
     STN_RPC_PENDING=0x1004,STN_RPC_SUBMIT_TRANSACTION=0x1005,
