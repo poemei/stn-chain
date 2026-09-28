@@ -17,7 +17,7 @@ stn_transaction_status_code stn_transaction_status_find(
     stn_transaction tx;
     stn_transaction_status found={0};
     uint8_t id[32],block_id[32];
-    size_t i,j,offset;
+    size_t i,j,offset,body_length;
 
     if(context==NULL||blocks==NULL||count==0u||transaction_id==NULL||out==NULL)
         return STN_TRANSACTION_STATUS_ARGUMENT;
@@ -36,14 +36,15 @@ stn_transaction_status_code stn_transaction_status_find(
     for(i=0u;i<count;++i){
         if(stn_block_decode(blocks[i].bytes,blocks[i].length,&block)!=STN_DATA_OK)
             return STN_TRANSACTION_STATUS_PROVIDER;
+        body_length=(size_t)block.header.body_length;
         offset=0u;
         for(j=0u;j<block.header.transaction_count;++j){
             size_t n;
-            if(offset>block.body_length||block.body_length-offset<4u)
+            if(offset>body_length||body_length-offset<4u)
                 return STN_TRANSACTION_STATUS_PROVIDER;
             n=(size_t)stn_wire_read(block.body+offset,4u);
             offset+=4u;
-            if(n>block.body_length-offset||stn_transaction_decode(block.body+offset,n,&tx)!=STN_DATA_OK)
+            if(n>body_length-offset||stn_transaction_decode(block.body+offset,n,&tx)!=STN_DATA_OK)
                 return STN_TRANSACTION_STATUS_PROVIDER;
             if(stn_transaction_id(block.body+offset,n,&context->hash_provider,id)!=STN_DATA_OK)
                 return STN_TRANSACTION_STATUS_PROVIDER;
@@ -58,7 +59,7 @@ stn_transaction_status_code stn_transaction_status_find(
             }
             offset+=n;
         }
-        if(offset!=block.body_length)return STN_TRANSACTION_STATUS_PROVIDER;
+        if(offset!=body_length)return STN_TRANSACTION_STATUS_PROVIDER;
     }
     return STN_TRANSACTION_STATUS_NOT_FOUND;
 }
