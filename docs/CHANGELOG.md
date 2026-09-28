@@ -5,6 +5,13 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Pending source compiler cleanup - 2026-09-27
+
+- Expanded compressed statements in stn_pending.c to remove misleading indentation; verified identical non-whitespace content and unchanged logic.
+- Declared the existing accepted-transfer replay accessor in stn_chain.h, including its envelope type and snapshot contract.
+- MSVC compilation passed. Clang diagnostic check passed with misleading indentation treated as an error. Full Windows linking remains blocked by 11 unresolved symbols in the checkout; see build-pending-format.log. Linux runtime/build not verified. No commit or release.
+
+
 
 ### Post-production STNC synchronization and recovery hardening - 2026-09-25
 

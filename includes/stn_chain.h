@@ -11,6 +11,7 @@
 #include "stn_block_compensation_replay.h"
 #include "stn_compensation_state.h"
 #include "stn_economic_state.h"
+#include "stn_transfer_envelope.h"
 
 #define STN_CHAIN_MAX_BATCH 64u
 
@@ -53,6 +54,12 @@ typedef struct stn_chain_state {
     stn_economic_state *economy;
     uint64_t publication_activation_height;
 } stn_chain_state;
+/* Read-only replay lookup in a Chain-owned immutable accepted snapshot.
+ * OK means fresh; DUPLICATE means consumed; missing state is UNRESOLVED.
+ * No historical decoding or replay consumption. The economic snapshot must
+ * originate from Chain initialization/validation, not standalone storage. */
+stn_data_status stn_chain_transfer_replay_check(
+    const stn_chain_state *state,const stn_transfer_envelope *envelope);
 /* One local reference per owning state. Plain structure copies are BORROWS,
  * never independent owners. share writes a fresh output; move replaces a
  * zero-initialized/owned destination and clears source. release clears state.
