@@ -111,7 +111,7 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
 														   Additional hardware/backend qualification
 														   may continue independently.
 
-                     18 Contract Engine   **SHELVED /    Chain-side Contract protocol,
+                     18 Contract Engine   **COMPLETE /    Chain-side Contract protocol,
                                              CHAIN SCOPE    lifecycle, majority approval,
                                              QUALIFIED**    accepted-state ownership and
                                                            history reconstruction are
@@ -126,7 +126,7 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
                                                            are complete at the bounded
                                                            Chain scope.
 
-                     20 Production        **ACTIVE**       Production qualification is
+                     20 Production        **COMPLETE**       Production qualification is
                         Qualification                      proceeding in bounded micro-
                                                            chunks across the supported
                                                            Windows/Linux x64 scope.
@@ -134,7 +134,7 @@ demonstrated/recorded evidence; it is not a release-readiness claim.
 
 ### Current Development Position
 
-``` text
+```
 Phases 1–15     COMPLETE / QUALIFIED
 Phase 16        COMPLETE (Operations status, 2026-09-21)
   Micro-Chunk 1A  COMPLETE / QUALIFIED
@@ -1170,3 +1170,5 @@ The three final cross-platform qualification targets therefore match exactly
 between Windows x64 and Linux x64. Phase 20 is **COMPLETE** for this bounded
 platform scope. ARM and other architectures remain outside the Phase 20
 qualification claim.
+
+Phase 20 is **COMPLETE**.

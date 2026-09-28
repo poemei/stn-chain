@@ -419,6 +419,60 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
 
     if(code!=STN_RPC_OK){return code;}
 
+    /*
+     * BALANCE is answered from the accepted state already reconstructed by
+     * stn_storage_load() for this request. Do not forward BALANCE through
+     * stn_node_service_handle(): that path reconstructs the same accepted
+     * history a second time and can turn a healthy request into
+     * STN_RPC_UNAVAILABLE under load.
+     *
+     * The storage view remains authoritative here: no cached or externally
+     * reported balance is trusted.
+     */
+    if(q->method==STN_RPC_BALANCE){
+        stn_address wallet;
+        uint64_t units=0u;
+        stn_data_status status;
+
+        if(q->payload==NULL ||
+           q->length!=70u ||
+           stn_address_decode(
+               (const char *)q->payload,
+               q->length,
+               &wallet)!=STN_DATA_OK ||
+           wallet.type!=STN_ADDRESS_WALLET){
+            code=STN_RPC_INVALID;
+            goto done;
+        }
+
+        if(v.state.economy==NULL){
+            code=STN_RPC_UNAVAILABLE;
+            goto done;
+        }
+
+        status=stn_economic_state_balance(
+            v.state.economy,
+            &wallet,
+            &units);
+
+        if(status!=STN_DATA_OK){
+            code=status==STN_DATA_UNRESOLVED ?
+                STN_RPC_UNAVAILABLE :
+                STN_RPC_PROVIDER;
+            goto done;
+        }
+
+        if(cap<8u){
+            code=STN_RPC_CAPACITY;
+            goto done;
+        }
+
+        stn_wire_write(p,8u,units);
+        *written=8u;
+        code=STN_RPC_OK;
+        goto done;
+    }
+
     if(q->method==STN_RPC_GET_ACCEPTED_RECORD ||
        q->method==STN_RPC_GET_FIRST_ACCEPTED_RECORD ||
        q->method==STN_RPC_GET_NEXT_ACCEPTED_RECORD ||
