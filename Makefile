@@ -27,12 +27,12 @@ HOST_ARCH := x64
 else
 $(error Unsupported Linux architecture: $(UNAME_M))
 endif
-CORE_SOURCES := src/main.c src/stn_address.c src/stn_config.c src/stn_authority.c src/stn_block.c src/stn_block_compensation.c src/stn_block_compensation_replay.c src/stn_block_compensation_acceptance.c src/stn_block_compensation_candidate.c src/stn_block_reward.c src/stn_chain.c src/stn_economy.c src/stn_compensation.c src/stn_issuance.c src/stn_economic_state.c src/stn_compensation_state.c src/stn_issuance_binding.c src/stn_wallet.c src/stn_transfer.c src/stn_transfer_replay.c src/stn_transfer_binding.c src/stn_transfer_authorization.c src/stn_transfer_acceptance.c src/stn_transfer_envelope.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_acceptance.c src/stn_fork.c src/stn_identity.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_mining.c src/stn_internal_miner.c src/stn_node_service.c src/stn_peer.c src/stn_pending.c src/stn_pending_cleanup.c src/stn_share_pending.c src/stn_pow.c src/stn_record.c src/stn_replay.c src/stn_report.c src/stn_rpc.c src/stn_share.c src/stn_share_replay.c src/stn_storage.c src/stn_transaction.c src/stn_validation.c src/stn_contract.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract_state.c src/stn_contract_snapshot.c src/stn_contract_transaction.c src/stn_contract_query.c
+CORE_SOURCES := src/main.c src/stn_address.c src/stn_config.c src/stn_authority.c src/stn_block.c src/stn_block_compensation.c src/stn_block_compensation_replay.c src/stn_block_compensation_acceptance.c src/stn_block_compensation_candidate.c src/stn_block_reward.c src/stn_chain.c src/stn_economy.c src/stn_compensation.c src/stn_issuance.c src/stn_economic_state.c src/stn_compensation_state.c src/stn_issuance_binding.c src/stn_wallet.c src/stn_transfer.c src/stn_transfer_replay.c src/stn_transfer_binding.c src/stn_transfer_authorization.c src/stn_transfer_acceptance.c src/stn_transfer_envelope.c src/stn_transfer_envelope_replay.c src/stn_transfer_envelope_authorization.c src/stn_transfer_envelope_acceptance.c src/stn_fork.c src/stn_identity.c src/stn_sentinel_intelligence.c src/stn_lifecycle.c src/stn_mining.c src/stn_internal_miner.c src/stn_node_service.c src/stn_peer.c src/stn_pending.c src/stn_pending_cleanup.c src/stn_share_pending.c src/stn_pow.c src/stn_record.c src/stn_replay.c src/stn_report.c src/stn_rpc.c src/stn_share.c src/stn_share_replay.c src/stn_storage.c src/stn_transaction.c src/stn_transaction_status.c src/stn_validation.c src/stn_contract.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract_state.c src/stn_contract_snapshot.c src/stn_contract_transaction.c src/stn_contract_query.c
 CRYPTO_SOURCES := src/crypto/ed25519_donna/ed25519_provider.c
 PLATFORM_SOURCES := platforms/linux/stn_sha256.c platforms/linux/stn_linux_storage.c platforms/linux/stn_linux_peer.c platforms/linux/stn_app_linux.c
 SOURCES := $(CORE_SOURCES) $(CRYPTO_SOURCES) $(PLATFORM_SOURCES)
 OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SOURCES))
-.PHONY: all configure clean install install-service uninstall info test-contract-query
+.PHONY: all configure clean install install-service uninstall info test-contract-query test-transaction-status
 all: configure $(TARGET_PATH)
 configure:
 	@echo "Configuring STN Chain for $(HOST_OS)/$(HOST_ARCH)..."
@@ -81,6 +81,7 @@ uninstall:
 	@echo "Removed $(BINDIR)/$(TARGET)"
 	@echo "Data and logs preserved:"
 	@echo "  $(DATADIR)"
+	@echo "  $(LOGDIR)"
 install-service: install
 clean:
 	rm -rf $(BUILD_DIR)
@@ -91,3 +92,9 @@ test-contract-query: $(BUILD_DIR)/test-contract-query
 $(BUILD_DIR)/test-contract-query: tests/test_contract_query.c src/stn_contract_query.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract_query.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -DSTN_CONTRACT_QUERY_TEST_MAIN tests/test_contract_query.c src/stn_contract_query.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+
+test-transaction-status: $(BUILD_DIR)/test-transaction-status
+	$(BUILD_DIR)/test-transaction-status
+$(BUILD_DIR)/test-transaction-status: tests/test_transaction_status.c src/stn_transaction_status.c $(filter-out src/main.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) $(PLATFORM_SOURCES)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(PLATFORM_CFLAGS) -DSTN_TRANSACTION_STATUS_TEST_MAIN tests/test_transaction_status.c $(filter-out src/main.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) $(PLATFORM_SOURCES) -o $@ $(LDLIBS)
