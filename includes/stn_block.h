@@ -4,7 +4,16 @@
 #include "stn_transaction.h"
 
 #define STN_BLOCK_HEADER_SIZE 168u
-#define STN_BLOCK_MAX_TRANSACTIONS 16u
+/*
+ * A qualifying mining share produces two protocol records: share evidence and
+ * its deterministic issuance. STN_SHARE_FACTOR is 10, so steady-state mining
+ * produces approximately 20 protocol transactions per solved-block interval.
+ * The former 16-transaction bound guaranteed backlog growth under the intended
+ * mining economy and eventually turned the local pending bound into a mining
+ * admission failure. Thirty-two keeps the block bounded while allowing normal
+ * mining-generated state to drain with headroom for ordinary Chain traffic.
+ */
+#define STN_BLOCK_MAX_TRANSACTIONS 32u
 #define STN_BLOCK_MIN_BODY (4u + STN_TX_MIN_SIZE)
 #define STN_BLOCK_MAX_BODY (STN_BLOCK_MAX_TRANSACTIONS * (4u + STN_TX_MAX_SIZE))
 #define STN_BLOCK_MAX_SIZE (STN_BLOCK_HEADER_SIZE + STN_BLOCK_MAX_BODY)
