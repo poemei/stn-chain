@@ -5,6 +5,7 @@
 #include "stn_mining.h"
 #include "stn_internal_miner.h"
 #include "stn_config.h"
+#include "stn_contract_query.h"
 #include "stn_sha256.h"
 #include "../../src/stn_wire_internal.h"
 #include "stn_report.h"
@@ -340,6 +341,7 @@ static stn_peer_status rpc_transfer(
 static pthread_mutex_t info_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint8_t info_payload[APP_INFO_PAYLOAD_SIZE];
 static stn_rpc_code info_status = STN_RPC_UNAVAILABLE;
+static stn_contract_snapshot *contract_read_snapshot;
 
 static void publish_info(const stn_chain_state *accepted)
 {
@@ -364,7 +366,13 @@ static void publish_info(const stn_chain_state *accepted)
         }
     }
 
+    /* Deep copy avoids sharing non-atomic reference counts with consensus.
+     * Readers only hold info_lock; they never wait on network dispatch. */
+    stn_contract_snapshot *contracts = accepted->has_tip && accepted->contracts != NULL
+        ? stn_contract_snapshot_clone(accepted->contracts) : NULL;
     pthread_mutex_lock(&info_lock);
+    stn_contract_snapshot_release(contract_read_snapshot);
+    contract_read_snapshot = contracts;
     memcpy(info_payload, payload, sizeof(info_payload));
     info_status = status;
     pthread_mutex_unlock(&info_lock);
@@ -377,6 +385,14 @@ static stn_rpc_code cached_info_handle(
     stn_rpc_code status;
     (void)user;
     *written = 0u;
+    if(request->method == STN_RPC_CONTRACT_LIST ||
+       request->method == STN_RPC_CONTRACT_STATE) {
+        pthread_mutex_lock(&info_lock);
+        status = stn_contract_query_handle(contract_read_snapshot,request,
+            payload,capacity,written);
+        pthread_mutex_unlock(&info_lock);
+        return status;
+    }
     if(request->method != STN_RPC_INFO) {
         return STN_RPC_METHOD;
     }
@@ -407,7 +423,8 @@ static stn_rpc_code dispatch_request(
      * the existing dispatcher. Invalid frames need no mutable Chain state. */
     result = stn_rpc_decode(request, length, &decoded);
     if(result != STN_RPC_OK || decoded.kind != 1u ||
-       decoded.method == STN_RPC_INFO) {
+       decoded.method == STN_RPC_INFO || decoded.method == STN_RPC_CONTRACT_LIST ||
+       decoded.method == STN_RPC_CONTRACT_STATE) {
         return stn_rpc_dispatch(request, length,
             STN_RPC_READ | STN_RPC_SUBMISSION, &cached,
             response, capacity, written);

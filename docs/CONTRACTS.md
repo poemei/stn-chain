@@ -27,6 +27,33 @@ may provide evidence. None independently determines accepted Chain state.
 ## STNC Core
 Utilizing Contracts **WILL** be implemented in *STNC Core* which will give the user a Graphical User Interface to a Contract.
 
+## CREATE admission and discovery (2026-09-29)
+
+CREATE uses the existing bootstrap envelope: a signed canonical DRAFT at
+sequence 0, action sequence 0, and zero authority-evidence bytes. Consensus
+verifies the signature and requires an ISSUER participant whose stn0 identifier
+is SHA256(actor public key). The draft must contain at least one unique APPROVER.
+Accepted CREATE registers the immutable draft and advances current state to
+ISSUED at sequence 1. Later actions retain their scoped-grant requirements.
+This completes bootstrap semantics already present in the codec and Core.
+
+Pending admission runs the same contract evaluator as consensus on a private
+accepted-state copy. Candidate assembly rechecks actions in selected order,
+skipping invalid/conflicting actions. Pending admission is not confirmation.
+Contracts appear in creator and recipient lists only after block acceptance;
+recipient identifiers must match their Core identity addresses.
+
+Linux CONTRACT_LIST and CONTRACT_STATE read an independently owned copy of
+validated accepted contract state, published alongside INFO after state changes.
+They do not wait for outbound peer dispatch or reconstruct history per query.
+During adoption, readers see the previous completed snapshot; reorganization
+publication replaces it. Nothing is inferred from an unaccepted submission.
+
+Pending remains memory-only. A creation lost before acceptance must be
+resubmitted; these changes do not reconstruct lost drafts or sign for users.
+Subsequent scoped grants and approval workflows are outside this creation and
+discovery repair. Nodes validating newly created contracts require this fix.
+
 ## Contract Model
 
 Conceptually, an STN Chain contract consists of:

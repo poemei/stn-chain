@@ -6,6 +6,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #include "stn_mining.h"
+#include "stn_contract_query.h"
 #include "stn_wire_internal.h"
 #include <stdio.h>
 #include <string.h>
@@ -99,12 +100,56 @@ static THREAD_RESULT alternate_snapshots(void *unused)
     return THREAD_RETURN;
 }
 
+static void contract_reads(void)
+{
+    stn_chain_state accepted={0};stn_contract draft={0};
+    stn_contract_participant participant={0};stn_address identity={0};
+    stn_rpc_message q={1,STN_RPC_CONTRACT_LIST,STN_RPC_OK,17,NULL,0},decoded;
+    uint8_t canonical[512],request[128],response[208];char address[71];
+    size_t cn=0,index=0,n=0,w=0,text_length=0;
+    accepted.has_tip=1;accepted.contracts=stn_contract_snapshot_create();
+    CHECK(accepted.contracts!=NULL);if(accepted.contracts==NULL)return;
+    participant.role=STN_CONTRACT_ROLE_APPROVER;memset(participant.identity,0x42,32);
+    draft.version=1;draft.type=STN_CONTRACT_GENERIC;draft.state=STN_CONTRACT_STATE_DRAFT;
+    draft.participants=&participant;draft.participant_count=1;
+    CHECK(stn_contract_encode(&draft,canonical,sizeof(canonical),&cn)==STN_CONTRACT_OK);
+    CHECK(stn_contract_snapshot_register(accepted.contracts,canonical,cn,&index)==STN_CONTRACT_OK);
+    stn_contract_snapshot_state(accepted.contracts)->entries[index].current.state=STN_CONTRACT_STATE_ISSUED;
+    stn_contract_snapshot_state(accepted.contracts)->entries[index].current.sequence=1;
+    identity.type=STN_ADDRESS_IDENTITY;memcpy(identity.identifier,participant.identity,32);
+    CHECK(stn_address_encode(&identity,address,sizeof(address),&text_length)==STN_DATA_OK);
+    q.payload=(const uint8_t *)address;q.length=(uint32_t)text_length;
+    CHECK(stn_rpc_encode(&q,request,sizeof(request),&n)==STN_RPC_OK);
+    publish_info(&accepted);
+    /* Removing the source proves readers own an independent copy. A held
+     * dispatch lock must not obstruct either contract read method. */
+    stn_contract_snapshot_release(accepted.contracts);accepted.contracts=NULL;
+    pthread_mutex_lock(&dispatch_test_lock);
+    CHECK(dispatch_request(request,n,NULL,NULL,NULL,response,sizeof(response),&w)==STN_RPC_OK);
+    CHECK(stn_rpc_decode(response,w,&decoded)==STN_RPC_OK && decoded.code==STN_RPC_OK);
+    CHECK(decoded.length==92 && stn_wire_read(decoded.payload,2)==1);
+    memcpy(address,decoded.payload+2,70);q.payload=(const uint8_t *)address;q.length=70;
+    q.method=STN_RPC_CONTRACT_STATE;
+    CHECK(stn_rpc_encode(&q,request,sizeof(request),&n)==STN_RPC_OK);
+    CHECK(dispatch_request(request,n,NULL,NULL,NULL,response,sizeof(response),&w)==STN_RPC_OK);
+    CHECK(stn_rpc_decode(response,w,&decoded)==STN_RPC_OK && decoded.code==STN_RPC_OK);
+    CHECK(decoded.length==26 && stn_wire_read(decoded.payload,2)==STN_CONTRACT_STATE_ISSUED && stn_wire_read(decoded.payload+4,8)==1);
+    pthread_mutex_unlock(&dispatch_test_lock);
+    /* Publication after rollback/reorganization removes the old contract. */
+    accepted.contracts=stn_contract_snapshot_create();publish_info(&accepted);
+    CHECK(dispatch_request(request,n,NULL,NULL,NULL,response,sizeof(response),&w)==STN_RPC_OK);
+    CHECK(stn_rpc_decode(response,w,&decoded)==STN_RPC_OK && decoded.code==STN_RPC_NOT_FOUND);
+    stn_contract_snapshot_release(accepted.contracts);accepted.contracts=NULL;
+    accepted.has_tip=0;publish_info(&accepted);
+}
+
 int main(void)
 {
     uint8_t response[208],expected_a[184],expected_b[184],request[25];
     size_t n=0,w=0;unsigned i;int started;test_thread worker;stn_rpc_message decoded;
     stn_rpc_message q={1,STN_RPC_INFO,STN_RPC_OK,UINT64_C(0x123456789abcdef0),NULL,0};
     stn_rpc_service service={NULL,mutation};
+    contract_reads();
     fixture(&state_a,17,42);fixture(&state_b,91,42); /* same-height reorg */
 
     CHECK(call_info(1,response,&w)==STN_RPC_OK);

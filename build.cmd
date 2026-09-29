@@ -11,6 +11,7 @@ rem Run from an ordinary Command Prompt. MSVC Build Tools + Windows SDK suffice.
 cd /d "%~dp0"
 
 if /i "%~1"=="clean" goto clean
+if /i "%~1"=="test-mining-mempool" goto setup
 if /i "%~1"=="test-contract" goto setup
 if /i "%~1"=="test-contract-consensus" goto setup
 if /i "%~1"=="test-contract-lineage" goto setup
@@ -112,7 +113,10 @@ echo Compiler: Microsoft cl.exe
 echo Target:   %TARGET%
 echo.
 
-set "SOURCES= src\main.c  src\stn_address.c  src\stn_authority.c  src\stn_block.c  src\stn_chain.c  src\stn_economy.c  src\stn_compensation.c  src\stn_issuance.c  src\stn_economic_state.c  src\stn_compensation_state.c  src\stn_issuance_binding.c  src\stn_wallet.c  src\stn_transfer.c  src\stn_transfer_replay.c  src\stn_transfer_binding.c  src\stn_transfer_authorization.c  src\stn_transfer_acceptance.c  src\stn_transfer_envelope.c  src\stn_transfer_envelope_replay.c  src\stn_transfer_envelope_authorization.c  src\stn_transfer_envelope_acceptance.c  src\stn_contract.c  src\stn_contract_consensus.c  src\stn_contract_lineage.c  src\stn_contract_state.c  src\stn_contract_snapshot.c  src\stn_contract_transaction.c  src\stn_fork.c  src\stn_identity.c  src\stn_sentinel_intelligence.c  src\stn_lifecycle.c  src\stn_mining.c  src\stn_internal_miner.c  src\stn_config.c  src\stn_node_service.c  src\stn_peer.c  src\stn_pending.c  src\stn_pow.c  src\stn_record.c  src\stn_replay.c  src\stn_report.c  src\stn_rpc.c  src\stn_share.c  src\stn_share_replay.c  src\stn_compensation_state.c  src\stn_storage.c  src\stn_transaction.c  src\stn_validation.c  src\crypto\ed25519_donna\ed25519_provider.c  platforms\windows\stn_sha256.c  platforms\windows\stn_storage_windows.c  platforms\windows\stn_peer_windows.c  platforms\windows\stn_app_windows.c"
+set "SOURCES= src\main.c  src\stn_address.c  src\stn_authority.c  src\stn_block.c  src\stn_chain.c  src\stn_economy.c  src\stn_compensation.c  src\stn_issuance.c  src\stn_economic_state.c  src\stn_compensation_state.c  src\stn_issuance_binding.c  src\stn_wallet.c  src\stn_transfer.c  src\stn_transfer_replay.c  src\stn_transfer_binding.c  src\stn_transfer_authorization.c  src\stn_transfer_acceptance.c  src\stn_transfer_envelope.c  src\stn_transfer_envelope_replay.c  src\stn_transfer_envelope_authorization.c  src\stn_transfer_envelope_acceptance.c  src\stn_contract.c  src\stn_contract_consensus.c  src\stn_contract_lineage.c  src\stn_contract_state.c  src\stn_contract_snapshot.c  src\stn_contract_transaction.c  src\stn_fork.c  src\stn_identity.c  src\stn_sentinel_intelligence.c  src\stn_lifecycle.c  src\stn_mining.c  src\stn_internal_miner.c  src\stn_config.c  src\stn_node_service.c  src\stn_peer.c  src\stn_pending.c  src\stn_pow.c  src\stn_record.c  src\stn_replay.c  src\stn_report.c  src\stn_rpc.c  src\stn_share.c  src\stn_share_replay.c  src\stn_storage.c  src\stn_transaction.c  src\stn_validation.c  src\crypto\ed25519_donna\ed25519_provider.c  platforms\windows\stn_sha256.c  platforms\windows\stn_storage_windows.c  platforms\windows\stn_peer_windows.c  platforms\windows\stn_app_windows.c"
+
+set "SOURCES=%SOURCES% src\stn_block_compensation.c src\stn_block_compensation_replay.c src\stn_block_compensation_acceptance.c src\stn_block_compensation_candidate.c src\stn_block_reward.c src\stn_pending_cleanup.c src\stn_share_pending.c src\stn_contract_query.c src\stn_transaction_status.c"
+if /i "%~1"=="test-mining-mempool" goto test_mining_mempool
 
 cl %CFLAGS% %INCLUDES% %SOURCES% ^
     /Fo"%OBJ_DIR%\\" ^
@@ -126,6 +130,14 @@ echo BUILD SUCCESSFUL
 echo %TARGET%
 exit /b 0
 
+:test_mining_mempool
+set "SOURCES=%SOURCES:src\main.c=tests\test_mining_mempool.c%"
+set "TEST_TARGET=%BUILD_DIR%\test-mining-mempool.exe"
+cl %CFLAGS% %INCLUDES% %SOURCES% /Fo"%OBJ_DIR%\\" /Fe"%TEST_TARGET%" /link /INCREMENTAL:NO ws2_32.lib bcrypt.lib crypt32.lib advapi32.lib user32.lib
+if errorlevel 1 goto fail
+"%TEST_TARGET%"
+if errorlevel 1 goto fail
+exit /b 0
 :test_contract
 set "TEST_TARGET=%BUILD_DIR%\test-contract.exe"
 

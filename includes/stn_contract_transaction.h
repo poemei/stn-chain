@@ -31,6 +31,9 @@
  *
  * CREATE is the bootstrap action. It carries zero authority bytes because no
  * accepted Contract exists yet from which a scoped Contract grant can derive.
+ * CREATE signs action sequence zero and DRAFT sequence zero; acceptance
+ * advances current state to ISSUED sequence one. The actor must own an ISSUER
+ * participant typed identity (SHA256 of the signing public key).
  * CREATE still carries actor and signature and remains subject to identity,
  * signature, participant, initial-state and consensus validation.
  *

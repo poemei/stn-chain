@@ -3,6 +3,8 @@
 # STN Chain Linux build
 # Small. Deterministic. Easy to Use.
 
+.DEFAULT_GOAL := all
+
 CC ?= cc
 TARGET := stn-chain
 BUILD_DIR := build
@@ -32,8 +34,17 @@ CRYPTO_SOURCES := src/crypto/ed25519_donna/ed25519_provider.c
 PLATFORM_SOURCES := platforms/linux/stn_sha256.c platforms/linux/stn_linux_storage.c platforms/linux/stn_linux_peer.c platforms/linux/stn_app_linux.c
 SOURCES := $(CORE_SOURCES) $(CRYPTO_SOURCES) $(PLATFORM_SOURCES)
 OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SOURCES))
+# Public headers define shared structure sizes (including the pending pool).
+# Rebuild every object after a header change, including old builds without .d files.
+$(OBJECTS): $(wildcard includes/*.h)
 .PHONY: all configure clean install install-service uninstall info test-contract-query test-transaction-status test-linux-info test-mining-capacity
 all: configure $(TARGET_PATH)
+.PHONY: test-mining-mempool
+test-mining-mempool: $(BUILD_DIR)/test-mining-mempool
+	$(BUILD_DIR)/test-mining-mempool
+$(BUILD_DIR)/test-mining-mempool: tests/test_mining_mempool.c $(filter-out src/main.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) platforms/linux/stn_sha256.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(PLATFORM_CFLAGS) tests/test_mining_mempool.c $(filter-out src/main.c,$(CORE_SOURCES)) $(CRYPTO_SOURCES) platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
 
 # [AI:GPT-6 | 2026-09-28 14:52:23 UTC]
 # The test includes stn_app_linux.c to exercise its private INFO helpers.
@@ -98,9 +109,9 @@ clean:
 
 test-contract-query: $(BUILD_DIR)/test-contract-query
 	$(BUILD_DIR)/test-contract-query
-$(BUILD_DIR)/test-contract-query: tests/test_contract_query.c src/stn_contract_query.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract_query.h
+$(BUILD_DIR)/test-contract-query: tests/test_contract_query.c src/stn_contract_query.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract_query.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -DSTN_CONTRACT_QUERY_TEST_MAIN tests/test_contract_query.c src/stn_contract_query.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) -DSTN_CONTRACT_QUERY_TEST_MAIN tests/test_contract_query.c src/stn_contract_query.c src/stn_contract_snapshot.c src/stn_contract_state.c src/stn_contract_consensus.c src/stn_contract_lineage.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
 
 test-transaction-status: $(BUILD_DIR)/test-transaction-status
 	$(BUILD_DIR)/test-transaction-status

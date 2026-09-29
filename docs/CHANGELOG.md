@@ -5,6 +5,81 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Contract creation and Core discovery repair - 2026-09-29
+
+- Completed CREATE bootstrap consensus rules already emitted by Core and the
+  codec: signed DRAFT/action sequence zero, no prior grant, verified issuer
+  typed identity, viable approver set; acceptance becomes ISSUED sequence one.
+  Previously the old consensus grant and sequence checks rejected every such
+  CREATE after it had been admitted to pending and included in mining work.
+- Pending admission and candidate selection reuse the consensus evaluator on
+  private contract snapshots. Invalid signatures, wrong issuers, wrong initial
+  sequence, replay and conflicting selected actions cannot poison templates.
+- Shared contract RPC serialization reads validated state. Linux publishes an
+  independent contract snapshot with INFO so list/state reads bypass outbound
+  peer synchronization and repeated history reconstruction. A live pre-fix
+  list request took 20.64 seconds. Reorganization publication replaces the copy.
+- Expanded the real-PoW mining regression through signed creation, rejection
+  cases, durable acceptance, full history reconstruction, creator/recipient
+  discovery and Core's list wire format. Added contract read tests with a held
+  dispatch lock, source snapshot disposal and reorganization removal.
+- Windows and Linux production builds passed. The expanded mining/contract
+  regression passed 1,609 checks on each; read-snapshot helpers passed 40,053
+  checks on each; Linux contract-query tests passed. The deployed Linux binary
+  passed isolated socket tests with a deliberately stalled outbound peer:
+  CONTRACT_LIST and CONTRACT_STATE each completed under one second, including
+  concurrent/persistent sessions and --once. Existing crypto fallthrough
+  warnings remain; no new compile errors.
+- Deployed on chain01 on 2026-09-29, executable SHA-256
+  4ecbff9bba554a16f71ba78d3ed19cdef2afeb8806899069e3a2bc102ebbafd0.
+  Preserved executable/history backups with suffix .before-20260929-contracts.
+  Startup recovered from temporary RPC-port bind failures and listened at
+  22:29:26Z, height 672; subsequent blocks were accepted normally.
+- Live signed diagnostic CREATE was admitted and mined at 22:31:22Z in height
+  674, nonce 68616, transaction
+  07c2d25a60ac74f152e86bd34a87add2bc453acb03c2cbb8f23bce6388d9b8c4.
+  Contract c853417b3c5a8a907ff63a2c5dd01472eedd788a83381e9cfc74ca0bf4108327
+  automatically appeared for both fresh test identities as ISSUED/sequence 1.
+  Live list reads took 0.140-0.234 seconds in the recorded acceptance checks.
+  The exact signed transaction was independently verified in persisted history;
+  a separate deployed-binary process reconstructed that history and returned
+  both lists. Core's unchanged production list decoder accepted both responses.
+- No commit or release. Verification used synthetic test identities and Core's
+  RPC/decoder path, not interaction with the user's GUI instances. The existing
+  transaction-status RPC returns METHOD (3); persisted block evidence was used
+  instead, without broadening this repair. Pending remains memory-only and
+  previously lost submissions need resubmission. Subsequent grant/approval GUI
+  workflows are not qualified. Other validating nodes need the CREATE fix too.
+
+### Mining pending-pool liveness - 2026-09-29
+
+- Recovered the exact height-587 candidate from chain01 history and Stratum
+  logs: nonce 838476 had valid PoW and passed full accepted-history validation,
+  but SUBMIT_WORK returned STALE after pending selection changed on the same
+  parent. Submission now binds the submitted zero-nonce header to its Work ID
+  and runs ordinary locked storage/consensus validation on those exact bytes.
+- Increased the local pending entry bound from 128 to 1,024 while retaining
+  the 256 KiB byte bound. Share admission reserves both the share pair and
+  the next block reward pair, so a share-saturated queue cannot make durable
+  block acceptance report capacity merely while constructing its reward.
+- Added a real-PoW regression covering changed pending work, invalid IDs,
+  proofs, targets, commitments and compensation; persistence failure; a queue
+  exceeding 128 entries; pair reservation; successful block acceptance at the
+  share-admission limit; and subsequent queue draining. Windows and Linux each
+  passed 1,559 checks with zero failures.
+- Restored missing Windows production link inputs and replaced an existing
+  MSVC-incompatible variable-length compensation scratch array with checked
+  heap allocation, preserving atomic updates and failure behavior.
+- No consensus target, block transaction limit, issuance amount or STNC wire
+  format changed. The server's existing 32-transaction limit is retained.
+  Pending remains bounded and memory-only; persistence across restarts is not
+  added. An isolated socket replay of the recovered real production proof
+  returned STALE (10) on the previous binary and OK (0), height 587, on the fix.
+  Deployed the mining fix on chain01 with executable/history backups; live
+  Stratum logged accepted blocks at 14:23:06Z and 14:24:34Z and verified shares.
+- Linux now rebuilds objects after public-header changes and explicitly keeps
+  `all` as the default Make goal, preventing mixed pending-structure layouts.
+
 ### Linux STNC INFO availability - 2026-09-28
 
 - Linux INFO now copies a separately synchronized 184-byte snapshot of local
