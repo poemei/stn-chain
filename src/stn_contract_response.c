@@ -29,7 +29,7 @@ stn_contract_status stn_contract_response_statement(const stn_contract_response 
     if(r->version!=STN_CONTRACT_RESPONSE_VERSION)return STN_CONTRACT_VERSION_ERROR;
     if(r->text_length==0u||r->text_length>STN_CONTRACT_RESPONSE_MAX_TEXT)return STN_CONTRACT_TERMS_LIMIT;
     total=STN_CONTRACT_RESPONSE_UNSIGNED_HEADER_SIZE+(size_t)r->text_length;if(capacity<total)return STN_CONTRACT_CAPACITY;
-    memcpy(out,response_magic,4);put16(out+4,r->version);put16(out+6,0);memcpy(out+8,r->contract_id,32);memcpy(out+40,r->actor,32);memcpy(out+72,r->text,r->text_length);*written=total;return STN_CONTRACT_OK;
+    memcpy(out,response_magic,4);put16(out+4,r->version);put16(out+6,0);memcpy(out+8,r->contract_id,32);memcpy(out+40,r->actor,32);put32(out+72,r->text_length);memcpy(out+76,r->text,r->text_length);*written=total;return STN_CONTRACT_OK;
 }
 
 stn_contract_status stn_contract_response_encode(const stn_contract_response *r,uint8_t *out,size_t capacity,size_t *written)
