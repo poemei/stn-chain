@@ -104,9 +104,9 @@ $(BUILD_DIR)/test-contract-query: tests/test_contract_query.c src/stn_contract_q
 
 test-contract-response: $(BUILD_DIR)/test-contract-response
 	$(BUILD_DIR)/test-contract-response
-$(BUILD_DIR)/test-contract-response: tests/test_contract_response.c src/stn_contract_response.c src/stn_contract.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract_response.h
+$(BUILD_DIR)/test-contract-response: tests/test_contract_response.c src/stn_contract_response.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c includes/stn_contract_response.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) tests/test_contract_response.c src/stn_contract_response.c src/stn_contract.c src/stn_address.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) tests/test_contract_response.c src/stn_contract_response.c src/stn_contract.c src/stn_address.c src/stn_authority.c src/stn_identity.c src/crypto/ed25519_donna/ed25519_provider.c platforms/linux/stn_sha256.c -o $@ $(LDLIBS)
 
 test-transaction-status: $(BUILD_DIR)/test-transaction-status
 	$(BUILD_DIR)/test-transaction-status
