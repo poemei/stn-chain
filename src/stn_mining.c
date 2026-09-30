@@ -1,6 +1,5 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_mining.h"
-#include "stn_contract_query.h"
 #include "stn_sha256.h"
 #include "stn_wire_internal.h"
 #include "stn_address.h"
@@ -392,11 +391,6 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
        s->chain->hash_provider.hash!=stn_sha256 || s->chain->pow_policy==NULL || s->template_bytes==NULL){
         return STN_RPC_PROVIDER;
     }
-
-    /* The synchronized service already owns validated accepted state. */
-    if(q->method==STN_RPC_CONTRACT_LIST || q->method==STN_RPC_CONTRACT_STATE)
-        return s->active.has_tip ? stn_contract_query_handle(s->active.contracts,
-            q,p,cap,written) : STN_RPC_UNAVAILABLE;
 
     if(s->owns_buffers){
         size_t needed=0;
@@ -1218,9 +1212,19 @@ history_done:
         goto done;
     }
 
+    code=template_build(s,&v,&n,id);
+
+    if(code!=STN_RPC_OK){
+        if(s->pending!=NULL &&
+           q->method==STN_RPC_SUBMIT_WORK &&
+           code==STN_RPC_UNAVAILABLE){
+            code=STN_RPC_STALE;
+        }
+
+        goto done;
+    }
+
     if(q->method==STN_RPC_MINING_TEMPLATE){
-        code=template_build(s,&v,&n,id);
-        if(code!=STN_RPC_OK){goto done;}
         if(cap<68+n){code=STN_RPC_CAPACITY;goto done;}
 
         memcpy(p,v.state.tip_id,32);
@@ -1235,25 +1239,24 @@ history_done:
 
     if(cap<80){code=STN_RPC_CAPACITY;goto done;}
 
-    {
-        static const uint8_t domain[]="STN-CHAIN:WORK:ID:1";
-        uint8_t header[STN_BLOCK_HEADER_SIZE];
-        const uint8_t *submitted=q->payload+STN_MINING_SUBMISSION_PREFIX;
-        stn_data_status hashed;
-        /* Pending arrivals cannot invalidate completed PoW on the same parent.
-         * Bind the submitted zero-nonce header to its Work ID. storage_extend
-         * validates the body commitment, proof and all consensus rules against
-         * the locked accepted prefix, independently of pending selection. */
-        n=q->length-STN_MINING_SUBMISSION_PREFIX;
-        if(stn_block_validate_structure(submitted,n)!=STN_DATA_OK){
-            code=STN_RPC_REJECTED;goto done;
-        }
-        memcpy(header,submitted,sizeof(header));
-        memset(header+STN_MINING_NONCE_OFFSET,0,STN_MINING_NONCE_SIZE);
-        hashed=s->chain->hash_provider.hash(s->chain->hash_provider.user,
-            domain,sizeof(domain),header,sizeof(header),id);
-        if(hashed!=STN_DATA_OK){code=STN_RPC_PROVIDER;goto done;}
-        if(memcmp(q->payload+32,id,32)!=0){code=STN_RPC_REJECTED;goto done;}
+    if(s->pending!=NULL &&
+       memcmp(q->payload+32,id,32)!=0){
+        code=STN_RPC_STALE;
+        goto done;
+    }
+
+    if(q->length!=STN_MINING_SUBMISSION_PREFIX+n ||
+       memcmp(q->payload+32,id,32)!=0 ||
+       memcmp(
+           q->payload+STN_MINING_SUBMISSION_PREFIX,
+           s->template_bytes,
+           STN_MINING_NONCE_OFFSET)!=0 ||
+       memcmp(
+           q->payload+STN_MINING_SUBMISSION_PREFIX+STN_MINING_NONCE_OFFSET+STN_MINING_NONCE_SIZE,
+           s->template_bytes+STN_MINING_NONCE_OFFSET+STN_MINING_NONCE_SIZE,
+           n-STN_MINING_NONCE_OFFSET-STN_MINING_NONCE_SIZE)!=0){
+        code=STN_RPC_REJECTED;
+        goto done;
     }
 
     if(s->pending!=NULL){

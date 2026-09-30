@@ -4,8 +4,6 @@
 
 #include "stn_contract_state.h"
 #include "stn_address.h"
-#include "stn_contract_snapshot.h"
-#include "stn_rpc.h"
 
 #define STN_CONTRACT_QUERY_MAX_RESULTS 16u
 
@@ -28,10 +26,5 @@ stn_contract_status stn_contract_query_identity(
     stn_contract_query_result *results,
     size_t capacity,
     size_t *count);
-
-/* No history replay or pending lookup. Caller holds this validated immutable
- * snapshot for the whole call. Supports CONTRACT_LIST and CONTRACT_STATE. */
-stn_rpc_code stn_contract_query_handle(const stn_contract_snapshot *contracts,
-    const stn_rpc_message *request,uint8_t *payload,size_t capacity,size_t *written);
 
 #endif

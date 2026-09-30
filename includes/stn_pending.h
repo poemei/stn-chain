@@ -3,9 +3,7 @@
 #define STN_PENDING_H
 #include "stn_storage.h"
 /* Local admission bounds, independent of history and validation batch sizes. */
-/* Allow share bursts to use the existing byte budget instead of exhausting
- * 128 small-record slots long before the memory limit. This is local policy. */
-#define STN_PENDING_MAX_ENTRIES 1024u
+#define STN_PENDING_MAX_ENTRIES 128u
 #define STN_PENDING_MAX_BYTES (256u*1024u)
 typedef enum stn_pending_result {
     STN_PENDING_ACCEPTED=0, STN_PENDING_DUPLICATE, STN_PENDING_REPLAY,

@@ -661,23 +661,6 @@ stn_pending_admit_transaction(stn_pending *p, const uint8_t *bytes,
             report->acceptance = STN_ACCEPTANCE_UNRESOLVED;
             return STN_PENDING_UNAVAILABLE;
         }
-        {
-            stn_contract_snapshot *projection;
-            if (active->state.contracts == NULL || active->state.lifecycle == NULL)
-                return STN_PENDING_UNAVAILABLE;
-            projection = stn_contract_snapshot_clone(active->state.contracts);
-            if (projection == NULL)
-                return STN_PENDING_CAPACITY;
-            status = stn_chain_contract_apply_transaction(projection,
-                active->state.lifecycle, &tx, hash);
-            stn_contract_snapshot_release(projection);
-            if (status != STN_DATA_OK) {
-                report->acceptance = STN_ACCEPTANCE_REJECTED;
-                return status == STN_DATA_CAPACITY ? STN_PENDING_CAPACITY :
-                    status == STN_DATA_PROVIDER_ERROR ? STN_PENDING_PROVIDER :
-                    STN_PENDING_INVALID;
-            }
-        }
         lifecycle_result = stn_pending_insert(p, bytes, length, hash, id);
         if (lifecycle_result == STN_PENDING_ACCEPTED)
         {
@@ -958,8 +941,7 @@ stn_pending_admit_transaction(stn_pending *p, const uint8_t *bytes,
                              hash, report, id);
 }
 
-static stn_data_status assemble_projected(stn_contract_snapshot **contracts,
-                                     const stn_pending *p,
+stn_data_status stn_pending_assemble(const stn_pending *p,
                                      const stn_validation_context *c,
                                      const stn_storage_view *active,
                                      uint8_t *body, size_t capacity,
@@ -1074,31 +1056,6 @@ static stn_data_status assemble_projected(stn_contract_snapshot **contracts,
             break;
         if (e->length + 4 > capacity - total)
             return STN_DATA_CAPACITY;
-        if (tx.type == STN_TX_CONTRACT_ACTION) {
-            stn_hash_provider hp = {stn_sha256, NULL};
-            stn_contract_snapshot *trial;
-            stn_data_status checked;
-            if (active == NULL || active->state.contracts == NULL ||
-                active->state.lifecycle == NULL)
-                return STN_DATA_UNRESOLVED;
-            /* A private trial also rolls back a failed action. Later actions
-             * see earlier selected actions, so conflicting creates/transitions
-             * cannot poison a candidate even if both passed admission. */
-            trial = stn_contract_snapshot_clone(*contracts != NULL ?
-                *contracts : active->state.contracts);
-            if (trial == NULL)
-                return STN_DATA_CAPACITY;
-            checked = stn_chain_contract_apply_transaction(trial,
-                active->state.lifecycle, &tx, &hp);
-            if (checked != STN_DATA_OK) {
-                stn_contract_snapshot_release(trial);
-                if (checked == STN_DATA_PROVIDER_ERROR || checked == STN_DATA_CAPACITY)
-                    return checked;
-                continue;
-            }
-            stn_contract_snapshot_release(*contracts);
-            *contracts = trial;
-        }
         selected[n].bytes = e->transaction;
         selected[n].length = (uint32_t)e->length;
         ++n;
@@ -1113,15 +1070,4 @@ static stn_data_status assemble_projected(stn_contract_snapshot **contracts,
             *count = n;
         return s;
     }
-}
-
-stn_data_status stn_pending_assemble(const stn_pending *p,
-    const stn_validation_context *c,const stn_storage_view *active,
-    uint8_t *body,size_t capacity,size_t *written,uint32_t *count)
-{
-    stn_contract_snapshot *contracts = NULL;
-    stn_data_status status = assemble_projected(&contracts,p,c,active,
-        body,capacity,written,count);
-    stn_contract_snapshot_release(contracts);
-    return status;
 }

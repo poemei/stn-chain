@@ -640,17 +640,6 @@ On submission, Chain:
 
 A changed accepted tip may make previously issued work stale.
 
-Pending arrivals and replacement templates on the same parent do not invalidate
-completed work. SUBMIT_WORK reproduces the submitted zero-nonce header's Work ID
-and validates that submitted block against accepted history. The latest pending
-selection is not an acceptance requirement. Only included transactions are
-removed; later arrivals remain queued.
-
-The local pending pool permits 1,024 entries within its existing 256 KiB byte
-budget. Share admission reserves space for both its evidence/issuance pair and
-the next solved block's reward pair. These are local admission limits, not new
-consensus limits or guarantees that arbitrary submission volume can be accepted.
-
 Tip changes caused by:
 
 - local solved work;
