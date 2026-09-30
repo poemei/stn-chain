@@ -25,11 +25,11 @@ stn_data_status stn_contract_response_accept(
     if(state==NULL)return STN_DATA_ARGUMENT;
     for(i=0u;i<state->entry_count;++i){
         const stn_contract_state_entry *entry=&state->entries[i];
-        stn_contract draft;
-        if(stn_contract_decode(entry->canonical_draft,
-            entry->canonical_draft_length,&draft)!=STN_CONTRACT_OK)
+        stn_address contract_address;
+        if(stn_contract_address(entry->canonical_draft,
+            entry->canonical_draft_length,&contract_address)!=STN_CONTRACT_OK)
             return STN_DATA_CONTENT;
-        if(memcmp(draft.contract_id,response.contract_id,
+        if(memcmp(contract_address.identifier,response.contract_id,
             STN_ADDRESS_ID_SIZE)!=0)continue;
         if(stn_contract_response_participant_validate(&response,
             entry->canonical_draft,entry->canonical_draft_length)!=STN_CONTRACT_OK)
