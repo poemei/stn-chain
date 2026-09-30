@@ -180,7 +180,7 @@ stn_contract_status stn_contract_snapshot_response_register(
            existing->text_length==decoded.text_length &&
            memcmp(snapshot->response_text_bytes+existing->text_offset,
                decoded.text,decoded.text_length)==0)
-            return STN_CONTRACT_DUPLICATE;
+            return STN_CONTRACT_DUPLICATE_APPROVAL;
     }
     old_length=snapshot->response_text_bytes_length;
     if(old_length>SIZE_MAX-decoded.text_length)return STN_CONTRACT_CAPACITY;
@@ -228,5 +228,5 @@ stn_contract_status stn_contract_snapshot_response_at(
         response->text_length=entry->text_length;
         return STN_CONTRACT_OK;
     }
-    return STN_CONTRACT_NOT_FOUND;
+    return STN_CONTRACT_ARGUMENT;
 }
