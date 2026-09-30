@@ -31,7 +31,7 @@ int main(void)
     CHECK(stn_contract_snapshot_response_at(clone,response.contract_id,0u,&got)==STN_CONTRACT_OK);
     CHECK(memcmp(got.actor,response.actor,STN_IDENTITY_PUBLIC_KEY_SIZE)==0);
     CHECK(got.text_length==sizeof(text)-1u && memcmp(got.text,text,sizeof(text)-1u)==0);
-    CHECK(stn_contract_snapshot_response_register(clone,encoded,written)==STN_CONTRACT_DUPLICATE);
+    CHECK(stn_contract_snapshot_response_register(clone,encoded,written)==STN_CONTRACT_DUPLICATE_APPROVAL);
     stn_contract_snapshot_release(clone);
     puts("contract snapshot response tests passed");
     return 0;
