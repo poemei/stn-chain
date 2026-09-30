@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include "stn_sha256.h"
 #include "stn_contract_transaction.h"
+#include "stn_contract_response_acceptance.h"
 
 /* Frozen checksums of exact qualified legacy genesis fixtures. */
 stn_data_status stn_chain_publication_activation(const stn_chain_context *c,uint64_t *height)
@@ -752,7 +753,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             (tx.type==STN_TX_PUBLICATION && stn_record_decode(tx.record_bytes,tx.record_length,&record)!=STN_RECORD_OK)) {
             r.body=STN_STAGE_REJECT; return fail(r,STN_CHAIN_BODY,STN_DATA_CONTENT);
         }
-        if(tx.type==STN_TX_CONTRACT_ACTION){has_contracts=1;}
+        if(tx.type==STN_TX_CONTRACT_ACTION || tx.type==STN_TX_CONTRACT_RESPONSE){has_contracts=1;}
         else if(tx.type==STN_TX_SHARE_EVIDENCE){has_shares=1;}
         else if(tx.type==STN_TX_BLOCK_COMPENSATION_EVIDENCE){has_block_compensation=1;}
         else if(tx.type==STN_TX_COMPENSATION_DESTINATION){has_compensation=1;}
@@ -939,6 +940,11 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
                     has_lifecycle ? &candidate_lifecycle->state : prior->lifecycle;
                 failure=contract_apply_transaction(candidate_contracts,
                     authority_state,&tx,&context->hash_provider);
+                if(failure!=STN_DATA_OK)break;
+                continue;
+            }
+            if(tx.type==STN_TX_CONTRACT_RESPONSE){
+                failure=stn_contract_response_accept(candidate_contracts,&tx);
                 if(failure!=STN_DATA_OK)break;
                 continue;
             }
