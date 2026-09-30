@@ -14,6 +14,7 @@ typedef struct stn_contract_snapshot_response {
     uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
     const uint8_t *text;
     uint32_t text_length;
+    uint8_t signature[STN_IDENTITY_SIGNATURE_SIZE];
 } stn_contract_snapshot_response;
 
 stn_contract_snapshot *stn_contract_snapshot_create(void);

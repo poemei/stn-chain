@@ -10,7 +10,7 @@
 #include "stn_transfer_envelope.h"
 #include "stn_transfer_envelope_authorization.h"
 #include "stn_contract_transaction.h"
-#include "stn_contract_response.h"
+#include "stn_contract_response_acceptance.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -125,72 +125,6 @@ history_issuance_state(const stn_storage_view *v,
     return STN_DATA_OK;
 }
 
-static stn_data_status
-history_contract_draft(const stn_storage_view *v,
-                       const uint8_t contract_id[STN_ADDRESS_ID_SIZE],
-                       const uint8_t **draft_bytes, size_t *draft_length)
-{
-    size_t i, j;
-
-    if (v == NULL || contract_id == NULL || draft_bytes == NULL ||
-        draft_length == NULL || (v->count != 0u && v->blocks == NULL))
-        return STN_DATA_ARGUMENT;
-
-    *draft_bytes = NULL;
-    *draft_length = 0u;
-
-    for (i = 0u; i < v->count; ++i)
-    {
-        stn_block block;
-        size_t offset = 0u;
-
-        if (stn_block_decode(v->blocks[i].bytes, v->blocks[i].length, &block) !=
-            STN_DATA_OK)
-            return STN_DATA_CONTENT;
-
-        for (j = 0u; j < block.header.transaction_count; ++j)
-        {
-            uint32_t n;
-            stn_transaction tx;
-
-            if (offset + 4u > block.header.body_length)
-                return STN_DATA_CONTENT;
-            n = (uint32_t)stn_wire_read(block.body + offset, 4u);
-            offset += 4u;
-            if (n > block.header.body_length - offset ||
-                stn_transaction_decode(block.body + offset, n, &tx) !=
-                    STN_DATA_OK)
-                return STN_DATA_CONTENT;
-
-            if (tx.type == STN_TX_CONTRACT_ACTION)
-            {
-                stn_contract_transaction contract_tx;
-                stn_address address;
-
-                if (stn_contract_transaction_decode(
-                        tx.record_bytes, tx.record_length, &contract_tx) !=
-                    STN_CONTRACT_OK)
-                    return STN_DATA_CONTENT;
-
-                if (contract_tx.action == STN_CONTRACT_ACTION_CREATE &&
-                    stn_contract_address(contract_tx.canonical_contract,
-                                         contract_tx.canonical_contract_length,
-                                         &address) == STN_CONTRACT_OK &&
-                    memcmp(address.identifier, contract_id,
-                           STN_ADDRESS_ID_SIZE) == 0)
-                {
-                    *draft_bytes = contract_tx.canonical_contract;
-                    *draft_length = contract_tx.canonical_contract_length;
-                    return STN_DATA_OK;
-                }
-            }
-            offset += n;
-        }
-    }
-
-    return STN_DATA_UNRESOLVED;
-}
-
 stn_pending_result stn_pending_insert(stn_pending *p, const uint8_t *bytes,
                                       size_t length,
                                       const stn_hash_provider *hash,
@@ -225,11 +159,9 @@ stn_pending_result stn_pending_insert(stn_pending *p, const uint8_t *bytes,
     else if (tx.type == STN_TX_CONTRACT_RESPONSE)
     {
         stn_contract_response response;
-        if (stn_contract_response_decode(tx.record_bytes, tx.record_length,
-                                         &response) != STN_CONTRACT_OK)
+        if(stn_contract_response_decode(tx.record_bytes,tx.record_length,&response)!=STN_CONTRACT_OK)
             return STN_PENDING_INVALID;
-        memcpy(entry.signer, response.actor, 32);
-        memcpy(entry.nonce, response.contract_id, 32);
+        memcpy(entry.signer,response.actor,32);
     }
     else if (tx.type == STN_TX_SHARE_EVIDENCE)
     {
@@ -433,13 +365,9 @@ static stn_data_status scan(const stn_pending *p, const stn_storage_view *v,
             else if (tx.type == STN_TX_CONTRACT_RESPONSE)
             {
                 stn_contract_response response;
-                if (stn_contract_response_decode(
-                        tx.record_bytes, tx.record_length, &response) !=
-                    STN_CONTRACT_OK)
+                if(stn_contract_response_decode(tx.record_bytes,tx.record_length,&response)!=STN_CONTRACT_OK)
                     return STN_DATA_CONTENT;
-                memcpy(signer, response.actor, 32);
-                memcpy(nonce, response.contract_id, 32);
-                lifecycle = 0;
+                memcpy(signer,response.actor,32);
             }
             else if (tx.type == STN_TX_SHARE_EVIDENCE)
             {
@@ -741,78 +669,36 @@ stn_pending_admit_transaction(stn_pending *p, const uint8_t *bytes,
         }
         return STN_PENDING_INVALID;
     }
-    if (tx.type == STN_TX_CONTRACT_ACTION)
+    if (tx.type == STN_TX_CONTRACT_ACTION || tx.type == STN_TX_CONTRACT_RESPONSE)
     {
         if (p == NULL || active == NULL || hash == NULL)
         {
             report->acceptance = STN_ACCEPTANCE_UNRESOLVED;
             return STN_PENDING_UNAVAILABLE;
+        }
+        {
+            stn_contract_snapshot *projection;
+            if (active->state.contracts == NULL || active->state.lifecycle == NULL)
+                return STN_PENDING_UNAVAILABLE;
+            projection = stn_contract_snapshot_clone(active->state.contracts);
+            if (projection == NULL)
+                return STN_PENDING_CAPACITY;
+            status = tx.type == STN_TX_CONTRACT_RESPONSE
+                ? stn_contract_response_accept(projection,active->state.contracts,&tx)
+                : stn_chain_contract_apply_transaction(projection,
+                    active->state.lifecycle, &tx, hash);
+            stn_contract_snapshot_release(projection);
+            if (status != STN_DATA_OK) {
+                report->acceptance = STN_ACCEPTANCE_REJECTED;
+                return status == STN_DATA_CAPACITY ? STN_PENDING_CAPACITY :
+                    status == STN_DATA_PROVIDER_ERROR ? STN_PENDING_PROVIDER :
+                    STN_PENDING_INVALID;
+            }
         }
         lifecycle_result = stn_pending_insert(p, bytes, length, hash, id);
         if (lifecycle_result == STN_PENDING_ACCEPTED)
         {
             report->structure = STN_STAGE_PASS;
-            report->acceptance = STN_ACCEPTANCE_UNDER_CONTEXT;
-            return lifecycle_result;
-        }
-        report->acceptance = STN_ACCEPTANCE_REJECTED;
-        return lifecycle_result;
-    }
-    if (tx.type == STN_TX_CONTRACT_RESPONSE)
-    {
-        stn_contract_response response;
-        const uint8_t *draft_bytes = NULL;
-        size_t draft_length = 0u;
-
-        if (p == NULL || active == NULL || hash == NULL)
-        {
-            report->acceptance = STN_ACCEPTANCE_UNRESOLVED;
-            return STN_PENDING_UNAVAILABLE;
-        }
-
-        if (stn_contract_response_decode(tx.record_bytes, tx.record_length,
-                                         &response) != STN_CONTRACT_OK)
-        {
-            report->structure = STN_STAGE_REJECT;
-            report->acceptance = STN_ACCEPTANCE_REJECTED;
-            return STN_PENDING_INVALID;
-        }
-        report->structure = STN_STAGE_PASS;
-
-        if (stn_contract_response_signature_verify(&response) !=
-            STN_CONTRACT_OK)
-        {
-            report->signature = STN_STAGE_REJECT;
-            report->acceptance = STN_ACCEPTANCE_REJECTED;
-            return STN_PENDING_SIGNATURE;
-        }
-        report->signature = STN_STAGE_PASS;
-
-        status = history_contract_draft(active, response.contract_id,
-                                        &draft_bytes, &draft_length);
-        if (status == STN_DATA_UNRESOLVED)
-        {
-            report->acceptance = STN_ACCEPTANCE_UNRESOLVED;
-            return STN_PENDING_UNAVAILABLE;
-        }
-        if (status != STN_DATA_OK)
-        {
-            report->acceptance = STN_ACCEPTANCE_ERROR;
-            return STN_PENDING_PROVIDER;
-        }
-
-        if (stn_contract_response_participant_validate(
-                &response, draft_bytes, draft_length) != STN_CONTRACT_OK)
-        {
-            report->authority = STN_STAGE_REJECT;
-            report->acceptance = STN_ACCEPTANCE_REJECTED;
-            return STN_PENDING_AUTHORITY;
-        }
-        report->authority = STN_STAGE_PASS;
-
-        lifecycle_result = stn_pending_insert(p, bytes, length, hash, id);
-        if (lifecycle_result == STN_PENDING_ACCEPTED)
-        {
             report->acceptance = STN_ACCEPTANCE_UNDER_CONTEXT;
             return lifecycle_result;
         }
@@ -1089,7 +975,8 @@ stn_pending_admit_transaction(stn_pending *p, const uint8_t *bytes,
                              hash, report, id);
 }
 
-stn_data_status stn_pending_assemble(const stn_pending *p,
+static stn_data_status assemble_projected(stn_contract_snapshot **contracts,
+                                     const stn_pending *p,
                                      const stn_validation_context *c,
                                      const stn_storage_view *active,
                                      uint8_t *body, size_t capacity,
@@ -1204,6 +1091,33 @@ stn_data_status stn_pending_assemble(const stn_pending *p,
             break;
         if (e->length + 4 > capacity - total)
             return STN_DATA_CAPACITY;
+        if (tx.type == STN_TX_CONTRACT_ACTION || tx.type == STN_TX_CONTRACT_RESPONSE) {
+            stn_hash_provider hp = {stn_sha256, NULL};
+            stn_contract_snapshot *trial;
+            stn_data_status checked;
+            if (active == NULL || active->state.contracts == NULL ||
+                active->state.lifecycle == NULL)
+                return STN_DATA_UNRESOLVED;
+            /* A private trial also rolls back a failed action. Later actions
+             * see earlier selected actions, so conflicting creates/transitions
+             * cannot poison a candidate even if both passed admission. */
+            trial = stn_contract_snapshot_clone(*contracts != NULL ?
+                *contracts : active->state.contracts);
+            if (trial == NULL)
+                return STN_DATA_CAPACITY;
+            checked = tx.type == STN_TX_CONTRACT_RESPONSE
+                ? stn_contract_response_accept(trial,active->state.contracts,&tx)
+                : stn_chain_contract_apply_transaction(trial,
+                    active->state.lifecycle, &tx, &hp);
+            if (checked != STN_DATA_OK) {
+                stn_contract_snapshot_release(trial);
+                if (checked == STN_DATA_PROVIDER_ERROR || checked == STN_DATA_CAPACITY)
+                    return checked;
+                continue;
+            }
+            stn_contract_snapshot_release(*contracts);
+            *contracts = trial;
+        }
         selected[n].bytes = e->transaction;
         selected[n].length = (uint32_t)e->length;
         ++n;
@@ -1218,4 +1132,15 @@ stn_data_status stn_pending_assemble(const stn_pending *p,
             *count = n;
         return s;
     }
+}
+
+stn_data_status stn_pending_assemble(const stn_pending *p,
+    const stn_validation_context *c,const stn_storage_view *active,
+    uint8_t *body,size_t capacity,size_t *written,uint32_t *count)
+{
+    stn_contract_snapshot *contracts = NULL;
+    stn_data_status status = assemble_projected(&contracts,p,c,active,
+        body,capacity,written,count);
+    stn_contract_snapshot_release(contracts);
+    return status;
 }

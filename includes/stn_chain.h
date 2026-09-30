@@ -187,6 +187,13 @@ stn_data_status stn_chain_publication_activation(const stn_chain_context *contex
 stn_data_status stn_chain_required_target(const stn_chain_context *context,
     const stn_chain_state *prior,uint8_t target[32]);
 
+/* Shared contract consensus evaluator. Mutates only a caller-owned private
+ * snapshot; caller must discard that snapshot on failure. Accepted lifecycle
+ * authority is read-only. Used by consensus and pending eligibility checks. */
+stn_data_status stn_chain_contract_apply_transaction(
+    stn_contract_snapshot *snapshot,const stn_lifecycle_state *lifecycle,
+    const stn_transaction *transaction,const stn_hash_provider *provider);
+
 /* Block ID = configured SHA-256 provider(domain || 168-byte canonical header).
  * Full structural validation first; integrity remains a separate requirement.
  * digest output must not overlap inputs; unchanged on failure. */

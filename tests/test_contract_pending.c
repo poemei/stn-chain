@@ -87,9 +87,10 @@ int main(void)
         STN_ADDRESS_ID_SIZE;
     invalid_action[approver_role_offset]=0u;
     invalid_action[approver_role_offset+1u]=(uint8_t)STN_CONTRACT_ROLE_PARTICIPANT;
-    outer.record_bytes=invalid_action;
-    if(stn_transaction_encode(&outer,invalid_transaction,
-        sizeof(invalid_transaction),&invalid_transaction_length)!=STN_DATA_OK)return 8;
+    /* Mutate the encoded wire: the encoder correctly rejects this shape too. */
+    memcpy(invalid_transaction,transaction,transaction_length);
+    memcpy(invalid_transaction+STN_TX_HEADER_SIZE,invalid_action,action_length);
+    invalid_transaction_length=transaction_length;
 
     stn_pending_init(&pending);
     if(stn_pending_insert(&pending,invalid_transaction,

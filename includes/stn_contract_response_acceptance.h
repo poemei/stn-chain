@@ -6,10 +6,11 @@
 #include "stn_transaction.h"
 
 /* Validate an accepted RESPONSE against the immutable contract draft already
- * present in the candidate snapshot, then register it in snapshot-owned state.
+ * present in the accepted parent snapshot, then register it in snapshot-owned state.
  * The response actor must be a participant and the signature must verify. */
 stn_data_status stn_contract_response_accept(
     stn_contract_snapshot *snapshot,
+    const stn_contract_snapshot *accepted,
     const stn_transaction *transaction);
 
 #endif

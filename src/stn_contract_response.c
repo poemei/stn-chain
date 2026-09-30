@@ -46,14 +46,14 @@ stn_contract_status stn_contract_response_validate_structure(const uint8_t *inpu
 
 stn_contract_status stn_contract_response_participant_validate(const stn_contract_response *r,const uint8_t *draft_bytes,size_t draft_length)
 {
-    stn_contract draft;stn_contract_participant p;stn_address address;uint8_t identity[32];uint16_t i;stn_contract_status s;
+    stn_contract draft;stn_contract_participant p;stn_address address,identity;uint16_t i;stn_contract_status s;
     if(r==NULL||draft_bytes==NULL)return STN_CONTRACT_ARGUMENT;
     s=stn_contract_decode(draft_bytes,draft_length,&draft);if(s!=STN_CONTRACT_OK)return s;
     if(draft.state!=STN_CONTRACT_STATE_DRAFT||draft.sequence!=0u)return STN_CONTRACT_STATE_ERROR;
     s=stn_contract_address(draft_bytes,draft_length,&address);if(s!=STN_CONTRACT_OK)return s;
     if(memcmp(address.identifier,r->contract_id,32)!=0)return STN_CONTRACT_ADDRESS_ERROR;
-    if(stn_identity_derive(r->actor,identity)!=STN_IDENTITY_VALID)return STN_CONTRACT_SIGNATURE_ERROR;
-    for(i=0;i<draft.participant_count;++i){s=stn_contract_participant_at(&draft,i,&p);if(s!=STN_CONTRACT_OK)return s;if(memcmp(p.identity,identity,32)==0)return STN_CONTRACT_OK;}
+    if(stn_address_derive(STN_ADDRESS_IDENTITY,r->actor,32,&identity)!=STN_DATA_OK)return STN_CONTRACT_SIGNATURE_ERROR;
+    for(i=0;i<draft.participant_count;++i){s=stn_contract_participant_at(&draft,i,&p);if(s!=STN_CONTRACT_OK)return s;if(memcmp(p.identity,identity.identifier,32)==0)return STN_CONTRACT_OK;}
     return STN_CONTRACT_AUTHORITY_ERROR;
 }
 

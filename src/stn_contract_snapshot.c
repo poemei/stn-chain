@@ -9,6 +9,7 @@ typedef struct stn_contract_snapshot_response_entry {
     uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
     size_t text_offset;
     uint32_t text_length;
+    uint8_t signature[STN_IDENTITY_SIGNATURE_SIZE];
 } stn_contract_snapshot_response_entry;
 
 struct stn_contract_snapshot {
@@ -196,6 +197,7 @@ stn_contract_status stn_contract_snapshot_response_register(
     memcpy(entry->actor,decoded.actor,STN_IDENTITY_PUBLIC_KEY_SIZE);
     entry->text_offset=old_length;
     entry->text_length=decoded.text_length;
+    memcpy(entry->signature,decoded.signature,STN_IDENTITY_SIGNATURE_SIZE);
     return STN_CONTRACT_OK;
 }
 
@@ -226,6 +228,7 @@ stn_contract_status stn_contract_snapshot_response_at(
         memcpy(response->actor,entry->actor,STN_IDENTITY_PUBLIC_KEY_SIZE);
         response->text=snapshot->response_text_bytes+entry->text_offset;
         response->text_length=entry->text_length;
+        memcpy(response->signature,entry->signature,STN_IDENTITY_SIGNATURE_SIZE);
         return STN_CONTRACT_OK;
     }
     return STN_CONTRACT_ARGUMENT;

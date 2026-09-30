@@ -3,6 +3,7 @@
 #include "stn_share.h"
 #include "stn_issuance.h"
 #include "stn_issuance_binding.h"
+#include "stn_block_reward.h"
 #include <string.h>
 
 static int pending_share_matches(const stn_pending *pool,
@@ -35,12 +36,16 @@ stn_pending_result stn_share_pending_admit(
     if(tx.type==STN_TX_SHARE_EVIDENCE){
         size_t issuance_length=STN_TX_HEADER_SIZE+STN_ISSUANCE_CANONICAL_SIZE;
         if(pool==NULL)return STN_PENDING_UNAVAILABLE;
-        /* Do not admit evidence unless its deterministic SHARE issuance can
-         * also fit. This prevents a one-sided pair from consuming the final
-         * pending slot under concurrent miners. */
-        if(pool->count>STN_PENDING_MAX_ENTRIES-2u ||
+        size_t reward_length=STN_BLOCK_REWARD_EVIDENCE_TX_SIZE+
+            STN_BLOCK_REWARD_ISSUANCE_TX_SIZE;
+        /* Keep the share pair atomic and leave room for a solved block's
+         * reward pair. Current-height shares cannot enter that block, so a
+         * full share queue must not cause its durable acceptance to return
+         * CAPACITY while constructing the reward. */
+        if(pool->count>STN_PENDING_MAX_ENTRIES-4u ||
            length>STN_PENDING_MAX_BYTES-pool->bytes ||
-           issuance_length>STN_PENDING_MAX_BYTES-pool->bytes-length){
+           issuance_length>STN_PENDING_MAX_BYTES-pool->bytes-length ||
+           reward_length>STN_PENDING_MAX_BYTES-pool->bytes-length-issuance_length){
             memset(report,0,sizeof(*report));
             report->acceptance=STN_ACCEPTANCE_REJECTED;
             return STN_PENDING_CAPACITY;

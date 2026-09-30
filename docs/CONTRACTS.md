@@ -27,6 +27,33 @@ may provide evidence. None independently determines accepted Chain state.
 ## STNC Core
 Utilizing Contracts **WILL** be implemented in *STNC Core* which will give the user a Graphical User Interface to a Contract.
 
+## CREATE admission and discovery (2026-09-29)
+
+CREATE uses the existing bootstrap envelope: a signed canonical DRAFT at
+sequence 0, action sequence 0, and zero authority-evidence bytes. Consensus
+verifies the signature and requires an ISSUER participant whose stn0 identifier
+is SHA256(actor public key). The draft must contain at least one unique APPROVER.
+Accepted CREATE registers the immutable draft and advances current state to
+ISSUED at sequence 1. Later actions retain their scoped-grant requirements.
+This completes bootstrap semantics already present in the codec and Core.
+
+Pending admission runs the same contract evaluator as consensus on a private
+accepted-state copy. Candidate assembly rechecks actions in selected order,
+skipping invalid/conflicting actions. Pending admission is not confirmation.
+Contracts appear in creator and recipient lists only after block acceptance;
+recipient identifiers must match their Core identity addresses.
+
+Linux CONTRACT_LIST and CONTRACT_STATE read an independently owned copy of
+validated accepted contract state, published alongside INFO after state changes.
+They do not wait for outbound peer dispatch or reconstruct history per query.
+During adoption, readers see the previous completed snapshot; reorganization
+publication replaces it. Nothing is inferred from an unaccepted submission.
+
+Pending remains memory-only. A creation lost before acceptance must be
+resubmitted; these changes do not reconstruct lost drafts or sign for users.
+Subsequent scoped grants and approval workflows are outside this creation and
+discovery repair. Nodes validating newly created contracts require this fix.
+
 ## Contract Model
 
 Conceptually, an STN Chain contract consists of:
@@ -545,3 +572,35 @@ The Contract Engine will grow through explicit protocol-defined behavior and
 bounded, independently qualified increments.
 
 It will not grow by importing general-purpose blockchain execution baggage.
+
+
+## Participant RESPONSE (Unreleased, 2026-09-30)
+
+RESPONSE is transaction type 11, distinct from the seven lifecycle actions. It
+records communication against an original contract already present in accepted
+parent history. It does not change the address, terms, state or sequence. CREATE
+and RESPONSE cannot bootstrap one another within the same candidate block.
+
+STRP v1 encodes big-endian fields: magic (4 bytes), version (2), zero reserved
+(2), original contract ID (32), actor Ed25519 public key (32), text length (4),
+signature (64), then exact nonempty text (1–65,536 bytes). Text is not normalized.
+The existing identity signature domain wraps the unsigned 76-byte header plus
+text. SHA-256(actor public key) must match an immutable draft participant.
+Admission and acceptance reject unknown/unaccepted contracts, unauthorized
+actors, malformed records, invalid signatures and replay. Repeating the same
+contract ID, actor and exact text is replay regardless of signature bytes.
+
+Accepted responses rebuild from history in acceptance order. The inherited
+snapshot bound is 256 responses across accepted state; exhausting it rejects
+further responses without mutating state. This bound is consensus-visible.
+
+Read RPC 14 (CONTRACT_RESPONSE) takes the canonical 70-byte contract address plus
+a zero-based four-byte response index. OK returns total count (4), record length
+(4), then the exact signed STRP record. Existing contracts with no responses
+return eight zero bytes for index zero. Unknown contracts and out-of-range
+indices return NOT_FOUND. Linux serves this through the published contract
+snapshot, independently of peer synchronization.
+
+STNC Core is unchanged. Clients must support transaction type 11 and RPC 14 to
+submit/display responses. Other validating nodes must also support type 11 to
+accept blocks containing responses.

@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_block_compensation_acceptance.h"
+#include <stdlib.h>
 
 stn_data_status stn_block_compensation_accept(
     stn_block_compensation_replay *replay,
@@ -29,12 +30,16 @@ stn_data_status stn_block_compensation_accept(
     balances=economy->balances;
     next_economy=*economy;
     if(economy->balance_capacity!=0u){
-        stn_economic_balance scratch[economy->balance_capacity];
+        stn_economic_balance *scratch;
+        if(economy->balance_capacity>SIZE_MAX/sizeof(*scratch))return STN_DATA_CAPACITY;
+        scratch=(stn_economic_balance *)malloc(economy->balance_capacity*sizeof(*scratch));
+        if(scratch==NULL)return STN_DATA_CAPACITY;
         for(i=0u;i<economy->balance_count;++i)scratch[i]=economy->balances[i];
         next_economy.balances=scratch;
         status=stn_economic_state_apply(&next_economy,issuance);
-        if(status!=STN_DATA_OK)return status;
+        if(status!=STN_DATA_OK){free(scratch);return status;}
         for(i=0u;i<next_economy.balance_count;++i)balances[i]=scratch[i];
+        free(scratch);
     }else{
         status=stn_economic_state_apply(&next_economy,issuance);
         if(status!=STN_DATA_OK)return status;
