@@ -3,8 +3,18 @@
 #define STN_CONTRACT_SNAPSHOT_H
 
 #include "stn_contract_state.h"
+#include "stn_contract_response.h"
+
+#define STN_CONTRACT_SNAPSHOT_MAX_RESPONSES 256u
 
 typedef struct stn_contract_snapshot stn_contract_snapshot;
+
+typedef struct stn_contract_snapshot_response {
+    uint8_t contract_id[STN_ADDRESS_ID_SIZE];
+    uint8_t actor[STN_IDENTITY_PUBLIC_KEY_SIZE];
+    const uint8_t *text;
+    uint32_t text_length;
+} stn_contract_snapshot_response;
 
 stn_contract_snapshot *stn_contract_snapshot_create(void);
 stn_contract_snapshot *stn_contract_snapshot_clone(
@@ -25,5 +35,21 @@ stn_contract_status stn_contract_snapshot_register(
     const uint8_t *canonical_draft,
     size_t canonical_draft_length,
     size_t *index);
+
+/* Copy an accepted canonical RESPONSE into snapshot-owned storage. */
+stn_contract_status stn_contract_snapshot_response_register(
+    stn_contract_snapshot *snapshot,
+    const uint8_t *canonical_response,
+    size_t canonical_response_length);
+
+size_t stn_contract_snapshot_response_count(
+    const stn_contract_snapshot *snapshot,
+    const uint8_t contract_id[STN_ADDRESS_ID_SIZE]);
+
+stn_contract_status stn_contract_snapshot_response_at(
+    const stn_contract_snapshot *snapshot,
+    const uint8_t contract_id[STN_ADDRESS_ID_SIZE],
+    size_t response_index,
+    stn_contract_snapshot_response *response);
 
 #endif
