@@ -5,6 +5,38 @@ are not claims of a published or deployed release.
 
 ## Unreleased
 
+### Repeated Core connection timeouts - 2026-09-30
+
+- Add process-owned validated-history reuse for mining reads and block append.
+  Re-read disk under exclusion and reuse validation only for identical history;
+  validate candidate history fully and retain its exact state only after atomic
+  publication. No consensus or Windows Core socket changes.
+- Linux and Windows builds pass; focused cache/mining tests: 1,628 checks, zero
+  failures. Contract CREATE and history/RESPONSE reconstruction remain valid.
+- Final deployment on chain01 preserves binary/history backups. Isolated append
+  took 9.663 seconds, next work read 0.002 seconds. Live persistent connection:
+  24 successful replies across heights 959–965, no transport failures
+  or error replies; peak balance time 7.359 seconds. Existing Core profiles
+  resumed accepted shares and height updates. Contract reads still pass.
+- Desktop Stratum submission timeouts still occurred after deployment, despite
+  the successful main-RPC check; mining reliability is not fully resolved.
+  P2P discovery/synchronization is outside scope. Full validation still costs
+  time. Uncommitted; see docs/DISCONNECT_REPAIR.md for evidence and limitations.
+
+### Accepted contract detail read for Core - 2026-09-30
+
+- Add read-only RPC 15 returning the original accepted canonical STCT draft
+  from the contract snapshot. Validate request address and response structure;
+  unknown/unaccepted contracts do not return terms. No consensus changes.
+- Linux production build, detail-query and existing contract-query tests pass.
+  Restart reconstruction preserves original contracts and the exact signed
+  response. Live creator/recipient listing, exact terms and exact response
+  reads pass (0.156–0.219 seconds).
+- Deployed to chain01 with history and binary backups, suffix
+  20260930T205001Z-contract-view. Source changes remain uncommitted.
+  Windows Chain build was not rerun for this read-only increment.
+
+
 ### Rollback recovery and participant RESPONSE repair - 2026-09-30
 
 - Restored the verified contract-creation, discovery, pending-share capacity and

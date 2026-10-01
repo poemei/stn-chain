@@ -335,7 +335,7 @@ int stn_windows_app(int argc,char **argv)
     wchar_t relative[260],absolute[260];DWORD path_length;
     uint8_t *genesis=NULL,*body=NULL;
     size_t genesis_length=0,transaction_length=0;stn_block decoded;
-    stn_chain_context chain={0};stn_pow_policy policy;stn_mining_service mining={0};stn_pending pending={0};
+    stn_chain_context chain={0};stn_pow_policy policy;stn_mining_service mining={0};stn_storage_cache read_cache={0};stn_pending pending={0};
     stn_windows_storage disk;stn_storage_provider storage;stn_storage_view view;
     stn_windows_peer listener={0};uint16_t bound;stn_storage_status status;
     rpc_client *clients=NULL;CRITICAL_SECTION dispatch_lock;int lock_ready=0;
@@ -387,7 +387,7 @@ int stn_windows_app(int argc,char **argv)
     }
     mining.chain=&chain;mining.storage=&storage;mining.timestamp_now=chain_timestamp_now;mining.body=body;mining.body_length=4+transaction_length;mining.transaction_count=1;
     if(!dev){mining.pending=&pending;mining.pending_body=body;mining.pending_body_capacity=STN_BLOCK_MAX_BODY;mining.body=NULL;mining.body_length=0;mining.transaction_count=0;}
-    mining.template_capacity=STN_BLOCK_MAX_SIZE;mining.owns_buffers=1;
+    mining.template_capacity=STN_BLOCK_MAX_SIZE;mining.owns_buffers=1;mining.read_cache=&read_cache;
 #ifdef STN_PHASE9_TEST_RUNTIME
     if(!phase9_setup(&mining)){fprintf(stderr,"Test runtime requires its private stop event.\n");goto cleanup;}
 #endif
@@ -463,7 +463,7 @@ cleanup:
 #endif
     stn_windows_peer_close(&listener);if(lock_ready){DeleteCriticalSection(&dispatch_lock);}
     free(outbound.workspace.storage.current_bytes);free(outbound.workspace.storage.next_bytes);free(outbound.workspace.candidate);free(outbound.workspace.frame);
-    stn_chain_state_release(&mining.active);stn_pending_clear(&pending);free(genesis);free(body);free(mining.snapshot);free(mining.workspace.current_bytes);free(mining.workspace.next_bytes);free(mining.template_bytes);
+    stn_chain_state_release(&mining.active);stn_pending_clear(&pending);free(genesis);free(body);stn_storage_cache_release(&read_cache);free(mining.snapshot);free(mining.workspace.current_bytes);free(mining.workspace.next_bytes);free(mining.template_bytes);
     report_line("STOP","STN Chain Windows stopped.");report_close();
     return result;
 usage:

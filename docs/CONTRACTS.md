@@ -604,3 +604,14 @@ snapshot, independently of peer synchronization.
 STNC Core is unchanged. Clients must support transaction type 11 and RPC 14 to
 submit/display responses. Other validating nodes must also support type 11 to
 accept blocks containing responses.
+
+## Accepted canonical terms read (RPC 15)
+
+STN_RPC_CONTRACT_DETAIL is a read-only query. The request is the canonical
+70-byte stnc0_ contract address, without a NUL terminator. A successful reply
+is the exact original canonical STCT draft stored in the accepted snapshot.
+Its SHA256 remains the original contract identifier. Current lifecycle state
+is read separately through method 11. Unknown or unaccepted contracts return
+NOT_FOUND; malformed requests return INVALID. This uses the same published
+read snapshot as contract listing and response retrieval, without rebuilding
+history during the query. It changes no serialization or consensus rules.

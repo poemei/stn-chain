@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_storage.h"
+#include "stn_storage_cache.h"
 #include "stn_wire_internal.h"
 #include <string.h>
 #include <stdlib.h>
@@ -282,8 +283,8 @@ done:
     return s;
 }
 
-stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_storage_provider *p,
-    const uint8_t *block,size_t block_length,stn_storage_workspace *w,stn_chain_state *active)
+stn_storage_status stn_storage_extend_cached(const stn_chain_context *c,const stn_storage_provider *p,
+    const uint8_t *block,size_t block_length,stn_storage_workspace *w,stn_chain_state *active,stn_storage_cache *cache)
 {
     stn_storage_status s;stn_storage_view current={0};stn_chain_state next={0};stn_chain_report r;
     size_t encoded=0,offset,i;uint8_t hash[32];
@@ -294,7 +295,8 @@ stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_stora
     s=io_status(p->acquire(p->user));
     if(s!=STN_STORAGE_OK){return s;}
 
-    s=read_locked(c,p,w->current_bytes,w->current_capacity,&current);
+    s=cache ? stn_storage_cache_load_locked(cache,c,p,w->current_bytes,w->current_capacity,&current) :
+        read_locked(c,p,w->current_bytes,w->current_capacity,&current);
     if(s!=STN_STORAGE_OK){goto done;}
 
     if(!state_equal(active,&current.state)){
@@ -379,6 +381,7 @@ stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_stora
     }
 
     if(s==STN_STORAGE_OK){
+        stn_storage_cache_remember(cache,c,w->next_bytes,encoded,&next);
         stn_chain_state_move(active,&next);
     }
 
@@ -387,6 +390,12 @@ done:
     stn_storage_view_release(&current);
     p->release(p->user);
     return s;
+}
+
+stn_storage_status stn_storage_extend(const stn_chain_context *c,const stn_storage_provider *p,
+    const uint8_t *block,size_t n,stn_storage_workspace *w,stn_chain_state *active)
+{
+    return stn_storage_extend_cached(c,p,block,n,w,active,NULL);
 }
 
 static stn_storage_status recovery_locked(const stn_chain_context *c,const stn_storage_provider *p,

@@ -133,7 +133,7 @@ static int contract_delivery(stn_mining_service *service,const stn_address *mine
 int main(void)
 {
     stn_chain_context context={0};stn_pow_policy policy={0};stn_block block={0};
-    stn_mining_service service={0};stn_pending pending={0};stn_storage_view view={0};
+    stn_storage_cache cache={0};stn_mining_service service={0};stn_pending pending={0};stn_storage_view view={0};
     stn_storage_provider storage={NULL,acquire,release,read_store,write_store};
     stn_block_span history[1];stn_address miner={0};
     uint8_t genesis[249],body[81],mapping[77],queued[77],queued_id[32];
@@ -156,7 +156,7 @@ int main(void)
     context.hash_provider=hash;context.pow_policy=&policy;
     history[0].bytes=genesis;history[0].length=gn;
     CHECK(stn_storage_create(&context,&storage,history,1,next,sizeof(next),&service.active)==STN_STORAGE_OK);
-    service.chain=&context;service.storage=&storage;service.pending=&pending;
+    service.read_cache=&cache;service.chain=&context;service.storage=&storage;service.pending=&pending;
     service.snapshot=snapshot;service.snapshot_capacity=sizeof(snapshot);
     service.workspace.current_bytes=current;service.workspace.current_capacity=sizeof(current);
     service.workspace.next_bytes=next;service.workspace.next_capacity=sizeof(next);
@@ -232,5 +232,5 @@ int main(void)
     CHECK(contract_delivery(&service,&miner)==0);
     stn_chain_state_release(&service.active);stn_pending_clear(&pending);
     printf("Mining mempool changes: %u checks, %u failures.\n",checks,failures);
-    return failures!=0;
+    stn_storage_cache_release(&cache);return failures!=0;
 }

@@ -3,6 +3,7 @@
 #define STN_MINING_H
 #include "stn_node_service.h"
 #include "stn_storage.h"
+#include "stn_storage_cache.h"
 #include "stn_pending.h"
 #include "stn_pending_cleanup.h"
 #include "stn_block_compensation_candidate.h"
@@ -24,7 +25,8 @@
  * Requests originate from validated RPC dispatch, or identical well-formed
  * internal messages. Work submission defensively checks its nested shape.
  * Production SHA-256 is required. Active state changes only after persistence.
- * A snapshot is freshly loaded for each call. No authoritative work/template
+ * A snapshot is freshly read for each call; optional read_cache reuses validation
+ * only for byte-identical history under immutable context. No work/template
  * bytes are cached. A non-authoritative timestamp lease is retained only while
  * the exact semantic mining candidate remains unchanged, so repeated reads of
  * the same candidate produce the same immutable Work ID. */
@@ -46,6 +48,7 @@ typedef struct stn_mining_session {
 typedef struct stn_mining_service {
     const stn_chain_context *chain;
     const stn_storage_provider *storage;
+    stn_storage_cache *read_cache; /* Optional, caller-owned; immutable context. */
     const uint8_t *body;
     size_t body_length;
     uint32_t transaction_count;

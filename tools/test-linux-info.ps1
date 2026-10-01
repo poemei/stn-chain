@@ -26,7 +26,7 @@ $sources = @('tests/test_linux_info.c','src/stn_rpc.c','src/stn_address.c',
     'src/stn_contract.c','src/stn_share.c','src/stn_compensation.c','src/stn_issuance.c',
     'src/stn_transfer_envelope.c','src/stn_transfer.c','src/stn_authority.c',
     'src/stn_contract_consensus.c','src/stn_identity.c','src/stn_economy.c',
-    'src/stn_contract_response.c','src/stn_contract_response_query.c','src/stn_contract_snapshot.c','src/stn_contract_state.c','src/stn_contract_lineage.c','src/stn_contract_query.c',
+    'src/stn_contract_response.c','src/stn_contract_response_query.c','src/stn_contract_detail_query.c','src/stn_contract_snapshot.c','src/stn_contract_state.c','src/stn_contract_lineage.c','src/stn_contract_query.c',
     'src/crypto/ed25519_donna/ed25519_provider.c','platforms/windows/stn_sha256.c')
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
