@@ -385,7 +385,7 @@ static stn_rpc_code cached_info_handle(
     stn_rpc_code status;
     (void)user;
     *written = 0u;
-    if(request->method == STN_RPC_CONTRACT_DETAIL || request->method == STN_RPC_CONTRACT_RESPONSE || request->method == STN_RPC_CONTRACT_LIST ||
+    if(request->method == STN_RPC_CONTRACT_LIST ||
        request->method == STN_RPC_CONTRACT_STATE) {
         pthread_mutex_lock(&info_lock);
         status = stn_contract_query_handle(contract_read_snapshot,request,
@@ -423,7 +423,7 @@ static stn_rpc_code dispatch_request(
      * the existing dispatcher. Invalid frames need no mutable Chain state. */
     result = stn_rpc_decode(request, length, &decoded);
     if(result != STN_RPC_OK || decoded.kind != 1u ||
-       decoded.method == STN_RPC_INFO || decoded.method == STN_RPC_CONTRACT_DETAIL || decoded.method == STN_RPC_CONTRACT_RESPONSE || decoded.method == STN_RPC_CONTRACT_LIST ||
+       decoded.method == STN_RPC_INFO || decoded.method == STN_RPC_CONTRACT_LIST ||
        decoded.method == STN_RPC_CONTRACT_STATE) {
         return stn_rpc_dispatch(request, length,
             STN_RPC_READ | STN_RPC_SUBMISSION, &cached,
@@ -1208,7 +1208,7 @@ int stn_linux_app(int argc, char **argv)
     stn_block decoded;
     stn_chain_context chain = {0};
     stn_pow_policy policy;
-    stn_mining_service mining = {0};stn_storage_cache read_cache={0};
+    stn_mining_service mining = {0};
     stn_pending pending = {0};
 
     stn_linux_storage disk;
@@ -1478,7 +1478,7 @@ int stn_linux_app(int argc, char **argv)
     }
 
     mining.template_capacity = STN_BLOCK_MAX_SIZE;
-    mining.owns_buffers = 1;mining.read_cache=&read_cache;
+    mining.owns_buffers = 1;
 
 #ifdef STN_PHASE9_TEST_RUNTIME
     if(!phase9_setup(&mining)) {
@@ -1980,7 +1980,7 @@ cleanup:
 
     free(genesis);
     free(body);
-    stn_storage_cache_release(&read_cache);free(mining.snapshot);
+    free(mining.snapshot);
     free(mining.workspace.current_bytes);
     free(mining.workspace.next_bytes);
     free(mining.template_bytes);

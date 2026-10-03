@@ -1,7 +1,6 @@
 /* Copyright (c) 2026 STN-Labz. See docs/LICENSE.md. */
 #include "stn_transaction.h"
 #include "stn_contract_transaction.h"
-#include "stn_contract_response.h"
 #include "stn_share.h"
 #include "stn_compensation.h"
 #include "stn_issuance.h"
@@ -60,13 +59,12 @@ stn_data_status stn_transaction_decode(const uint8_t *bytes,size_t length,stn_tr
     if(memcmp(bytes,magic,4)!=0)return STN_DATA_MAGIC;
     t.version=(uint16_t)stn_wire_read(bytes+4,2);t.type=(uint16_t)stn_wire_read(bytes+6,2);
     if(t.version!=1)return STN_DATA_VERSION;
-    if(t.type<STN_TX_PUBLICATION||t.type>STN_TX_CONTRACT_RESPONSE)return STN_DATA_TYPE;
+    if(t.type<STN_TX_PUBLICATION||t.type>STN_TX_BLOCK_COMPENSATION_EVIDENCE)return STN_DATA_TYPE;
     t.record_length=(uint32_t)stn_wire_read(bytes+8,4);
     if((size_t)t.record_length!=length-STN_TX_HEADER_SIZE)return STN_DATA_LENGTH;
     t.record_bytes=bytes+STN_TX_HEADER_SIZE;
     if(t.type==STN_TX_PUBLICATION){if(stn_record_decode(t.record_bytes,t.record_length,&record)!=STN_RECORD_OK)return STN_DATA_CONTENT;}
     else if(t.type==STN_TX_CONTRACT_ACTION){if(stn_contract_transaction_validate_structure(t.record_bytes,t.record_length)!=STN_CONTRACT_OK)return STN_DATA_CONTENT;}
-    else if(t.type==STN_TX_CONTRACT_RESPONSE){if(stn_contract_response_validate_structure(t.record_bytes,t.record_length)!=STN_CONTRACT_OK)return STN_DATA_CONTENT;}
     else if(t.type==STN_TX_SHARE_EVIDENCE){stn_share_evidence x;if(t.record_length!=73u&&stn_share_decode(t.record_bytes,t.record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
     else if(t.type==STN_TX_COMPENSATION_DESTINATION){stn_compensation_destination x;if(stn_compensation_destination_decode(t.record_bytes,t.record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
     else if(t.type==STN_TX_ISSUANCE){stn_issuance_record x;if(stn_issuance_decode(t.record_bytes,t.record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
@@ -84,12 +82,11 @@ stn_data_status stn_transaction_encode(const stn_transaction *tx,uint8_t *output
     stn_record r;size_t total;if(written!=NULL)*written=0;
     if(tx==NULL||output==NULL||written==NULL||tx->record_bytes==NULL)return STN_DATA_ARGUMENT;
     if(tx->version!=1)return STN_DATA_VERSION;
-    if(tx->type<STN_TX_PUBLICATION||tx->type>STN_TX_CONTRACT_RESPONSE)return STN_DATA_TYPE;
+    if(tx->type<STN_TX_PUBLICATION||tx->type>STN_TX_BLOCK_COMPENSATION_EVIDENCE)return STN_DATA_TYPE;
     if(tx->type==STN_TX_PUBLICATION&&(tx->record_length<STN_RECORD_OVERHEAD||tx->record_length>STN_RECORD_MAX_SIZE))return STN_DATA_LENGTH;
-    if(tx->type!=STN_TX_PUBLICATION&&tx->type!=STN_TX_CONTRACT_ACTION&&tx->type!=STN_TX_CONTRACT_RESPONSE&&tx->type!=STN_TX_SHARE_EVIDENCE&&tx->type!=STN_TX_COMPENSATION_DESTINATION&&tx->type!=STN_TX_ISSUANCE&&tx->type!=STN_TX_TRANSFER&&tx->type!=STN_TX_BLOCK_COMPENSATION_EVIDENCE&&(size_t)tx->record_length!=lifecycle_size(tx->type))return STN_DATA_LENGTH;
+    if(tx->type!=STN_TX_PUBLICATION&&tx->type!=STN_TX_CONTRACT_ACTION&&tx->type!=STN_TX_SHARE_EVIDENCE&&tx->type!=STN_TX_COMPENSATION_DESTINATION&&tx->type!=STN_TX_ISSUANCE&&tx->type!=STN_TX_TRANSFER&&tx->type!=STN_TX_BLOCK_COMPENSATION_EVIDENCE&&(size_t)tx->record_length!=lifecycle_size(tx->type))return STN_DATA_LENGTH;
     if(tx->type==STN_TX_PUBLICATION){if(stn_record_decode(tx->record_bytes,tx->record_length,&r)!=STN_RECORD_OK)return STN_DATA_CONTENT;}
     else if(tx->type==STN_TX_CONTRACT_ACTION){if(tx->record_length>STN_TX_CONTRACT_ACTION_MAX_SIZE||stn_contract_transaction_validate_structure(tx->record_bytes,tx->record_length)!=STN_CONTRACT_OK)return STN_DATA_CONTENT;}
-    else if(tx->type==STN_TX_CONTRACT_RESPONSE){if(stn_contract_response_validate_structure(tx->record_bytes,tx->record_length)!=STN_CONTRACT_OK)return STN_DATA_CONTENT;}
     else if(tx->type==STN_TX_SHARE_EVIDENCE){stn_share_evidence x;if(tx->record_length!=73u&&stn_share_decode(tx->record_bytes,tx->record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
     else if(tx->type==STN_TX_COMPENSATION_DESTINATION){stn_compensation_destination x;if(stn_compensation_destination_decode(tx->record_bytes,tx->record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}
     else if(tx->type==STN_TX_ISSUANCE){stn_issuance_record x;if(stn_issuance_decode(tx->record_bytes,tx->record_length,&x)!=STN_DATA_OK)return STN_DATA_CONTENT;}

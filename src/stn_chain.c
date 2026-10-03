@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include "stn_sha256.h"
 #include "stn_contract_transaction.h"
-#include "stn_contract_response_acceptance.h"
 
 /* Frozen checksums of exact qualified legacy genesis fixtures. */
 stn_data_status stn_chain_publication_activation(const stn_chain_context *c,uint64_t *height)
@@ -610,7 +609,7 @@ static stn_data_status contract_authorized(
     return STN_DATA_CONTENT;
 }
 
-stn_data_status stn_chain_contract_apply_transaction(
+static stn_data_status contract_apply_transaction(
     stn_contract_snapshot *snapshot,const stn_lifecycle_state *lifecycle,
     const stn_transaction *transaction,const stn_hash_provider *provider)
 {
@@ -629,37 +628,20 @@ stn_data_status stn_chain_contract_apply_transaction(
     if(state==NULL)return STN_DATA_ARGUMENT;
 
     if(action.action==STN_CONTRACT_ACTION_CREATE){
-        stn_address actor_address;
-        int issuer=0;
         status=stn_contract_decode(action.canonical_contract,
             action.canonical_contract_length,&current);
         if(status!=STN_CONTRACT_OK || current.state!=STN_CONTRACT_STATE_DRAFT ||
-           current.sequence!=0u || action.sequence!=0u ||
-           action.authority_evidence_length!=0u)return STN_DATA_CONTENT;
-        /* CREATE bootstraps authority: authenticate the issuer's typed identity,
-         * not a scoped grant for a contract which does not exist yet. */
-        if(stn_contract_signature_verify(action.actor,action.action,
-            action.canonical_contract,action.canonical_contract_length,
-            action.sequence,action.signature)!=STN_CONTRACT_OK)
-            return STN_DATA_CONTENT;
-        if(stn_address_derive(STN_ADDRESS_IDENTITY,action.actor,32,
-            &actor_address)!=STN_DATA_OK)return STN_DATA_PROVIDER_ERROR;
-        for(i=0;i<current.participant_count;++i){
-            stn_contract_participant participant;
-            if(stn_contract_participant_at(&current,(uint16_t)i,&participant)!=STN_CONTRACT_OK)
-                return STN_DATA_CONTENT;
-            if(participant.role==STN_CONTRACT_ROLE_ISSUER &&
-               memcmp(participant.identity,actor_address.identifier,32)==0)
-                issuer=1;
-        }
-        if(!issuer)return STN_DATA_CONTENT;
+           current.sequence!=0u)return STN_DATA_CONTENT;
+        authorized=contract_authorized(lifecycle,&action,
+            action.canonical_contract,action.canonical_contract_length,provider);
+        if(authorized!=STN_DATA_OK)return authorized;
         status=stn_contract_snapshot_register(snapshot,action.canonical_contract,
             action.canonical_contract_length,&index);
         if(status!=STN_CONTRACT_OK)
             return status==STN_CONTRACT_CAPACITY ? STN_DATA_CAPACITY : STN_DATA_CONTENT;
         state=stn_contract_snapshot_state(snapshot);
         status=stn_contract_apply_action(&state->entries[index].current,
-            action.action,1u,&next);
+            action.action,action.sequence,&next);
         if(status!=STN_CONTRACT_OK)return STN_DATA_CONTENT;
         next.participants=state->entries[index].current.participants;
         next.participant_bytes=state->entries[index].current.participant_bytes;
@@ -770,7 +752,7 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
             (tx.type==STN_TX_PUBLICATION && stn_record_decode(tx.record_bytes,tx.record_length,&record)!=STN_RECORD_OK)) {
             r.body=STN_STAGE_REJECT; return fail(r,STN_CHAIN_BODY,STN_DATA_CONTENT);
         }
-        if(tx.type==STN_TX_CONTRACT_ACTION || tx.type==STN_TX_CONTRACT_RESPONSE){has_contracts=1;}
+        if(tx.type==STN_TX_CONTRACT_ACTION){has_contracts=1;}
         else if(tx.type==STN_TX_SHARE_EVIDENCE){has_shares=1;}
         else if(tx.type==STN_TX_BLOCK_COMPENSATION_EVIDENCE){has_block_compensation=1;}
         else if(tx.type==STN_TX_COMPENSATION_DESTINATION){has_compensation=1;}
@@ -952,15 +934,10 @@ static stn_chain_report validate_candidate(const stn_chain_context *context,
                 if(failure!=STN_DATA_OK)break;
                 continue;
             }
-            if(tx.type==STN_TX_CONTRACT_RESPONSE){
-                failure=stn_contract_response_accept(candidate_contracts,prior->contracts,&tx);
-                if(failure!=STN_DATA_OK)break;
-                continue;
-            }
             if(tx.type==STN_TX_CONTRACT_ACTION){
                 const stn_lifecycle_state *authority_state=
                     has_lifecycle ? &candidate_lifecycle->state : prior->lifecycle;
-                failure=stn_chain_contract_apply_transaction(candidate_contracts,
+                failure=contract_apply_transaction(candidate_contracts,
                     authority_state,&tx,&context->hash_provider);
                 if(failure!=STN_DATA_OK)break;
                 continue;

@@ -77,13 +77,6 @@ stn_storage_status stn_storage_apply(const stn_chain_context *context,
 stn_storage_status stn_storage_extend(const stn_chain_context *context,
     const stn_storage_provider *provider,const uint8_t *block,size_t length,
     stn_storage_workspace *workspace,stn_chain_state *active);
-/* Optional byte-identical prefix validation reuse; append validation remains
- * complete and publication is still performed under provider exclusion. */
-struct stn_storage_cache;
-stn_storage_status stn_storage_extend_cached(const stn_chain_context *context,
-    const stn_storage_provider *provider,const uint8_t *block,size_t length,
-    stn_storage_workspace *workspace,stn_chain_state *active,
-    struct stn_storage_cache *cache);
 stn_storage_status stn_storage_recovery_read(const stn_chain_context *context,
     const stn_storage_provider *provider,uint8_t *scratch,size_t capacity,
     stn_storage_view *prefix,int *needs_recovery);

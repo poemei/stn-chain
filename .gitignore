@@ -9,6 +9,12 @@
 [Dd]ebug/
 [Rr]elease/
 
+# Recovery
+/stn-chain-recovery/
+
+# Dev Tools
+/tools/
+
 # Visual Studio per-user state and caches
 .vs/
 *.suo
@@ -49,7 +55,12 @@ ipch/
 Thumbs.db
 Desktop.ini
 
+# Agent Documentation
+/AGENTS.md
+
 # Local development chain and adapter sidecars
 /stn-chain-dev.stns
 /stn-chain-dev.stns.lock
 /stn-chain-dev.stns.stage
+/sentinel-test.bin
+/sentinel.py

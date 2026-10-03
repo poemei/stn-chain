@@ -3,7 +3,6 @@
 #include "stn_chain.h"
 #include "stn_contract_transaction.h"
 #include "stn_sha256.h"
-#include "stn_wire_internal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,35 +44,10 @@ static const uint8_t reject_action_signature[64]={0x98,0xa2,0x83,0x64,0xa6,0xf6,
 static const uint8_t execute_grant_signature[64]={0x94,0xce,0x05,0x51,0xa1,0x06,0x48,0xc6,0xae,0xaf,0x99,0x6b,0x48,0x03,0x5a,0xa2,0xef,0x3c,0x29,0x67,0xbd,0x4c,0x21,0x92,0x97,0xf3,0xfd,0xee,0x72,0x16,0x92,0x0f,0x96,0x91,0xf9,0xa7,0xa6,0x7a,0x02,0xfd,0x56,0x80,0x89,0x85,0xe0,0xd5,0x78,0xbf,0x9b,0xfc,0x34,0x0b,0x40,0x30,0xdc,0x0f,0xa6,0x05,0x75,0x1e,0x25,0xcb,0xfe,0x0d};
 static const uint8_t execute_action_signature[64]={0x9c,0x42,0xc4,0xf1,0xc7,0xef,0x07,0x6a,0x50,0xb0,0x0a,0xf6,0xd1,0xfb,0xe4,0xe7,0x18,0xc1,0x82,0x18,0x61,0xa3,0x02,0x64,0x1c,0xcb,0x1a,0xda,0xfe,0x20,0x0e,0x53,0x99,0xf6,0x15,0xbf,0x2c,0xda,0x11,0x59,0xf2,0xd7,0x2c,0x54,0x73,0x5d,0x7c,0xed,0xe7,0x0e,0x69,0x97,0x02,0xe5,0x7a,0x22,0xef,0x91,0x6c,0x58,0x31,0x26,0x2d,0x01};
 
-
-/* RFC 8032 test keys sign the current canonical fixture. */
-int stn_ed25519_sign(const uint8_t *,size_t,const uint8_t [32],const uint8_t [32],uint8_t [64]);
-static const uint8_t root_seed[32]={0x9d,0x61,0xb1,0x9d,0xef,0xfd,0x5a,0x60,0xba,0x84,0x4a,0xf4,0x92,0xec,0x2c,0xc4,0x44,0x49,0xc5,0x69,0x7b,0x32,0x69,0x19,0x70,0x3b,0xac,0x03,0x1c,0xae,0x7f,0x60};
-static const uint8_t two_seed[32]={0x4c,0xcd,0x08,0x9b,0x28,0xff,0x96,0xda,0x9d,0xb6,0xc3,0x46,0xec,0x11,0x4e,0x0f,0x5b,0x8a,0x31,0x9f,0x35,0xab,0xa6,0x24,0xda,0x8c,0xf6,0xed,0x4f,0xb8,0xa6,0xfb};
-static void fixture_sign_action(stn_contract_transaction *action)
-{
-    uint8_t data[STN_CONTRACT_MAX_SIZE+42],statement[STN_CONTRACT_MAX_SIZE+66];
-    size_t n=action->canonical_contract_length,written=0;
-    const uint8_t *seed=memcmp(action->actor,chain_root,32)==0?root_seed:two_seed;
-    memcpy(data,action->canonical_contract,n);memcpy(data+n,action->actor,32);
-    stn_wire_write(data+n+32,2,action->action);stn_wire_write(data+n+34,8,action->sequence);
-    CHECK(stn_identity_statement(data,n+42,statement,sizeof(statement),&written)==STN_IDENTITY_VALID);
-    CHECK(stn_ed25519_sign(statement,written,action->actor,seed,action->signature)==0);
-}
-static stn_authority_grant_result fixture_grant_encode(const uint8_t issuer[32],
-    const uint8_t evidence[97],const uint8_t unused[64],uint8_t *out,size_t cap,size_t *written)
-{
-    uint8_t statement[STN_AUTHORITY_GRANT_DOMAIN_SIZE+130],signature[64];size_t n=0;
-    (void)unused;
-    CHECK(stn_authority_grant_statement(issuer,evidence,statement,sizeof(statement),&n)==STN_AUTHORITY_VALID_GRANT);
-    CHECK(stn_ed25519_sign(statement,n,issuer,root_seed,signature)==0);
-    return stn_authority_grant_encode(issuer,evidence,signature,out,cap,written);
-}
-
 static void contract_history_majority(void)
 {
     static const uint8_t terms[]={'T'};
-    stn_contract_participant participants[4]={{0}};
+    stn_contract_participant participants[3]={{0}};
     stn_contract draft={0},current={0};
     stn_contract_transaction action={0};
     stn_transaction tx={0};
@@ -103,11 +77,9 @@ static void contract_history_majority(void)
     memcpy(participants[0].identity,chain_root,32);participants[0].role=STN_CONTRACT_ROLE_APPROVER;
     memcpy(participants[1].identity,approver_two,32);participants[1].role=STN_CONTRACT_ROLE_APPROVER;
     memcpy(participants[2].identity,approver_three,32);participants[2].role=STN_CONTRACT_ROLE_APPROVER;
-    CHECK(stn_sha256(NULL,NULL,0,chain_root,32,participants[3].identity)==STN_DATA_OK);
-    participants[3].role=STN_CONTRACT_ROLE_ISSUER;
     draft.version=STN_CONTRACT_VERSION;draft.type=STN_CONTRACT_GENERIC;
     draft.sequence=0u;draft.created_at=1u;draft.state=STN_CONTRACT_STATE_DRAFT;
-    draft.participants=participants;draft.participant_count=4u;
+    draft.participants=participants;draft.participant_count=3u;
     draft.terms=terms;draft.terms_length=(uint32_t)sizeof(terms);
     CHECK(stn_contract_encode(&draft,draft_bytes,sizeof(draft_bytes),&draft_length)==STN_CONTRACT_OK);
     CHECK(stn_contract_address(draft_bytes,draft_length,&address)==STN_CONTRACT_OK);
@@ -140,7 +112,7 @@ static void contract_history_majority(void)
     CHECK(stn_contract_authority_context(draft_bytes,draft_length,authority_context)==STN_CONTRACT_OK);
     CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
         evidence,sizeof(evidence),&evidence_length)==STN_AUTHORITY_AUTHORIZED);
-    CHECK(fixture_grant_encode(chain_root,evidence,create_grant_signature,
+    CHECK(stn_authority_grant_encode(chain_root,evidence,create_grant_signature,
         grant,sizeof(grant),&grant_length)==STN_AUTHORITY_VALID_GRANT);
     tx.version=1u;tx.type=STN_TX_AUTHORITY_GRANT;tx.record_bytes=grant;tx.record_length=(uint32_t)grant_length;
     CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -154,10 +126,10 @@ static void contract_history_majority(void)
     CHECK(stn_chain_initialize(&context,&state)==STN_DATA_OK);
     ACCEPT_HISTORY_BLOCK(0);
 
-    action.version=STN_CONTRACT_TX_VERSION;action.action=STN_CONTRACT_ACTION_CREATE;action.sequence=0u;
+    action.version=STN_CONTRACT_TX_VERSION;action.action=STN_CONTRACT_ACTION_CREATE;action.sequence=1u;
     action.canonical_contract=draft_bytes;action.canonical_contract_length=(uint32_t)draft_length;
-    memcpy(action.actor,chain_root,32);memcpy(action.signature,create_action_signature,64);fixture_sign_action(&action);
-    action.authority_evidence=action.action==STN_CONTRACT_ACTION_CREATE?NULL:evidence;action.authority_evidence_length=action.action==STN_CONTRACT_ACTION_CREATE?0u:(uint32_t)evidence_length;
+    memcpy(action.actor,chain_root,32);memcpy(action.signature,create_action_signature,64);
+    action.authority_evidence=evidence;action.authority_evidence_length=(uint32_t)evidence_length;
     CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
     tx.type=STN_TX_CONTRACT_ACTION;tx.record_bytes=action_bytes;tx.record_length=(uint32_t)action_length;
     CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -170,7 +142,7 @@ static void contract_history_majority(void)
     CHECK(stn_contract_authority_action(STN_CONTRACT_ACTION_AMEND,authority_action)==STN_CONTRACT_OK);
     CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
         evidence,sizeof(evidence),&evidence_length)==STN_AUTHORITY_AUTHORIZED);
-    CHECK(fixture_grant_encode(chain_root,evidence,amend_grant_signature,
+    CHECK(stn_authority_grant_encode(chain_root,evidence,amend_grant_signature,
         grant,sizeof(grant),&grant_length)==STN_AUTHORITY_VALID_GRANT);
     tx.type=STN_TX_AUTHORITY_GRANT;tx.record_bytes=grant;tx.record_length=(uint32_t)grant_length;
     CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -179,8 +151,8 @@ static void contract_history_majority(void)
 
     action.action=STN_CONTRACT_ACTION_AMEND;action.sequence=2u;
     action.canonical_contract=current_bytes;action.canonical_contract_length=(uint32_t)current_length;
-    memcpy(action.actor,chain_root,32);memcpy(action.signature,amend_action_signature,64);fixture_sign_action(&action);
-    action.authority_evidence=action.action==STN_CONTRACT_ACTION_CREATE?NULL:evidence;action.authority_evidence_length=action.action==STN_CONTRACT_ACTION_CREATE?0u:(uint32_t)evidence_length;
+    memcpy(action.actor,chain_root,32);memcpy(action.signature,amend_action_signature,64);
+    action.authority_evidence=evidence;action.authority_evidence_length=(uint32_t)evidence_length;
     CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
     tx.type=STN_TX_CONTRACT_ACTION;tx.record_bytes=action_bytes;tx.record_length=(uint32_t)action_length;
     CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -193,7 +165,7 @@ static void contract_history_majority(void)
     CHECK(stn_contract_authority_action(STN_CONTRACT_ACTION_APPROVE,authority_action)==STN_CONTRACT_OK);
     CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
         evidence,sizeof(evidence),&evidence_length)==STN_AUTHORITY_AUTHORIZED);
-    CHECK(fixture_grant_encode(chain_root,evidence,approve_one_grant_signature,
+    CHECK(stn_authority_grant_encode(chain_root,evidence,approve_one_grant_signature,
         grant,sizeof(grant),&grant_length)==STN_AUTHORITY_VALID_GRANT);
     tx.type=STN_TX_AUTHORITY_GRANT;tx.record_bytes=grant;tx.record_length=(uint32_t)grant_length;
     CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -202,8 +174,8 @@ static void contract_history_majority(void)
 
     action.action=STN_CONTRACT_ACTION_APPROVE;action.sequence=3u;
     action.canonical_contract=current_bytes;action.canonical_contract_length=(uint32_t)current_length;
-    memcpy(action.actor,chain_root,32);memcpy(action.signature,approve_one_action_signature,64);fixture_sign_action(&action);
-    action.authority_evidence=action.action==STN_CONTRACT_ACTION_CREATE?NULL:evidence;action.authority_evidence_length=action.action==STN_CONTRACT_ACTION_CREATE?0u:(uint32_t)evidence_length;
+    memcpy(action.actor,chain_root,32);memcpy(action.signature,approve_one_action_signature,64);
+    action.authority_evidence=evidence;action.authority_evidence_length=(uint32_t)evidence_length;
     CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
     tx.type=STN_TX_CONTRACT_ACTION;tx.record_bytes=action_bytes;tx.record_length=(uint32_t)action_length;
     CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -215,7 +187,7 @@ static void contract_history_majority(void)
     CHECK(stn_contract_encode(&current,current_bytes,sizeof(current_bytes),&current_length)==STN_CONTRACT_OK);
     CHECK(stn_authority_evidence_encode(approver_two,authority_action,authority_context,
         evidence,sizeof(evidence),&evidence_length)==STN_AUTHORITY_AUTHORIZED);
-    CHECK(fixture_grant_encode(chain_root,evidence,approve_two_grant_signature,
+    CHECK(stn_authority_grant_encode(chain_root,evidence,approve_two_grant_signature,
         grant,sizeof(grant),&grant_length)==STN_AUTHORITY_VALID_GRANT);
     tx.type=STN_TX_AUTHORITY_GRANT;tx.record_bytes=grant;tx.record_length=(uint32_t)grant_length;
     CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -224,8 +196,8 @@ static void contract_history_majority(void)
 
     action.action=STN_CONTRACT_ACTION_APPROVE;action.sequence=4u;
     action.canonical_contract=current_bytes;action.canonical_contract_length=(uint32_t)current_length;
-    memcpy(action.actor,approver_two,32);memcpy(action.signature,approve_two_action_signature,64);fixture_sign_action(&action);
-    action.authority_evidence=action.action==STN_CONTRACT_ACTION_CREATE?NULL:evidence;action.authority_evidence_length=action.action==STN_CONTRACT_ACTION_CREATE?0u:(uint32_t)evidence_length;
+    memcpy(action.actor,approver_two,32);memcpy(action.signature,approve_two_action_signature,64);
+    action.authority_evidence=evidence;action.authority_evidence_length=(uint32_t)evidence_length;
     CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
     tx.type=STN_TX_CONTRACT_ACTION;tx.record_bytes=action_bytes;tx.record_length=(uint32_t)action_length;
     CHECK(stn_transaction_encode(&tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -254,7 +226,7 @@ static void contract_history_majority(void)
 static void contract_chain_create(void)
 {
     static const uint8_t terms[]={'T'};
-    stn_contract_participant participants[4]={{0}};
+    stn_contract_participant participants[3]={{0}};
     stn_contract draft={0};
     stn_contract_transaction action={0};
     stn_transaction grant_tx={0},contract_tx={0};
@@ -296,11 +268,9 @@ static void contract_chain_create(void)
     participants[1].role=STN_CONTRACT_ROLE_APPROVER;
     memcpy(participants[2].identity,approver_three,sizeof(approver_three));
     participants[2].role=STN_CONTRACT_ROLE_APPROVER;
-    CHECK(stn_sha256(NULL,NULL,0,chain_root,32,participants[3].identity)==STN_DATA_OK);
-    participants[3].role=STN_CONTRACT_ROLE_ISSUER;
     draft.version=STN_CONTRACT_VERSION;draft.type=STN_CONTRACT_GENERIC;
     draft.sequence=0u;draft.created_at=1u;draft.state=STN_CONTRACT_STATE_DRAFT;
-    draft.participants=participants;draft.participant_count=4u;
+    draft.participants=participants;draft.participant_count=3u;
     draft.terms=terms;draft.terms_length=(uint32_t)sizeof(terms);
     CHECK(stn_contract_encode(&draft,draft_bytes,sizeof(draft_bytes),&draft_length)==STN_CONTRACT_OK);
     CHECK(stn_contract_address(draft_bytes,draft_length,&address)==STN_CONTRACT_OK);
@@ -308,7 +278,7 @@ static void contract_chain_create(void)
     CHECK(stn_contract_authority_context(draft_bytes,draft_length,authority_context)==STN_CONTRACT_OK);
     CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
         evidence,sizeof(evidence),&evidence_length)==STN_AUTHORITY_AUTHORIZED);
-    CHECK(fixture_grant_encode(chain_root,evidence,create_grant_signature,
+    CHECK(stn_authority_grant_encode(chain_root,evidence,create_grant_signature,
         grant,sizeof(grant),&grant_length)==STN_AUTHORITY_VALID_GRANT);
 
     grant_tx.version=1u;grant_tx.type=STN_TX_AUTHORITY_GRANT;
@@ -333,11 +303,11 @@ static void contract_chain_create(void)
     CHECK(stn_contract_snapshot_const_state(genesis_state.contracts)->entry_count==0u);
 
     action.version=STN_CONTRACT_TX_VERSION;action.action=STN_CONTRACT_ACTION_CREATE;
-    action.sequence=0u;action.canonical_contract=draft_bytes;
+    action.sequence=1u;action.canonical_contract=draft_bytes;
     action.canonical_contract_length=(uint32_t)draft_length;
     memcpy(action.actor,chain_root,sizeof(chain_root));
-    memcpy(action.signature,create_action_signature,sizeof(create_action_signature));fixture_sign_action(&action);
-    action.authority_evidence=action.action==STN_CONTRACT_ACTION_CREATE?NULL:evidence;action.authority_evidence_length=action.action==STN_CONTRACT_ACTION_CREATE?0u:(uint32_t)evidence_length;
+    memcpy(action.signature,create_action_signature,sizeof(create_action_signature));
+    action.authority_evidence=evidence;action.authority_evidence_length=(uint32_t)evidence_length;
     CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
     contract_tx.version=1u;contract_tx.type=STN_TX_CONTRACT_ACTION;
     contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
@@ -413,7 +383,7 @@ static void contract_chain_create(void)
         CHECK(stn_contract_authority_context(draft_bytes,draft_length,authority_context)==STN_CONTRACT_OK);
         CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
             amend_evidence,sizeof(amend_evidence),&amend_evidence_length)==STN_AUTHORITY_AUTHORIZED);
-        CHECK(fixture_grant_encode(chain_root,amend_evidence,amend_grant_signature,
+        CHECK(stn_authority_grant_encode(chain_root,amend_evidence,amend_grant_signature,
             amend_grant,sizeof(amend_grant),&amend_grant_length)==STN_AUTHORITY_VALID_GRANT);
         grant_tx.record_bytes=amend_grant;grant_tx.record_length=(uint32_t)amend_grant_length;
         CHECK(stn_transaction_encode(&grant_tx,amend_grant_tx,sizeof(amend_grant_tx),
@@ -432,7 +402,7 @@ static void contract_chain_create(void)
 
         action.action=STN_CONTRACT_ACTION_AMEND;action.sequence=2u;
         action.canonical_contract=issued_bytes;action.canonical_contract_length=(uint32_t)issued_length;
-        memcpy(action.signature,amend_action_signature,sizeof(amend_action_signature));fixture_sign_action(&action);
+        memcpy(action.signature,amend_action_signature,sizeof(amend_action_signature));
         action.authority_evidence=amend_evidence;action.authority_evidence_length=(uint32_t)amend_evidence_length;
         CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
         contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
@@ -514,7 +484,7 @@ static void contract_chain_create(void)
             CHECK(stn_contract_authority_context(draft_bytes,draft_length,authority_context)==STN_CONTRACT_OK);
             CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
                 revoke_evidence,sizeof(revoke_evidence),&revoke_evidence_length)==STN_AUTHORITY_AUTHORIZED);
-            CHECK(fixture_grant_encode(chain_root,revoke_evidence,revoke_grant_signature,
+            CHECK(stn_authority_grant_encode(chain_root,revoke_evidence,revoke_grant_signature,
                 revoke_grant,sizeof(revoke_grant),&revoke_grant_length)==STN_AUTHORITY_VALID_GRANT);
             grant_tx.record_bytes=revoke_grant;grant_tx.record_length=(uint32_t)revoke_grant_length;
             CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -533,7 +503,7 @@ static void contract_chain_create(void)
             action.canonical_contract=review_revoke_bytes;
             action.canonical_contract_length=(uint32_t)review_revoke_length;
             memcpy(action.actor,chain_root,sizeof(chain_root));
-            memcpy(action.signature,revoke_action_signature,sizeof(revoke_action_signature));fixture_sign_action(&action);
+            memcpy(action.signature,revoke_action_signature,sizeof(revoke_action_signature));
             action.authority_evidence=revoke_evidence;
             action.authority_evidence_length=(uint32_t)revoke_evidence_length;
             CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),
@@ -578,7 +548,7 @@ static void contract_chain_create(void)
             CHECK(stn_contract_authority_context(draft_bytes,draft_length,authority_context)==STN_CONTRACT_OK);
             CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
                 reject_evidence,sizeof(reject_evidence),&reject_evidence_length)==STN_AUTHORITY_AUTHORIZED);
-            CHECK(fixture_grant_encode(chain_root,reject_evidence,reject_grant_signature,
+            CHECK(stn_authority_grant_encode(chain_root,reject_evidence,reject_grant_signature,
                 reject_grant,sizeof(reject_grant),&reject_grant_length)==STN_AUTHORITY_VALID_GRANT);
             grant_tx.record_bytes=reject_grant;grant_tx.record_length=(uint32_t)reject_grant_length;
             CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -597,7 +567,7 @@ static void contract_chain_create(void)
             action.canonical_contract=review_reject_bytes;
             action.canonical_contract_length=(uint32_t)review_reject_length;
             memcpy(action.actor,chain_root,sizeof(chain_root));
-            memcpy(action.signature,reject_action_signature,sizeof(reject_action_signature));fixture_sign_action(&action);
+            memcpy(action.signature,reject_action_signature,sizeof(reject_action_signature));
             action.authority_evidence=reject_evidence;
             action.authority_evidence_length=(uint32_t)reject_evidence_length;
             CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),
@@ -637,7 +607,7 @@ static void contract_chain_create(void)
                 CHECK(stn_contract_authority_context(draft_bytes,draft_length,authority_context)==STN_CONTRACT_OK);
                 CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
                     close_evidence,sizeof(close_evidence),&close_evidence_length)==STN_AUTHORITY_AUTHORIZED);
-                CHECK(fixture_grant_encode(chain_root,close_evidence,close_grant_signature,
+                CHECK(stn_authority_grant_encode(chain_root,close_evidence,close_grant_signature,
                     close_grant,sizeof(close_grant),&close_grant_length)==STN_AUTHORITY_VALID_GRANT);
                 grant_tx.record_bytes=close_grant;grant_tx.record_length=(uint32_t)close_grant_length;
                 CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -656,7 +626,7 @@ static void contract_chain_create(void)
                 action.canonical_contract=rejected_bytes;
                 action.canonical_contract_length=(uint32_t)rejected_length;
                 memcpy(action.actor,chain_root,sizeof(chain_root));
-                memcpy(action.signature,close_action_signature,sizeof(close_action_signature));fixture_sign_action(&action);
+                memcpy(action.signature,close_action_signature,sizeof(close_action_signature));
                 action.authority_evidence=close_evidence;
                 action.authority_evidence_length=(uint32_t)close_evidence_length;
                 CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),
@@ -706,7 +676,7 @@ static void contract_chain_create(void)
             CHECK(stn_contract_authority_context(draft_bytes,draft_length,authority_context)==STN_CONTRACT_OK);
             CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
                 approve_evidence_one,sizeof(approve_evidence_one),&approve_evidence_one_length)==STN_AUTHORITY_AUTHORIZED);
-            CHECK(fixture_grant_encode(chain_root,approve_evidence_one,approve_one_grant_signature,
+            CHECK(stn_authority_grant_encode(chain_root,approve_evidence_one,approve_one_grant_signature,
                 approve_grant_one_bytes,sizeof(approve_grant_one_bytes),&approve_grant_one_length)==STN_AUTHORITY_VALID_GRANT);
             grant_tx.record_bytes=approve_grant_one_bytes;grant_tx.record_length=(uint32_t)approve_grant_one_length;
             CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -723,7 +693,7 @@ static void contract_chain_create(void)
             action.action=STN_CONTRACT_ACTION_APPROVE;action.sequence=3u;
             action.canonical_contract=review_bytes;action.canonical_contract_length=(uint32_t)review_length;
             memcpy(action.actor,chain_root,sizeof(chain_root));
-            memcpy(action.signature,approve_one_action_signature,sizeof(approve_one_action_signature));fixture_sign_action(&action);
+            memcpy(action.signature,approve_one_action_signature,sizeof(approve_one_action_signature));
             action.authority_evidence=approve_evidence_one;action.authority_evidence_length=(uint32_t)approve_evidence_one_length;
             CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
             contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
@@ -800,7 +770,7 @@ static void contract_chain_create(void)
             CHECK(stn_contract_encode(&approvals,approvals_bytes,sizeof(approvals_bytes),&approvals_length)==STN_CONTRACT_OK);
             CHECK(stn_authority_evidence_encode(approver_two,authority_action,authority_context,
                 approve_evidence_two,sizeof(approve_evidence_two),&approve_evidence_two_length)==STN_AUTHORITY_AUTHORIZED);
-            CHECK(fixture_grant_encode(chain_root,approve_evidence_two,approve_two_grant_signature,
+            CHECK(stn_authority_grant_encode(chain_root,approve_evidence_two,approve_two_grant_signature,
                 approve_grant_two_bytes,sizeof(approve_grant_two_bytes),&approve_grant_two_length)==STN_AUTHORITY_VALID_GRANT);
             grant_tx.record_bytes=approve_grant_two_bytes;grant_tx.record_length=(uint32_t)approve_grant_two_length;
             CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -817,7 +787,7 @@ static void contract_chain_create(void)
             action.sequence=4u;action.canonical_contract=approvals_bytes;
             action.canonical_contract_length=(uint32_t)approvals_length;
             memcpy(action.actor,approver_two,sizeof(approver_two));
-            memcpy(action.signature,approve_two_action_signature,sizeof(approve_two_action_signature));fixture_sign_action(&action);
+            memcpy(action.signature,approve_two_action_signature,sizeof(approve_two_action_signature));
             action.authority_evidence=approve_evidence_two;action.authority_evidence_length=(uint32_t)approve_evidence_two_length;
             CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
             contract_tx.record_bytes=action_bytes;contract_tx.record_length=(uint32_t)action_length;
@@ -842,7 +812,7 @@ static void contract_chain_create(void)
             action.sequence=4u;action.canonical_contract=approvals_bytes;
             action.canonical_contract_length=(uint32_t)approvals_length;
             memcpy(action.actor,chain_root,sizeof(chain_root));
-            memcpy(action.signature,approve_one_action_signature,sizeof(approve_one_action_signature));fixture_sign_action(&action);
+            memcpy(action.signature,approve_one_action_signature,sizeof(approve_one_action_signature));
             action.authority_evidence=approve_evidence_one;
             action.authority_evidence_length=(uint32_t)approve_evidence_one_length;
             CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),&action_length)==STN_CONTRACT_OK);
@@ -877,7 +847,7 @@ static void contract_chain_create(void)
                 CHECK(stn_contract_authority_context(draft_bytes,draft_length,authority_context)==STN_CONTRACT_OK);
                 CHECK(stn_authority_evidence_encode(chain_root,authority_action,authority_context,
                     execute_evidence,sizeof(execute_evidence),&execute_evidence_length)==STN_AUTHORITY_AUTHORIZED);
-                CHECK(fixture_grant_encode(chain_root,execute_evidence,execute_grant_signature,
+                CHECK(stn_authority_grant_encode(chain_root,execute_evidence,execute_grant_signature,
                     execute_grant,sizeof(execute_grant),&execute_grant_length)==STN_AUTHORITY_VALID_GRANT);
                 grant_tx.record_bytes=execute_grant;grant_tx.record_length=(uint32_t)execute_grant_length;
                 CHECK(stn_transaction_encode(&grant_tx,tx_bytes,sizeof(tx_bytes),&tx_length)==STN_DATA_OK);
@@ -896,7 +866,7 @@ static void contract_chain_create(void)
                 action.canonical_contract=attestation_bytes;
                 action.canonical_contract_length=(uint32_t)attestation_length;
                 memcpy(action.actor,chain_root,sizeof(chain_root));
-                memcpy(action.signature,execute_action_signature,sizeof(execute_action_signature));fixture_sign_action(&action);
+                memcpy(action.signature,execute_action_signature,sizeof(execute_action_signature));
                 action.authority_evidence=execute_evidence;
                 action.authority_evidence_length=(uint32_t)execute_evidence_length;
                 CHECK(stn_contract_transaction_encode(&action,action_bytes,sizeof(action_bytes),

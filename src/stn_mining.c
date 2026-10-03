@@ -394,7 +394,7 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
     }
 
     /* The synchronized service already owns validated accepted state. */
-    if(q->method==STN_RPC_CONTRACT_DETAIL || q->method==STN_RPC_CONTRACT_RESPONSE || q->method==STN_RPC_CONTRACT_LIST || q->method==STN_RPC_CONTRACT_STATE)
+    if(q->method==STN_RPC_CONTRACT_LIST || q->method==STN_RPC_CONTRACT_STATE)
         return s->active.has_tip ? stn_contract_query_handle(s->active.contracts,
             q,p,cap,written) : STN_RPC_UNAVAILABLE;
 
@@ -416,8 +416,8 @@ stn_rpc_code stn_mining_handle(void *user,const stn_rpc_message *q,uint8_t *p,si
         }
     }
 
-    code=storage_code(stn_storage_cache_load(
-        s->read_cache, s->chain,
+    code=storage_code(stn_storage_load(
+        s->chain,
         s->storage,
         s->snapshot,
         s->snapshot_capacity,
@@ -785,13 +785,13 @@ history_done:
             goto done;
         }
 
-        code=storage_code(stn_storage_extend_cached(
+        code=storage_code(stn_storage_extend(
             s->chain,
             s->storage,
             q->payload,
             q->length,
             &s->workspace,
-            &accepted,s->read_cache));
+            &accepted));
 
         if(code!=STN_RPC_OK){
             goto done;
@@ -1284,13 +1284,13 @@ history_done:
         goto done;
     }
 
-    code=storage_code(stn_storage_extend_cached(
+    code=storage_code(stn_storage_extend(
         s->chain,
         s->storage,
         q->payload+STN_MINING_SUBMISSION_PREFIX,
         n,
         &s->workspace,
-        &accepted,s->read_cache));
+        &accepted));
 
     if(code!=STN_RPC_OK){
         goto done;
@@ -1339,8 +1339,8 @@ history_done:
             goto done;
         }
 
-        code=storage_code(stn_storage_cache_load(
-            s->read_cache, s->chain,s->storage,s->workspace.current_bytes,
+        code=storage_code(stn_storage_load(
+            s->chain,s->storage,s->workspace.current_bytes,
             s->workspace.current_capacity,&reward_view));
         if(code!=STN_RPC_OK)goto done;
 

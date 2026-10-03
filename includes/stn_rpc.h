@@ -42,8 +42,6 @@ typedef enum stn_rpc_method {
      * from the current accepted history; it does not mean rejected or absent
      * from pending state. */
     STN_RPC_TRANSACTION_STATUS=13,
-    STN_RPC_CONTRACT_RESPONSE=14,
-    STN_RPC_CONTRACT_DETAIL=15, /* indexed accepted response; see response_query.h */
     STN_RPC_CHECK_INTELLIGENCE=0x1000,STN_RPC_SUBMIT_INTELLIGENCE=0x1001,
     STN_RPC_INTELLIGENCE_ID=0x1002,STN_RPC_INTELLIGENCE_CURSOR=0x1003,
     STN_RPC_PENDING=0x1004,STN_RPC_SUBMIT_TRANSACTION=0x1005,

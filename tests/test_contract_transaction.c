@@ -62,7 +62,6 @@ int test_contract_transaction(void)
     CHECK(decoded.authority_evidence_length==STN_AUTHORITY_EVIDENCE_SIZE);
 
     /* CREATE bootstraps a new Contract: no pre-existing Contract grant exists. */
-    participant.role=STN_CONTRACT_ROLE_APPROVER;
     contract.sequence=0u;
     contract.state=STN_CONTRACT_STATE_DRAFT;
     CHECK(stn_contract_encode(&contract,canonical,sizeof(canonical),&canonical_length)==STN_CONTRACT_OK);
